@@ -233,7 +233,6 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
           <PanelHeader
             title="Complaint volume vs resolved - 30 days"
             subtitle="Intake is outpacing resolution since 21 Aug; backlog is accumulating."
-            right={<Chip tone="crit">Backlog +</Chip>}
           />
           <div className="p-4">
             <ResponsiveContainer width="100%" height={286}>
