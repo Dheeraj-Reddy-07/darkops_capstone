@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/customer/")({
   head: () => ({
     meta: [
-      { title: "Your orders — DarkOps care" },
+      { title: "Your orders - DarkOps care" },
       {
         name: "description",
         content:
           "Track live orders, follow an open complaint and check refund status for your dark store deliveries.",
       },
-      { property: "og:title", content: "Your orders — DarkOps care" },
+      { property: "og:title", content: "Your orders - DarkOps care" },
       {
         property: "og:description", content: "Live order tracking, complaint status and refunds in one place." },
     ],

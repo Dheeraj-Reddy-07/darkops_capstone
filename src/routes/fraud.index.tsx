@@ -27,13 +27,13 @@ import {
 export const Route = createFileRoute("/fraud/")({
   head: () => ({
     meta: [
-      { title: "Fraud & risk review — DarkOps" },
+      { title: "Fraud & risk review - DarkOps" },
       {
         name: "description",
         content:
           "AI-flagged complaints and refund claims with confidence scores, risk factors and analyst decisions.",
       },
-      { property: "og:title", content: "Fraud & risk review — DarkOps" },
+      { property: "og:title", content: "Fraud & risk review - DarkOps" },
       {
         property: "og:description",
         content: "Risk queue for flagged refund claims across the dark store network.",

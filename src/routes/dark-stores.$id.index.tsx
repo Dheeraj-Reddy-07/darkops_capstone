@@ -30,12 +30,12 @@ import { useMemo } from "react";
 export const Route = createFileRoute("/dark-stores/$id/")({
   head: ({ params }) => ({
     meta: [
-      { title: `${params.id} store operations — DarkOps` },
+      { title: `${params.id} store operations - DarkOps` },
       {
         name: "description",
         content: `Dark store ${params.id}: PulseScore breakdown, equipment failures, inventory issues, work orders and live complaints.`,
       },
-      { property: "og:title", content: `${params.id} store operations — DarkOps` },
+      { property: "og:title", content: `${params.id} store operations - DarkOps` },
       {
         property: "og:description",
         content: "Store-level operational dashboard with explainable PulseScore.",
@@ -78,7 +78,7 @@ function StoreDashboard() {
   const { id } = Route.useParams();
   const { data: detailData, isLoading, error } = useStoreDetail(id);
   const { data: casesData } = useCases();
-  const networkAvgPulse = '—'; // Executive data not needed on store detail page
+  const networkAvgPulse = '-'; // Executive data not needed on store detail page
 
   const localCases = useMemo(() => {
     if (!casesData?.cases || !detailData) return [];
@@ -267,7 +267,7 @@ function StoreDashboard() {
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         <Panel>
           <PanelHeader
-            title="Equipment failures — 14 days"
+            title="Equipment failures - 14 days"
             subtitle="Failures and downtime hours; cold chain drives quality complaints."
           />
           <div className="p-4">
@@ -286,7 +286,7 @@ function StoreDashboard() {
 
         <Panel>
           <PanelHeader
-            title="Inventory issues — 14 days"
+            title="Inventory issues - 14 days"
             subtitle="Stockouts cause substitutions; mismatches cause missing-item claims."
           />
           <div className="p-4">

@@ -48,7 +48,7 @@ CREATE POLICY "pulse_scores_elevated" ON pulse_scores
 CREATE POLICY "pulse_scores_agent" ON pulse_scores
   FOR SELECT USING (get_role() IN ('OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER'));
 
--- Complaint Status History (based on complaints)
+-- Complaint Status History (based on complaints) 
 DROP POLICY IF EXISTS "complaint_status_history_customer" ON complaint_status_history;
 DROP POLICY IF EXISTS "complaint_status_history_agent" ON complaint_status_history;
 DROP POLICY IF EXISTS "complaint_status_history_elevated" ON complaint_status_history;

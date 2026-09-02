@@ -22,13 +22,13 @@ const ISSUE_CATEGORIES = [
 export const Route = createFileRoute("/customer/support")({
   head: () => ({
     meta: [
-      { title: "Report an issue — DarkOps care" },
+      { title: "Report an issue - DarkOps care" },
       {
         name: "description",
         content:
           "Report a problem with a dark store order: pick the order, choose a category, add details and track the complaint.",
       },
-      { property: "og:title", content: "Report an issue — DarkOps care" },
+      { property: "og:title", content: "Report an issue - DarkOps care" },
       {
         property: "og:description",
         content: "Raise and track a complaint on a recent grocery order.",

@@ -40,13 +40,13 @@ import { useQuery } from "@tanstack/react-query";
 export const Route = createFileRoute("/executive/")({
   head: () => ({
     meta: [
-      { title: "Executive overview — DarkOps" },
+      { title: "Executive overview - DarkOps" },
       {
         name: "description",
         content:
           "Network PulseScore, SLA compliance, refund rate and critical dark stores across 200 stores in 14 Indian cities.",
       },
-      { property: "og:title", content: "Executive overview — DarkOps" },
+      { property: "og:title", content: "Executive overview - DarkOps" },
       {
         property: "og:description",
         content: "Command center view of dark store network health and complaint resolution.",
@@ -146,7 +146,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-crit/40 bg-crit-soft/25 px-4 py-3">
         <AlertTriangle className="size-4 text-crit" />
         <p className="text-[13px] font-medium">
-          Network health declining — backlog up {EXEC_KPIS.openComplaintsDelta}%,{" "}
+          Network health declining - backlog up {EXEC_KPIS.openComplaintsDelta}%,{" "}
           {NETWORK.criticalStores} stores need intervention, {EXEC_KPIS.slaBreached} SLA breaches today.
         </p>
       </div>
@@ -231,7 +231,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_400px]">
         <Panel>
           <PanelHeader
-            title="Complaint volume vs resolved — 30 days"
+            title="Complaint volume vs resolved - 30 days"
             subtitle="Intake is outpacing resolution since 21 Aug; backlog is accumulating."
             right={<Chip tone="crit">Backlog +</Chip>}
           />
@@ -342,7 +342,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
         <Panel>
           <PanelHeader
             title="Top 5 worst stores"
-            subtitle="Lowest PulseScore — click to open the store's dashboard."
+            subtitle="Lowest PulseScore - click to open the store's dashboard."
           />
           <ul>
             {WORST_STORES.map((s) => (

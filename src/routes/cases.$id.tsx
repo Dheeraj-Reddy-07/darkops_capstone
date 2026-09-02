@@ -36,12 +36,12 @@ import {
 export const Route = createFileRoute("/cases/$id")({
   head: ({ params }) => ({
     meta: [
-      { title: `Case ${params.id} — DarkOps` },
+      { title: `Case ${params.id} - DarkOps` },
       {
         name: "description",
         content: `Case management record ${params.id}: classification, routing, SLA and resolution timeline.`,
       },
-      { property: "og:title", content: `Case ${params.id} — DarkOps` },
+      { property: "og:title", content: `Case ${params.id} - DarkOps` },
       {
         property: "og:description",
         content: "Enterprise case record with classification, routing and resolution timeline.",

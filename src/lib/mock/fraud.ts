@@ -89,7 +89,7 @@ function build(): FraudCase[] {
               {
                 at: `${istClock(40)} IST`,
                 actor: `Risk analyst · ${pick(rand, ["AG-0917", "AG-2041", "AG-1502"])}`,
-                action: `Decision recorded — ${decision}`,
+                action: `Decision recorded - ${decision}`,
               },
             ]),
       ],

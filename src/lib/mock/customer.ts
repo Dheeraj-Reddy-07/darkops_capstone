@@ -104,7 +104,7 @@ export const REFUND_REQUESTS = [
     id: "RFD-32874",
     orderId: "ORD-879654",
     amount: 120,
-    reason: "Missing item — paneer 200g",
+    reason: "Missing item - paneer 200g",
     status: "Settled" as const,
     raised: "26 Aug, 10:22 IST",
   },

@@ -8,7 +8,7 @@ import { format } from "date-fns";
 export const Route = createFileRoute("/customer/profile")({
   head: () => ({
     meta: [
-      { title: "My Profile — DarkOps" },
+      { title: "My Profile - DarkOps" },
       {
         name: "description",
         content: "View your order history, complaints, and account details.",

@@ -37,13 +37,13 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 export const Route = createFileRoute("/operations")({
   head: () => ({
     meta: [
-      { title: "Operations queue — DarkOps" },
+      { title: "Operations queue - DarkOps" },
       {
         name: "description",
         content:
           "Live case queue, SLA breaches, agent workload and priority mix for dark store complaint resolution.",
       },
-      { property: "og:title", content: "Operations queue — DarkOps" },
+      { property: "og:title", content: "Operations queue - DarkOps" },
       {
         property: "og:description",
         content: "Live complaint case queue with SLA risk, priority mix and agent workload.",
@@ -213,7 +213,7 @@ function OperationsQueue() {
       <Panel className="mt-3">
         <PanelHeader
           title="Live case queue"
-          subtitle="Sorted by SLA risk. Unassigned cases first — assign or escalate."
+          subtitle="Sorted by SLA risk. Unassigned cases first - assign or escalate."
           right={<Chip tone="warn">{kpis.awaitingAssignment} awaiting assignment</Chip>}
         />
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">

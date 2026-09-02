@@ -19,12 +19,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/fraud/$id")({
   head: ({ params }) => ({
     meta: [
-      { title: `Risk review ${params.id} — DarkOps` },
+      { title: `Risk review ${params.id} - DarkOps` },
       {
         name: "description",
         content: `Risk review for flagged complaint ${params.id}: contributing factors, evidence and claim history.`,
       },
-      { property: "og:title", content: `Risk review ${params.id} — DarkOps` },
+      { property: "og:title", content: `Risk review ${params.id} - DarkOps` },
       {
         property: "og:description",
         content: "Explainable risk scoring with analyst decision controls.",

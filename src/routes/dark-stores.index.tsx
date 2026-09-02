@@ -27,13 +27,13 @@ import {
 export const Route = createFileRoute("/dark-stores/")({
   head: () => ({
     meta: [
-      { title: "Dark store network — DarkOps" },
+      { title: "Dark store network - DarkOps" },
       {
         name: "description",
         content:
           "All 200 dark stores with PulseScore, SLA, refund rate and open issues across 14 Indian cities.",
       },
-      { property: "og:title", content: "Dark store network — DarkOps" },
+      { property: "og:title", content: "Dark store network - DarkOps" },
       {
         property: "og:description",
         content: "PulseScore, SLA and refund performance for every dark store in the network.",

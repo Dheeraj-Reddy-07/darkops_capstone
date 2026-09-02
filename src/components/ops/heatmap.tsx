@@ -64,8 +64,8 @@ export function StoreHeatmap() {
                         )}
                       </TooltipTrigger>
                       <TooltipContent side="top" className="text-xs">
-                        <span className="num">{s.id || "—"}</span> · {s.name} · PulseScore{" "}
-                        <span className="num">{s.pulse ?? "—"}</span>
+                        <span className="num">{s.id || "-"}</span> · {s.name} · PulseScore{" "}
+                        <span className="num">{s.pulse ?? "-"}</span>
                       </TooltipContent>
                     </Tooltip>
                   ))}

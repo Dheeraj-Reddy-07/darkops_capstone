@@ -9,7 +9,7 @@ import { num } from "@/lib/utils";
 export const Route = createFileRoute("/admin/")({
   head: () => ({
     meta: [
-      { title: "Admin console — DarkOps" },
+      { title: "Admin console - DarkOps" },
       { name: "description", content: "System administration dashboard for DarkOps platform." },
     ],
   }),
@@ -69,28 +69,28 @@ function AdminOverview() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
           label="Total users"
-          value={statsLoading ? "—" : num(stats?.users || 0)}
+          value={statsLoading ? "-" : num(stats?.users || 0)}
           footnote="registered profiles"
         >
           <Users className="mt-1 size-6 text-muted-foreground" />
         </KpiCard>
         <KpiCard
           label="Dark stores"
-          value={statsLoading ? "—" : num(stats?.stores || 0)}
+          value={statsLoading ? "-" : num(stats?.stores || 0)}
           footnote="network stores"
         >
           <Database className="mt-1 size-6 text-muted-foreground" />
         </KpiCard>
         <KpiCard
           label="Total complaints"
-          value={statsLoading ? "—" : num(stats?.complaints || 0)}
+          value={statsLoading ? "-" : num(stats?.complaints || 0)}
           footnote="all time"
         >
           <FileText className="mt-1 size-6 text-muted-foreground" />
         </KpiCard>
         <KpiCard
           label="Fraud reviews"
-          value={statsLoading ? "—" : num(stats?.fraud_reviews || 0)}
+          value={statsLoading ? "-" : num(stats?.fraud_reviews || 0)}
           footnote="flagged claims"
         >
           <TrendingUp className="mt-1 size-6 text-muted-foreground" />

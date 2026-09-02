@@ -17,12 +17,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/dark-stores/$id/pulse")({
   head: ({ params }) => ({
     meta: [
-      { title: `PulseScore breakdown ${params.id} — DarkOps` },
+      { title: `PulseScore breakdown ${params.id} - DarkOps` },
       {
         name: "description",
         content: `Explainable PulseScore for dark store ${params.id}: every deduction, its evidence and the recommended fix.`,
       },
-      { property: "og:title", content: `PulseScore breakdown ${params.id} — DarkOps` },
+      { property: "og:title", content: `PulseScore breakdown ${params.id} - DarkOps` },
       {
         property: "og:description",
         content: "Every PulseScore deduction with evidence and remediation.",
@@ -91,7 +91,7 @@ function PulseDetail() {
   const { id } = Route.useParams();
   const { data: detailData, isLoading, error } = useStoreDetail(id);
   const { data: execData } = useExecutive();
-  const networkAvgPulse = execData?.network?.avgPulse ?? '—';
+  const networkAvgPulse = execData?.network?.avgPulse ?? '-';
 
   if (isLoading) return <div className="p-8">Loading pulse detail...</div>;
   if (error || !detailData) return <div className="p-8 text-crit">Failed to load pulse detail.</div>;
@@ -157,7 +157,7 @@ function PulseDetail() {
 
       <Panel className="mt-3">
         <PanelHeader
-          title="PulseScore — last 30 days"
+          title="PulseScore - last 30 days"
           subtitle="Score decays as drivers accumulate; recovery follows remediation."
         />
         <div className="p-4">

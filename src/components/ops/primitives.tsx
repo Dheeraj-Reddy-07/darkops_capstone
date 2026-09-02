@@ -284,7 +284,7 @@ export function PermissionDenied({ scope }: { scope: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
       <Lock className="size-5 text-muted-foreground" />
-      <p className="text-sm font-medium text-foreground">Restricted — {scope}</p>
+      <p className="text-sm font-medium text-foreground">Restricted - {scope}</p>
       <p className="max-w-md text-xs text-muted-foreground">
         Your role (Regional Ops) does not include this permission. Request access from the network
         operations administrator.

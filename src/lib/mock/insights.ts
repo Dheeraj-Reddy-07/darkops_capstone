@@ -41,7 +41,7 @@ export const INSIGHTS: InsightAnswer[] = [
     ],
     action:
       "Escalate WO-77412 to same-day field service and divert frozen picks to Kolkata Riverside DS until the freezer clears QA.",
-    sources: "PulseScore breakdown, work orders, complaint attribution — last 7 days",
+    sources: "PulseScore breakdown, work orders, complaint attribution - last 7 days",
   },
   {
     question: "Which stores need intervention today?",
@@ -89,7 +89,7 @@ export const INSIGHTS: InsightAnswer[] = [
     ],
     action:
       "Lower the auto-approval ceiling to ₹500 for accounts with 2+ upheld flags and clear the 214 high-risk claims awaiting decision.",
-    sources: "Refund ledger, Risk & Trust queue, store refund rates — last 30 days",
+    sources: "Refund ledger, Risk & Trust queue, store refund rates - last 30 days",
   },
   {
     question: "Where are SLA breaches concentrated?",
@@ -102,7 +102,7 @@ export const INSIGHTS: InsightAnswer[] = [
       { label: "Oldest unassigned", value: "47m", tone: "warn" },
     ],
     stores: [
-      { id: "DS-2162", note: "SLA 57.3% — lowest in network" },
+      { id: "DS-2162", note: "SLA 57.3% - lowest in network" },
       { id: "DS-1525", note: "SLA 60.6%" },
       { id: "DS-1462", note: "SLA 61.9%" },
     ],
@@ -113,7 +113,7 @@ export const INSIGHTS: InsightAnswer[] = [
     ],
     action:
       "Move 40 P3 cases from the Mumbai hub to the night shift and hold P1 auto-assignment to agents under 60% load.",
-    sources: "Live case queue, agent workload by hub, SLA ledger — today",
+    sources: "Live case queue, agent workload by hub, SLA ledger - today",
   },
   {
     question: "Summarize today's network health.",
@@ -136,7 +136,7 @@ export const INSIGHTS: InsightAnswer[] = [
     ],
     action:
       "Approve emergency field service for the 5 worst stores and add 40 agents to the evening shift for the next 7 days.",
-    sources: "Executive KPI set, store network, risk queue — as of 21:40 IST",
+    sources: "Executive KPI set, store network, risk queue - as of 21:40 IST",
   },
 ];
 
@@ -155,7 +155,7 @@ export function answerFor(question: string): InsightAnswer {
   return {
     question,
     answer:
-      "No grounded answer is available for that question yet. This assistant only answers from the operational KPI set currently loaded — network health, store PulseScore, SLA, refunds and the risk queue.",
+      "No grounded answer is available for that question yet. This assistant only answers from the operational KPI set currently loaded - network health, store PulseScore, SLA, refunds and the risk queue.",
     metrics: [
       { label: "Network PulseScore", value: "78", tone: "warn" },
       { label: "Open complaints", value: "8,214", tone: "neutral" },
@@ -163,6 +163,6 @@ export function answerFor(question: string): InsightAnswer {
     stores: [],
     causes: [],
     action: "Try one of the suggested questions, or narrow the question to a store, city or KPI.",
-    sources: "Executive KPI set — as of 21:40 IST",
+    sources: "Executive KPI set - as of 21:40 IST",
   };
 }

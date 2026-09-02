@@ -7,7 +7,7 @@ import { queryClient } from "@/lib/queryClient";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — DarkOps" },
+      { title: "Sign in - DarkOps" },
       { name: "description", content: "Sign in to DarkOps Operational Intelligence Platform." },
     ],
   }),
@@ -163,7 +163,7 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Left panel — branding */}
+      {/* Left panel - branding */}
       <div className="hidden lg:flex lg:flex-col lg:w-[440px] xl:w-[520px] border-r border-border bg-surface p-12">
         <div className="flex items-center gap-2.5">
           <span className="flex size-7 items-center justify-center rounded-[5px] bg-primary/15">
@@ -183,7 +183,7 @@ function LoginPage() {
           </h1>
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xs">
             Real-time visibility into dark-store health, case operations,
-            fraud risk, and executive network analytics — in one command center.
+            fraud risk, and executive network analytics - in one command center.
           </p>
 
           <div className="mt-10 space-y-4">
@@ -205,7 +205,7 @@ function LoginPage() {
         </div>
       </div>
 
-      {/* Right panel — login form */}
+      {/* Right panel - login form */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
         {/* Mobile logo */}
         <div className="flex items-center gap-2 mb-10 lg:hidden">

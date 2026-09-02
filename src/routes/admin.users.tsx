@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/admin/users")({
   head: () => ({
     meta: [
-      { title: "User management — DarkOps Admin" },
+      { title: "User management - DarkOps Admin" },
       { name: "description", content: "Manage platform users, view roles, and update access permissions." },
     ],
   }),
@@ -155,12 +155,12 @@ function UsersPage() {
             <tbody>
               {filtered.map((user) => (
                 <tr key={user.id} className="row-hover">
-                  <Td className="text-[13px] font-medium">{user.full_name || "—"}</Td>
+                  <Td className="text-[13px] font-medium">{user.full_name || "-"}</Td>
                   <Td className="text-xs text-muted-foreground">{user.email}</Td>
                   <Td>
                     <span className="label-caps text-[10px]">{user.role?.replace(/_/g, " ")}</span>
                   </Td>
-                  <Td className="text-xs text-muted-foreground">{user.hub_city || "—"}</Td>
+                  <Td className="text-xs text-muted-foreground">{user.hub_city || "-"}</Td>
                   <Td>
                     <StatusBadge status={user.is_active !== false ? "Active" : "Inactive"} />
                   </Td>

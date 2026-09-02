@@ -16,7 +16,7 @@ import {
 export const Route = createFileRoute("/admin/audit-logs")({
   head: () => ({
     meta: [
-      { title: "Audit logs — DarkOps Admin" },
+      { title: "Audit logs - DarkOps Admin" },
       { name: "description", content: "Complete platform audit trail of all state-changing operations." },
     ],
   }),
@@ -154,7 +154,7 @@ function AuditLogsPage() {
                     <span className="label-caps text-[10px]">{log.actor_role?.replace(/_/g, " ")}</span>
                   </Td>
                   <Td className="max-w-[200px] truncate text-xs text-muted-foreground">
-                    {log.metadata ? JSON.stringify(log.metadata) : "—"}
+                    {log.metadata ? JSON.stringify(log.metadata) : "-"}
                   </Td>
                 </tr>
               ))}

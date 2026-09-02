@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 export const Route = createFileRoute("/")(({
   head: () => ({
     meta: [
-      { title: "DarkOps — Operational Intelligence Platform" },
+      { title: "DarkOps - Operational Intelligence Platform" },
       {
         name: "description",
         content:
@@ -68,7 +68,7 @@ function LandingPage() {
         <section className="mx-auto max-w-6xl px-6 py-24 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-surface px-3 py-1 text-xs text-muted-foreground mb-8">
             <span className="size-1.5 rounded-full bg-ok animate-pulse" />
-            Live — 14 dark-store network · Bengaluru metro
+            Live - 14 dark-store network · Bengaluru metro
           </div>
 
           <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl text-foreground">
@@ -79,7 +79,7 @@ function LandingPage() {
           <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground leading-relaxed">
             DarkOps gives ops managers, agents, fraud analysts, and executives a
             single command center to monitor store health, resolve complaints,
-            review fraud risk, and understand network performance — in real time.
+            review fraud risk, and understand network performance - in real time.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
@@ -101,7 +101,7 @@ function LandingPage() {
           <div className="mx-auto mt-14 max-w-3xl rounded-sm border border-border bg-surface p-5">
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
               <span className="size-1.5 rounded-full bg-ok" />
-              Network snapshot — live
+              Network snapshot - live
             </div>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-left">
               {[

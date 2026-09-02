@@ -8,7 +8,7 @@ export type CaseStatus =
   | "Assigned"
   | "In progress"
   | "Awaiting customer"
-  | "Escalated — L2"
+  | "Escalated - L2"
   | "Resolved";
 export type SlaState = "on-track" | "at-risk" | "breached";
 export type RouteKind = "Refund" | "Reorder" | "Operational investigation";
@@ -152,7 +152,7 @@ const STATUSES: CaseStatus[] = [
   "Assigned",
   "In progress",
   "Awaiting customer",
-  "Escalated — L2",
+  "Escalated - L2",
 ];
 
 function build(): CaseRecord[] {
@@ -163,7 +163,7 @@ function build(): CaseRecord[] {
     const store = pool[Math.floor(rand() * pool.length)]!;
     const c = COMPLAINTS[i % COMPLAINTS.length]!;
     const priority = pick(rand, PRIORITIES);
-    const status = i % 9 === 3 ? "Escalated — L2" : pick(rand, STATUSES);
+    const status = i % 9 === 3 ? "Escalated - L2" : pick(rand, STATUSES);
     const agentId = status === "Unassigned" ? null : pick(rand, AGENTS).id;
     const ageMins = intBetween(rand, 12, 380);
     const sla: SlaState = ageMins > 240 ? "breached" : ageMins > 150 ? "at-risk" : "on-track";
@@ -253,7 +253,7 @@ export const PENDING_STATUS_MIX = [
 export function caseTimeline(c: CaseRecord): TimelineEvent[] {
   const t = (mins: number) => `${istClock(mins)} IST`;
   const routed: TimelineEvent = {
-    label: `Routed — ${c.type}`,
+    label: `Routed - ${c.type}`,
     detail:
       c.type === "Refund"
         ? `Refund of ₹${c.refundAmount.toLocaleString("en-IN")} queued for risk review`
@@ -320,8 +320,8 @@ export function caseTimeline(c: CaseRecord): TimelineEvent[] {
     detail:
       c.status === "Resolved"
         ? c.resolution
-        : `Pending — SLA deadline ${c.slaDueIST} IST`,
-    at: c.status === "Resolved" ? t(c.ageMins - 60) : "—",
+        : `Pending - SLA deadline ${c.slaDueIST} IST`,
+    at: c.status === "Resolved" ? t(c.ageMins - 60) : "-",
     state: c.status === "Resolved" ? "done" : "pending",
     tone: c.sla === "breached" ? "crit" : "info",
   });
