@@ -233,7 +233,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
           <PanelHeader
             title="Complaint volume vs resolved — 30 days"
             subtitle="Intake is outpacing resolution since 21 Aug; backlog is accumulating."
-            right={<Chip tone="crit">Backlog +{num(BACKLOG_DELTA)}</Chip>}
+            right={<Chip tone="crit">Backlog +</Chip>}
           />
           <div className="p-4">
             <ResponsiveContainer width="100%" height={286}>
@@ -273,7 +273,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
         <Panel>
           <PanelHeader
             title="Red alerts"
-            subtitle="Needs a leadership decision in the next 4 hours."
+            subtitle="Needs a leadership decision."
           />
           <div className="max-h-64 overflow-y-auto">
             <ul>
