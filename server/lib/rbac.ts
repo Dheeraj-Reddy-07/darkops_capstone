@@ -4,7 +4,7 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   PLATFORM_ADMIN: [
     'cases.read.all', 'cases.read.assigned', 'cases.create', 'cases.assign', 'cases.escalate', 'cases.resolve', 'cases.comment',
     'stores.read.all', 'stores.read.own', 'stores.manage',
-    'fraud.read', 'fraud.review', 'fraud.decide',
+    'support.read', 'support.review', 'support.decide',
     'executive.read',
     'customers.read.own', 'customers.create_complaint',
     'orders.read.all', 'orders.read.own',
@@ -15,19 +15,19 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     'executive.read',
     'cases.read.all',
     'stores.read.all',
-    'fraud.read',
+    'support.read',
     'orders.read.all',
     'work_orders.read.all'
   ],
   OPERATIONS: [
     'cases.read.all', 'cases.read.assigned', 'cases.assign', 'cases.escalate', 'cases.resolve', 'cases.comment',
     'stores.read.all',
-    'fraud.read',
+    'support.read',
     'orders.read.all',
     'work_orders.read.all', 'work_orders.manage'
   ],
-  FRAUD_ANALYST: [
-    'fraud.read', 'fraud.review', 'fraud.decide',
+  CUSTOMER_SUPPORT: [
+    'support.read', 'support.review', 'support.decide',
     'cases.comment',
     'orders.read.all'
   ],

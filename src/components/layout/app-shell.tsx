@@ -40,8 +40,8 @@ const NAV_BY_ROLE: Record<string, Array<{ label: string; to: string; match?: str
     { label: "Operations", to: "/operations" },
     { label: "Dark Stores", to: "/dark-stores" },
   ],
-  FRAUD_ANALYST: [
-    { label: "Fraud", to: "/fraud" },
+  CUSTOMER_SUPPORT: [
+    { label: "Customer Support", to: "/fraud" },
   ],
   STORE_MANAGER: [
     { label: "My Store", to: "/dark-stores" },

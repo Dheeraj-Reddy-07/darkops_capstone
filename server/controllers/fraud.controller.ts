@@ -114,7 +114,7 @@ export const makeFraudDecision = async (req: Request, res: Response, next: NextF
     await logAudit({
       actorId: auth.user.id,
       actorRole: auth.user.role,
-      action: 'fraud.decide',
+      action: 'support.decide',
       resourceType: 'fraud_review',
       resourceId: id,
       metadata: { decision }

@@ -17,7 +17,7 @@ export const Route = createFileRoute("/login")({
 const DEMO_ROLES = [
   { label: "Executive", email: "exec@darkops.com", color: "text-primary" },
   { label: "Operations", email: "manager@darkops.com", color: "text-ok" },
-  { label: "Fraud Analyst", email: "fraud@darkops.com", color: "text-crit" },
+  { label: "Customer Support", email: "support@darkops.com", color: "text-crit" },
   { label: "Store Manager", email: "storemanager@darkops.com", color: "text-warn" },
   { label: "Platform Admin", email: "admin@darkops.com", color: "text-muted-foreground" },
   { label: "Customer", email: "customer@darkops.com", color: "text-info" },

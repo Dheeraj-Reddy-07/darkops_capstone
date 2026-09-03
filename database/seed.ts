@@ -24,7 +24,7 @@ async function seed() {
     { email: "admin@darkops.com", name: "System Admin", role: "PLATFORM_ADMIN" },
     { email: "exec@darkops.com", name: "Network Exec", role: "EXECUTIVE" },
     { email: "manager@darkops.com", name: "Ops Manager", role: "OPERATIONS" },
-    { email: "fraud@darkops.com", name: "Risk Analyst", role: "FRAUD_ANALYST" },
+    { email: "support@darkops.com", name: "Customer Support", role: "CUSTOMER_SUPPORT" },
     { email: "customer@darkops.com", name: "Test Customer", role: "CUSTOMER" },
     { email: "storemanager@darkops.com", name: "Store Manager", role: "STORE_MANAGER" },
   ];
@@ -370,7 +370,7 @@ async function seed() {
   const notificationRows: any[] = [];
   const operationsProfileId = createdProfiles["manager@darkops.com"]?.id;
   const storeManagerProfileId = createdProfiles["storemanager@darkops.com"]?.id;
-  const fraudProfileId = createdProfiles["fraud@darkops.com"]?.id;
+  const supportProfileId = createdProfiles["support@darkops.com"]?.id;
   
   // Operations notifications for high-priority cases
   const highPriorityCases = complaintRows.filter(c => c.priority === 'P1' && c.status !== 'resolved');
@@ -411,13 +411,13 @@ async function seed() {
     });
   }
   
-  // Fraud analyst notifications for high-risk cases
+  // Customer support notifications for high-risk cases
   const highRiskFraud = fraudRows.filter((f: any) => f.risk_confidence >= 90);
   highRiskFraud.slice(0, 2).forEach((f: any) => {
-    if (fraudProfileId) {
+    if (supportProfileId) {
       notificationRows.push({
-        recipient_id: fraudProfileId,
-        title: `High-risk fraud review required (${f.risk_confidence}% confidence)`,
+        recipient_id: supportProfileId,
+        title: `High-risk case review required (${f.risk_confidence}% confidence)`,
         meta: JSON.stringify({ fraud_review_id: f.id, confidence: f.risk_confidence }),
         link_type: "fraud",
         link_ref: f.id,

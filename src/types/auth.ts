@@ -2,10 +2,8 @@ export type AppRole =
   | 'PLATFORM_ADMIN'
   | 'EXECUTIVE'
   | 'OPERATIONS'
-  | 'OPERATIONS_AGENT'
-  | 'OPERATIONS_MANAGER'
-  | 'FRAUD_ANALYST'
   | 'STORE_MANAGER'
+  | 'CUSTOMER_SUPPORT'
   | 'CUSTOMER';
 
 export type AppPermission =
@@ -23,10 +21,10 @@ export type AppPermission =
   | 'stores.read.own'
   | 'stores.manage'
   
-  // Fraud
-  | 'fraud.read'
-  | 'fraud.review'
-  | 'fraud.decide'
+  // Customer Support
+  | 'support.read'
+  | 'support.review'
+  | 'support.decide'
   
   // Executive
   | 'executive.read'
