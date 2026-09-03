@@ -143,9 +143,9 @@ const OVERRIDES: Record<
   "Bengaluru|Ring Road DS": {
     id: "DS-1525",
     manager: "K. Reddy",
-    breakdown: { equipment: 12, sla: 21, refunds: 14, delivery: 12, picker: 5, inventory: 4 },
-    sla: 60.6,
-    refundRate: 9.2,
+    breakdown: { equipment: 0, sla: 0, refunds: 1, delivery: 0, picker: 2, inventory: 0 },
+    sla: 100,
+    refundRate: 0.5,
   },
   "Kochi|Airport Road DS": {
     id: "DS-1714",
