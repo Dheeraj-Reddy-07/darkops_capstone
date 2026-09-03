@@ -38,6 +38,7 @@ import customersRoutes from './routes/customers.routes';
 import searchRoutes from './routes/search.routes';
 import adminRoutes from './routes/admin.routes';
 import notificationsRoutes from './routes/notifications.routes';
+import supportRoutes from './routes/support.routes';
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/cases', casesRoutes);
@@ -48,6 +49,7 @@ app.use('/api/v1/customers', customersRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
+app.use('/api/v1/support', supportRoutes);
 
 // Centralized error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

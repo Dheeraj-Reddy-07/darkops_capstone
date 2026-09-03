@@ -1,7 +1,7 @@
 import { AppRole } from "@/types/auth";
 
 export const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
-  ADMIN: [
+  PLATFORM_ADMIN: [
     'executive.read',
     'cases.read.all', 'cases.read.assigned', 'cases.create', 'cases.assign', 'cases.escalate', 'cases.resolve',
     'stores.read.all', 'stores.manage',
@@ -26,19 +26,8 @@ export const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
     'orders.read.all',
     'work_orders.read.all', 'work_orders.manage'
   ],
-  OPERATIONS_MANAGER: [
-    'cases.read.all', 'cases.read.assigned', 'cases.assign', 'cases.escalate', 'cases.resolve',
-    'stores.read.all',
-    'fraud.read',
-    'orders.read.all',
-    'work_orders.read.all', 'work_orders.manage'
-  ],
-  OPERATIONS_AGENT: [
-    'cases.read.assigned', 'cases.escalate', 'cases.resolve',
-    'orders.read.all'
-  ],
-  FRAUD_ANALYST: [
-    'fraud.read', 'fraud.decide',
+  CUSTOMER_SUPPORT: [
+    'support.read', 'support.review', 'support.decide',
     'cases.comment',
     'orders.read.all'
   ],
@@ -58,6 +47,7 @@ export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/operations': ['cases.read.all', 'cases.read.assigned'],
   '/cases': ['cases.read.all', 'cases.read.assigned'],
   '/fraud': ['fraud.read'],
+  '/support': ['support.read'],
   '/dark-stores': ['stores.read.all', 'stores.read.own'],
   '/admin': ['admin.users'],
   '/customer': ['customers.read.own'],

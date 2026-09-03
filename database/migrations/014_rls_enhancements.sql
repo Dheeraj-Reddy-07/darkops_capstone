@@ -32,7 +32,7 @@ DROP POLICY IF EXISTS "store_metrics_agent" ON store_metrics_snapshots;
 CREATE POLICY "store_metrics_manager" ON store_metrics_snapshots
   FOR SELECT USING (get_role() = 'STORE_MANAGER' AND store_id = (SELECT store_id FROM profiles WHERE id = auth.uid()));
 CREATE POLICY "store_metrics_elevated" ON store_metrics_snapshots
-  FOR SELECT USING (get_role() IN ('EXECUTIVE','OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER','FRAUD_ANALYST','PLATFORM_ADMIN'));
+  FOR SELECT USING (get_role() IN ('EXECUTIVE','OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER','CUSTOMER_SUPPORT','PLATFORM_ADMIN'));
 CREATE POLICY "store_metrics_agent" ON store_metrics_snapshots
   FOR SELECT USING (get_role() IN ('OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER'));
 
@@ -44,7 +44,7 @@ DROP POLICY IF EXISTS "pulse_scores_agent" ON pulse_scores;
 CREATE POLICY "pulse_scores_manager" ON pulse_scores
   FOR SELECT USING (get_role() = 'STORE_MANAGER' AND store_id = (SELECT store_id FROM profiles WHERE id = auth.uid()));
 CREATE POLICY "pulse_scores_elevated" ON pulse_scores
-  FOR SELECT USING (get_role() IN ('EXECUTIVE','OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER','FRAUD_ANALYST','PLATFORM_ADMIN'));
+  FOR SELECT USING (get_role() IN ('EXECUTIVE','OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER','CUSTOMER_SUPPORT','PLATFORM_ADMIN'));
 CREATE POLICY "pulse_scores_agent" ON pulse_scores
   FOR SELECT USING (get_role() IN ('OPERATIONS','OPERATIONS_AGENT','OPERATIONS_MANAGER'));
 
@@ -64,7 +64,7 @@ CREATE POLICY "complaint_status_history_agent" ON complaint_status_history
     complaint_id IN (SELECT id FROM complaints WHERE assigned_agent_id = auth.uid())
   );
 CREATE POLICY "complaint_status_history_elevated" ON complaint_status_history
-  FOR SELECT USING (get_role() IN ('OPERATIONS','FRAUD_ANALYST','EXECUTIVE','PLATFORM_ADMIN'));
+  FOR SELECT USING (get_role() IN ('OPERATIONS','CUSTOMER_SUPPORT','EXECUTIVE','PLATFORM_ADMIN'));
 
 -- Complaint Comments (based on complaints)
 DROP POLICY IF EXISTS "complaint_comments_customer" ON complaint_comments;
@@ -83,11 +83,11 @@ CREATE POLICY "complaint_comments_agent" ON complaint_comments
     complaint_id IN (SELECT id FROM complaints WHERE assigned_agent_id = auth.uid())
   );
 CREATE POLICY "complaint_comments_elevated" ON complaint_comments
-  FOR SELECT USING (get_role() IN ('OPERATIONS','FRAUD_ANALYST','EXECUTIVE','PLATFORM_ADMIN'));
+  FOR SELECT USING (get_role() IN ('OPERATIONS','CUSTOMER_SUPPORT','EXECUTIVE','PLATFORM_ADMIN'));
 CREATE POLICY "complaint_comments_mutate" ON complaint_comments
   FOR INSERT WITH CHECK (
     (get_role() = 'OPERATIONS' AND complaint_id IN (SELECT id FROM complaints WHERE assigned_agent_id = auth.uid())) OR
-    (get_role() IN ('OPERATIONS','FRAUD_ANALYST','PLATFORM_ADMIN'))
+    (get_role() IN ('OPERATIONS','CUSTOMER_SUPPORT','PLATFORM_ADMIN'))
   );
 
 -- Fraud Risk Factors (based on fraud_reviews)
@@ -95,7 +95,7 @@ DROP POLICY IF EXISTS "fraud_risk_factors_elevated" ON fraud_risk_factors;
 CREATE POLICY "fraud_risk_factors_elevated" ON fraud_risk_factors
   FOR SELECT USING (
     fraud_review_id IN (SELECT id FROM fraud_reviews) AND
-    get_role() IN ('FRAUD_ANALYST','OPERATIONS','PLATFORM_ADMIN')
+    get_role() IN ('CUSTOMER_SUPPORT','OPERATIONS','PLATFORM_ADMIN')
   );
 
 -- Fraud Review History (based on fraud_reviews)
@@ -103,7 +103,7 @@ DROP POLICY IF EXISTS "fraud_review_history_elevated" ON fraud_review_history;
 CREATE POLICY "fraud_review_history_elevated" ON fraud_review_history
   FOR SELECT USING (
     fraud_review_id IN (SELECT id FROM fraud_reviews) AND
-    get_role() IN ('FRAUD_ANALYST','OPERATIONS','PLATFORM_ADMIN')
+    get_role() IN ('CUSTOMER_SUPPORT','OPERATIONS','PLATFORM_ADMIN')
   );
 
 -- Audit Logs (append-only, admin only)

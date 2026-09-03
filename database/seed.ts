@@ -48,7 +48,7 @@ async function seed() {
     // Profile doesn't exist, try to create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: tu.email,
-      password: "demo123",
+      password: "password123",
     });
     
     if (authError) {

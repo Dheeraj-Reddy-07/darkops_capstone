@@ -41,7 +41,7 @@ const NAV_BY_ROLE: Record<string, Array<{ label: string; to: string; match?: str
     { label: "Dark Stores", to: "/dark-stores" },
   ],
   CUSTOMER_SUPPORT: [
-    { label: "Customer Support", to: "/fraud" },
+    { label: "Customer Support", to: "/support" },
   ],
   STORE_MANAGER: [
     { label: "My Store", to: "/dark-stores" },
@@ -89,7 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navItems = NAV_BY_ROLE[userRole] || DEFAULT_NAV;
   
   // Roles that should have search access (can search stores, cases, complaints)
-  const canSearch = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER'].includes(userRole);
+  const canSearch = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER', 'CUSTOMER_SUPPORT'].includes(userRole);
   
   const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();

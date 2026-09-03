@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from '../lib/supabase';
 import { logAudit } from '../services/audit.service';
 import { HTTPError } from '../middleware/errors';
+import { processComplaint } from '../services/automation.service';
 
 export const getCustomerOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -164,6 +165,11 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
     }
 
     console.log('[createComplaint] Complaint created successfully');
+
+    // Trigger automation processing (async, don't wait for it)
+    processComplaint(complaintId).catch(err => {
+      console.error('[createComplaint] Automation processing error:', err);
+    });
 
     await logAudit({
       actorId: auth.user.id,

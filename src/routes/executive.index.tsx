@@ -112,9 +112,6 @@ function ExecutiveOverview() {
 }
 
 function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: string; setTimeFilter: (val: string) => void }) {
-  const { data: execData, isLoading: execLoading } = useExecutive(true);
-  const { data: storesData, isLoading: storesLoading } = useStores();
-  
   const { data: userProfile } = useQuery({
     queryKey: ['current-user'],
     queryFn: async () => {
@@ -133,7 +130,15 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
   });
   
   const userRole = userProfile?.role as string;
-  const canAccessStores = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER'].includes(userRole);
+  const canAccessExecutive = ['PLATFORM_ADMIN', 'EXECUTIVE'].includes(userRole);
+  
+  // Only fetch executive data if user has permission
+  const { data: execData, isLoading: execLoading } = useExecutive(canAccessExecutive);
+  const { data: storesData, isLoading: storesLoading } = useStores(canAccessExecutive);
+
+  if (!canAccessExecutive) {
+    return <div className="p-8 text-center text-muted-foreground">You don't have permission to view executive metrics.</div>;
+  }
 
   if (execLoading || storesLoading) return <div className="p-8">Loading executive metrics...</div>;
   if (!execData || !storesData) return <div className="p-8 text-crit">Failed to load metrics.</div>;

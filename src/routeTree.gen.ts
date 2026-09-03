@@ -23,8 +23,10 @@ import { Route as DarkStoresIndexRouteImport } from './routes/dark-stores.index'
 import { Route as ExecutiveIndexRouteImport } from './routes/executive.index'
 import { Route as FraudIndexRouteImport } from './routes/fraud.index'
 import { Route as FraudIdRouteImport } from './routes/fraud.$id'
+import { Route as SupportIndexRouteImport } from './routes/support.index'
 import { Route as DarkStoresIdIndexRouteImport } from './routes/dark-stores.$id.index'
 import { Route as DarkStoresIdPulseRouteImport } from './routes/dark-stores.$id.pulse'
+import { Route as SupportTicketsIdRouteImport } from './routes/support.tickets.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -96,6 +98,11 @@ const FraudIdRoute = FraudIdRouteImport.update({
   path: '/fraud/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SupportIndexRoute = SupportIndexRouteImport.update({
+  id: '/support/',
+  path: '/support/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DarkStoresIdIndexRoute = DarkStoresIdIndexRouteImport.update({
   id: '/dark-stores/$id/',
   path: '/dark-stores/$id/',
@@ -104,6 +111,11 @@ const DarkStoresIdIndexRoute = DarkStoresIdIndexRouteImport.update({
 const DarkStoresIdPulseRoute = DarkStoresIdPulseRouteImport.update({
   id: '/dark-stores/$id/pulse',
   path: '/dark-stores/$id/pulse',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportTicketsIdRoute = SupportTicketsIdRouteImport.update({
+  id: '/support/tickets/$id',
+  path: '/support/tickets/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -122,7 +134,9 @@ export interface FileRoutesByFullPath {
   '/dark-stores/': typeof DarkStoresIndexRoute
   '/executive/': typeof ExecutiveIndexRoute
   '/fraud/': typeof FraudIndexRoute
+  '/support/': typeof SupportIndexRoute
   '/dark-stores/$id/pulse': typeof DarkStoresIdPulseRoute
+  '/support/tickets/$id': typeof SupportTicketsIdRoute
   '/dark-stores/$id/': typeof DarkStoresIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -140,7 +154,9 @@ export interface FileRoutesByTo {
   '/dark-stores': typeof DarkStoresIndexRoute
   '/executive': typeof ExecutiveIndexRoute
   '/fraud': typeof FraudIndexRoute
+  '/support': typeof SupportIndexRoute
   '/dark-stores/$id/pulse': typeof DarkStoresIdPulseRoute
+  '/support/tickets/$id': typeof SupportTicketsIdRoute
   '/dark-stores/$id': typeof DarkStoresIdIndexRoute
 }
 export interface FileRoutesById {
@@ -159,7 +175,9 @@ export interface FileRoutesById {
   '/dark-stores/': typeof DarkStoresIndexRoute
   '/executive/': typeof ExecutiveIndexRoute
   '/fraud/': typeof FraudIndexRoute
+  '/support/': typeof SupportIndexRoute
   '/dark-stores/$id/pulse': typeof DarkStoresIdPulseRoute
+  '/support/tickets/$id': typeof SupportTicketsIdRoute
   '/dark-stores/$id/': typeof DarkStoresIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -179,7 +197,9 @@ export interface FileRouteTypes {
     | '/dark-stores/'
     | '/executive/'
     | '/fraud/'
+    | '/support/'
     | '/dark-stores/$id/pulse'
+    | '/support/tickets/$id'
     | '/dark-stores/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -197,7 +217,9 @@ export interface FileRouteTypes {
     | '/dark-stores'
     | '/executive'
     | '/fraud'
+    | '/support'
     | '/dark-stores/$id/pulse'
+    | '/support/tickets/$id'
     | '/dark-stores/$id'
   id:
     | '__root__'
@@ -215,7 +237,9 @@ export interface FileRouteTypes {
     | '/dark-stores/'
     | '/executive/'
     | '/fraud/'
+    | '/support/'
     | '/dark-stores/$id/pulse'
+    | '/support/tickets/$id'
     | '/dark-stores/$id/'
   fileRoutesById: FileRoutesById
 }
@@ -234,7 +258,9 @@ export interface RootRouteChildren {
   DarkStoresIndexRoute: typeof DarkStoresIndexRoute
   ExecutiveIndexRoute: typeof ExecutiveIndexRoute
   FraudIndexRoute: typeof FraudIndexRoute
+  SupportIndexRoute: typeof SupportIndexRoute
   DarkStoresIdPulseRoute: typeof DarkStoresIdPulseRoute
+  SupportTicketsIdRoute: typeof SupportTicketsIdRoute
   DarkStoresIdIndexRoute: typeof DarkStoresIdIndexRoute
 }
 
@@ -338,6 +364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FraudIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/support/': {
+      id: '/support/'
+      path: '/support'
+      fullPath: '/support/'
+      preLoaderRoute: typeof SupportIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dark-stores/$id/': {
       id: '/dark-stores/$id/'
       path: '/dark-stores/$id'
@@ -350,6 +383,13 @@ declare module '@tanstack/react-router' {
       path: '/dark-stores/$id/pulse'
       fullPath: '/dark-stores/$id/pulse'
       preLoaderRoute: typeof DarkStoresIdPulseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support/tickets/$id': {
+      id: '/support/tickets/$id'
+      path: '/support/tickets/$id'
+      fullPath: '/support/tickets/$id'
+      preLoaderRoute: typeof SupportTicketsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -370,7 +410,9 @@ const rootRouteChildren: RootRouteChildren = {
   DarkStoresIndexRoute: DarkStoresIndexRoute,
   ExecutiveIndexRoute: ExecutiveIndexRoute,
   FraudIndexRoute: FraudIndexRoute,
+  SupportIndexRoute: SupportIndexRoute,
   DarkStoresIdPulseRoute: DarkStoresIdPulseRoute,
+  SupportTicketsIdRoute: SupportTicketsIdRoute,
   DarkStoresIdIndexRoute: DarkStoresIdIndexRoute,
 }
 export const routeTree = rootRouteImport

@@ -15,6 +15,7 @@ const ISSUE_CATEGORIES = [
   { key: "late_delivery", label: "Late delivery", hint: "The order arrived after the promised time" },
   { key: "damaged_item", label: "Damaged item", hint: "Packaging or contents were damaged" },
   { key: "quality_issue", label: "Quality issue", hint: "Spoiled, expired or thawed product" },
+  { key: "reorder", label: "Request reorder", hint: "Send the same order again (within 24 hours)" },
   { key: "payment_issue", label: "Payment issue", hint: "Charge, refund or wallet problem" },
   { key: "other", label: "Other", hint: "Something else about this order" },
 ];

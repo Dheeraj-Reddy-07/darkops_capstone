@@ -40,7 +40,7 @@ function statusFor(pulse: number): StoreStatus {
   return "healthy";
 }
 
-export function useStores() {
+export function useStores(enabled: boolean = true) {
   return useQuery({
     queryKey: ['stores'],
     queryFn: async () => {
@@ -104,5 +104,6 @@ export function useStores() {
         worstStores,
       };
     },
+    enabled,
   });
 }
