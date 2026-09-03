@@ -272,57 +272,73 @@ async function seed() {
   }));
   await supabase.from("fraud_reviews").upsert(fraudRows, { onConflict: "id" });
 
-  // 11. Pulse Scores - correlated with store metrics
-  const pulseRows = STORES.map((s) => {
-    // Calculate pulse score based on breakdown components
-    const equipmentScore = Math.min(100, s.breakdown.equipment * 20); // 0-5 -> 0-100
-    const slaScore = Math.min(100, s.breakdown.sla * 20);
-    const refundsScore = Math.min(100, (100 - s.breakdown.refunds) * 1.5); // lower refunds = higher score
-    const deliveryScore = Math.min(100, s.breakdown.delivery * 20);
-    const pickerScore = Math.min(100, s.breakdown.picker * 20);
-    const inventoryScore = Math.min(100, s.breakdown.inventory * 20);
-    
-    // Weighted average for overall pulse
-    const pulse = Math.round(
-      (equipmentScore * 0.25 + 
-       slaScore * 0.25 + 
-       refundsScore * 0.2 + 
-       deliveryScore * 0.15 + 
-       pickerScore * 0.1 + 
-       inventoryScore * 0.05)
-    );
+  // 11. Store Metrics Snapshots - calculate from actual operational metrics first
+  await supabase.from("store_metrics_snapshots").delete().in('store_id', STORES.map(s => s.id));
+  const metricsRows = STORES.map((s) => {
+    // Use the actual metrics from the store data
+    const slaPct = s.sla || 95;
+    const refundRatePct = s.refundRate || 5;
+    const equipmentFailures14d = s.equipmentFailures14d || 0;
+    const inventoryIssues = s.inventoryIssues || 0;
+    const deliveryDelays = s.deliveryDelays || 0;
+    const pickerDelayMins = s.pickerDelayMins || 2;
+    const avgResolutionMins = s.avgResolutionMins || 60;
+    const openIssues = s.openIssues || 0;
     
     return {
       store_id: s.id,
+      sla_pct: slaPct,
+      refund_rate_pct: refundRatePct,
+      equipment_failures_14d: equipmentFailures14d,
+      inventory_issues: inventoryIssues,
+      delivery_delays: deliveryDelays,
+      picker_delay_mins: pickerDelayMins,
+      avg_resolution_mins: avgResolutionMins,
+      open_issues: openIssues,
+    };
+  });
+  await supabase.from("store_metrics_snapshots").upsert(metricsRows, { onConflict: "store_id" });
+
+  // 12. Pulse Scores - calculate from actual metrics using real formula
+  await supabase.from("pulse_scores").delete().in('store_id', STORES.map(s => s.id));
+  const pulseRows = metricsRows.map((m) => {
+    // Calculate deduction points from actual metrics
+    // Equipment: each failure = 3 points
+    const equipmentPts = Math.min(30, m.equipment_failures_14d * 3);
+    
+    // SLA: each % below 95 = 0.5 points
+    const slaPts = Math.max(0, (95 - m.sla_pct) * 0.5);
+    
+    // Refunds: each % above 2 = 1 point
+    const refundsPts = Math.max(0, (m.refund_rate_pct - 2) * 1);
+    
+    // Delivery: each delay > 20min = 0.5 points
+    const deliveryPts = Math.min(20, m.delivery_delays * 0.5);
+    
+    // Picker: each minute above 2.5 = 2 points
+    const pickerPts = Math.max(0, (m.picker_delay_mins - 2.5) * 2);
+    
+    // Inventory: each issue = 1 point
+    const inventoryPts = Math.min(15, m.inventory_issues * 1);
+    
+    // Total deduction
+    const totalDeduction = equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
+    
+    // Pulse score = 100 - total deduction (min 0, max 100)
+    const pulse = Math.max(0, Math.min(100, Math.round(100 - totalDeduction)));
+    
+    return {
+      store_id: m.store_id,
       score: pulse,
-      equipment_pts: equipmentScore,
-      sla_pts: slaScore,
-      refunds_pts: refundsScore,
-      delivery_pts: deliveryScore,
-      picker_pts: pickerScore,
-      inventory_pts: inventoryScore,
+      equipment_pts: Math.round(equipmentPts),
+      sla_pts: Math.round(slaPts),
+      refunds_pts: Math.round(refundsPts),
+      delivery_pts: Math.round(deliveryPts),
+      picker_pts: Math.round(pickerPts),
+      inventory_pts: Math.round(inventoryPts),
     };
   });
   await supabase.from("pulse_scores").upsert(pulseRows, { onConflict: "store_id" });
-
-  // 12. Store Metrics Snapshots - correlated with pulse scores
-  await supabase.from("store_metrics_snapshots").delete().in('store_id', STORES.map(s => s.id));
-  const metricsRows = pulseRows.map((p) => {
-    // Derive metrics from pulse score for consistency
-    const slaPct = Math.min(100, Math.max(70, p.score + 10)); // Higher pulse = better SLA
-    const refundRatePct = Math.max(0.5, Math.min(8, (100 - p.score) / 10)); // Lower pulse = higher refunds
-    const openIssues = Math.max(0, Math.floor((100 - p.score) / 20)); // Lower pulse = more issues
-    const avgResolutionMins = Math.max(15, Math.floor((100 - p.score) * 0.8 + 30)); // Lower pulse = slower resolution
-    
-    return {
-      store_id: p.store_id,
-      sla_pct: slaPct,
-      refund_rate_pct: refundRatePct,
-      open_issues: openIssues,
-      avg_resolution_mins: avgResolutionMins,
-    };
-  });
-  await supabase.from("store_metrics_snapshots").insert(metricsRows);
 
   // 13. Work Orders - correlated with store health (more issues for low pulse stores)
   const workOrderRows = pulseRows
