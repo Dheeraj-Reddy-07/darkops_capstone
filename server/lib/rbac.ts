@@ -29,7 +29,8 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   CUSTOMER_SUPPORT: [
     'support.read', 'support.review', 'support.decide',
     'cases.comment',
-    'orders.read.all'
+    'orders.read.all',
+    'customers.read.own',
   ],
   STORE_MANAGER: [
     'stores.read.own',

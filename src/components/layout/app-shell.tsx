@@ -1,17 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, Calendar, ChevronDown, Search, LogOut, User, Settings } from "lucide-react";
+import { Bell, Calendar, ChevronDown, LogOut, User, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { useSearch } from "@/hooks/useSearch";
+
+import { useNotifications, useUnreadCount, useMarkAsRead } from "@/hooks/useNotifications";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -41,7 +34,7 @@ const NAV_BY_ROLE: Record<string, Array<{ label: string; to: string; match?: str
     { label: "Dark Stores", to: "/dark-stores" },
   ],
   CUSTOMER_SUPPORT: [
-    { label: "Customer Support", to: "/support" },
+    { label: "My Queue", to: "/support" },
   ],
   STORE_MANAGER: [
     { label: "My Store", to: "/dark-stores" },
@@ -57,18 +50,14 @@ const DEFAULT_NAV = [
   { label: "Fraud", to: "/fraud" },
 ] as const;
 
-const RANGES = ["Last 24 hours", "Last 7 days", "Last 30 days", "Quarter to date"];
+
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const [openSearch, setOpenSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const { data: searchResults } = useSearch(searchQuery);
-  const [range, setRange] = useState("Last 30 days");
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   
   // Fetch current user profile
-  const { data: userProfile } = useQuery({
+  const { data: userProfile, isLoading } = useQuery({
     queryKey: ['current-user'],
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
@@ -85,11 +74,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     },
   });
   
-  const userRole = (userProfile?.role as string) || 'EXECUTIVE';
-  const navItems = NAV_BY_ROLE[userRole] || DEFAULT_NAV;
+  // Fetch notifications
+  const { data: notifications } = useNotifications();
+  const { data: unreadCount } = useUnreadCount();
+  const { mutate: markAsRead } = useMarkAsRead();
+  
+  const userRole = (userProfile?.role as string);
+  const navItems = userRole ? (NAV_BY_ROLE[userRole] || DEFAULT_NAV) : (isLoading ? [] : DEFAULT_NAV);
+  
+  const defaultPath = userRole === 'OPERATIONS' ? '/operations' : 
+                      userRole === 'PLATFORM_ADMIN' ? '/admin' : 
+                      userRole === 'CUSTOMER_SUPPORT' ? '/support' :
+                      userRole === 'STORE_MANAGER' ? '/dark-stores' : '/executive';
+  
+  // Workspace label shown in the navbar (role-contextual)
+  const workspaceLabel = userRole === 'CUSTOMER_SUPPORT' ? 'Support' :
+                         userRole === 'OPERATIONS' ? 'Operations' :
+                         userRole === 'STORE_MANAGER' ? 'Store Ops' :
+                         userRole === 'EXECUTIVE' ? 'Executive' :
+                         userRole === 'PLATFORM_ADMIN' ? 'Admin' :
+                         'Operational Intelligence';
   
   // Roles that should have search access (can search stores, cases, complaints)
-  const canSearch = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER', 'CUSTOMER_SUPPORT'].includes(userRole);
+  const canSearch = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER', 'CUSTOMER_SUPPORT'].includes(userRole || 'EXECUTIVE');
   
   const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();
@@ -99,16 +106,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: '/login' });
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setOpenSearch((v) => !v);
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
 
   const isActive = (item: { label: string; to: string; match?: string }) => {
     const base = "match" in item && item.match ? item.match : item.to;
@@ -119,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-5">
-          <Link to="/executive" className="flex items-center gap-2.5">
+          <Link to={defaultPath} className="flex items-center gap-2.5">
             <span className="flex size-6 items-center justify-center rounded-[4px] bg-primary/15">
               <span className="size-2.5 rounded-[2px] bg-primary" />
             </span>
@@ -128,7 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
           <span className="label-caps hidden rounded-sm border border-border px-2 py-1 lg:inline-block">
-            Operational Intelligence
+            {workspaceLabel}
           </span>
 
           <nav className="ml-2 flex items-center gap-0.5">
@@ -149,27 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {canSearch && (
-              <>
-                <button
-                  onClick={() => setOpenSearch(true)}
-                  className="hidden h-8 w-64 items-center gap-2 rounded-sm border border-border bg-surface px-2.5 text-xs text-muted-foreground hover:border-input xl:flex"
-                >
-                  <Search className="size-3.5" />
-                  Search store, case or complaint…
-                  <kbd className="num ml-auto rounded-[3px] border border-border px-1 text-[10px]">
-                    ⌘K
-                  </kbd>
-                </button>
-                <button
-                  onClick={() => setOpenSearch(true)}
-                  className="flex size-8 items-center justify-center rounded-sm border border-border bg-surface text-muted-foreground xl:hidden"
-                  aria-label="Search"
-                >
-                  <Search className="size-3.5" />
-                </button>
-              </>
-            )}
+
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -178,36 +155,59 @@ export function AppShell({ children }: { children: ReactNode }) {
                   aria-label="Notifications"
                 >
                   <Bell className="size-4" />
-                  <span className="num absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-surface-3 text-[10px] font-semibold text-muted-foreground">
-                    0
-                  </span>
+                  {unreadCount && unreadCount > 0 ? (
+                    <span className="num absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  ) : null}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel className="label-caps">Operational alerts</DropdownMenuLabel>
+                <DropdownMenuLabel className="label-caps">Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="py-8 text-center text-[13px] text-muted-foreground">
-                  No new alerts
-                </div>
+                {notifications && notifications.length > 0 ? (
+                  <div className="flex flex-col max-h-96 overflow-y-auto">
+                    {notifications.slice(0, 10).map((notification: any) => (
+                      <DropdownMenuItem 
+                        key={notification.id} 
+                        className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                        onSelect={() => {
+                          if (!notification.is_read) {
+                            markAsRead(notification.id);
+                          }
+                          if (notification.link_type === 'complaint') {
+                            navigate({ to: '/cases/$id', params: { id: notification.link_ref } });
+                          } else if (notification.link_type === 'support_ticket') {
+                            navigate({ to: '/support/tickets/$id', params: { id: notification.link_ref } });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <span className={cn(
+                            "size-2 rounded-full shrink-0",
+                            !notification.is_read ? "bg-primary" : "bg-transparent"
+                          )} />
+                          <span className={cn(
+                            "text-xs truncate", 
+                            !notification.is_read ? "font-medium" : "text-muted-foreground"
+                          )}>
+                            {notification.title}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground ml-4 line-clamp-2">
+                          {notification.meta}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-[13px] text-muted-foreground">
+                    No new notifications
+                  </div>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex h-8 items-center gap-2 rounded-sm border border-border bg-surface px-2.5 text-xs text-foreground">
-                  <Calendar className="size-3.5 text-muted-foreground" />
-                  {range}
-                  <ChevronDown className="size-3.5 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {RANGES.map((r) => (
-                  <DropdownMenuItem key={r} onSelect={() => setRange(r)}>
-                    {r}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -238,79 +238,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <CommandDialog open={openSearch} onOpenChange={setOpenSearch}>
-        <CommandInput 
-          placeholder="Search stores, cases, complaints…" 
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-        />
-        <CommandList>
-          {searchQuery.length < 2 && <CommandEmpty>Type at least 2 characters to search.</CommandEmpty>}
-          {searchQuery.length >= 2 && searchResults && (
-            <>
-              {(!searchResults.stores?.length && !searchResults.cases?.length && !searchResults.fraud?.length) && (
-                <CommandEmpty>No matching operational record found.</CommandEmpty>
-              )}
-              {searchResults.stores?.length > 0 && (
-                <CommandGroup heading="Dark stores">
-                  {searchResults.stores.map((s: any) => (
-                    <CommandItem
-                      key={s.id}
-                      value={`${s.id} ${s.name} ${s.city}`}
-                      onSelect={() => {
-                        if (s.id) {
-                          setOpenSearch(false);
-                          navigate({ to: "/dark-stores/$id", params: { id: s.id } });
-                        }
-                      }}
-                    >
-                      <span className="num text-muted-foreground">{s.id}</span>
-                      <span>{s.name}</span>
-                      <span className="ml-auto text-xs text-muted-foreground">{s.city}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-              {searchResults.cases?.length > 0 && (
-                <CommandGroup heading="Cases">
-                  {searchResults.cases.map((c: any) => (
-                    <CommandItem
-                      key={c.id}
-                      value={`${c.id} ${c.complaint_id} ${c.summary}`}
-                      onSelect={() => {
-                        setOpenSearch(false);
-                        navigate({ to: "/cases/$id", params: { id: c.id } });
-                      }}
-                    >
-                      <span className="num text-muted-foreground">{c.complaint_id}</span>
-                      <span>{c.summary}</span>
-                      <span className="num ml-auto text-xs text-muted-foreground">{c.store_id}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-              {searchResults.fraud?.length > 0 && (
-                <CommandGroup heading="Risk queue">
-                  {searchResults.fraud.map((f: any) => (
-                    <CommandItem
-                      key={f.id}
-                      value={`${f.id} ${f.customer_name} fraud risk`}
-                      onSelect={() => {
-                        setOpenSearch(false);
-                        navigate({ to: "/fraud/$id", params: { id: f.id } });
-                      }}
-                    >
-                      <span className="num text-muted-foreground">{f.id}</span>
-                      <span>{f.customer_name}</span>
-                      <span className="num ml-auto text-xs text-muted-foreground">{f.confidence_score}%</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-            </>
-          )}
-        </CommandList>
-      </CommandDialog>
 
       <main className="mx-auto max-w-[1600px] px-5 py-5">{children}</main>
     </div>

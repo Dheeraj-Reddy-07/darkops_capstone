@@ -69,6 +69,7 @@ const tooltipStyle = {
   border: "1px solid var(--border)",
   borderRadius: 6,
   fontSize: 12,
+  color: "var(--popover-foreground)",
 };
 
 function PulseDial({ score }: { score: number }) {
@@ -131,6 +132,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
   
   const userRole = userProfile?.role as string;
   const canAccessExecutive = ['PLATFORM_ADMIN', 'EXECUTIVE'].includes(userRole);
+  const canAccessStores = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER'].includes(userRole);
   
   // Only fetch executive data if user has permission
   const { data: execData, isLoading: execLoading } = useExecutive(canAccessExecutive);
@@ -251,7 +253,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="day" interval={4} {...axis} />
                 <YAxis {...axis} width={52} />
-                <RTooltip contentStyle={tooltipStyle} />
+                <RTooltip contentStyle={tooltipStyle} itemStyle={{ color: "var(--popover-foreground)" }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={9} />
                 <Area
                   type="monotone"
@@ -336,7 +338,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="city" {...axis} interval={0} angle={0} height={40} />
                 <YAxis {...axis} width={52} />
-                <RTooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--surface-2)" }} />
+                <RTooltip contentStyle={tooltipStyle} itemStyle={{ color: "var(--popover-foreground)" }} cursor={{ fill: "var(--surface-2)" }} />
                 <Bar dataKey="complaints" name="Complaints" fill="var(--chart-1)" maxBarSize={34} />
               </BarChart>
             </ResponsiveContainer>

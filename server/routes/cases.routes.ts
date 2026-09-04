@@ -11,11 +11,11 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/metrics', rateLimit(50, 60000), getOperationsMetrics);
+router.get('/agents', rateLimit(30, 60000), requirePermission(['cases.assign', 'cases.read.all']), getAgents);
 router.get('/', rateLimit(50, 60000), requirePermission(['cases.read.all', 'cases.read.assigned']), getCases);
 router.get('/:id', rateLimit(50, 60000), requirePermission(['cases.read.all', 'cases.read.assigned']), getCaseById);
 router.post('/:id/assign', rateLimit(20, 60000), requirePermission('cases.assign'), validateBody(AssignCaseSchema), assignCaseHandler);
 router.post('/:id/escalate', rateLimit(20, 60000), requirePermission('cases.escalate'), validateBody(EscalateCaseSchema), escalateCaseHandler);
 router.post('/:id/resolve', rateLimit(20, 60000), requirePermission('cases.resolve'), validateBody(ResolveCaseSchema), resolveCaseHandler);
-router.get('/agents', rateLimit(30, 60000), requirePermission(['cases.assign', 'cases.read.all']), getAgents);
 
 export default router;

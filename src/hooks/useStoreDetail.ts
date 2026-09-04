@@ -43,30 +43,31 @@ export function useStoreDetail(id: string) {
         breakdown,
       };
 
-      const series = Array.from({ length: 14 }, (_, i) => {
-        // Generate realistic time-series data with some variation
-        const baseFailures = row.metrics?.equipment_failures_14d || 0;
-        const baseStockouts = row.metrics?.inventory_issues || 0;
-        
-        // Add variation based on day index to create a realistic trend
-        const dayVariation = Math.sin(i * 0.5) * 2;
-        const failures = Math.max(0, Math.round(baseFailures / 14 + dayVariation + Math.random() * 2));
-        const stockouts = Math.max(0, Math.round(baseStockouts / 14 + dayVariation * 0.5 + Math.random()));
+      const history = row.pulseHistory || [];
+      const recentHistory = history.slice(-14);
+      
+      const series = recentHistory.map((p: any) => {
+        const date = new Date(p.calculated_at);
+        const failures = Math.round(p.equipment_pts / 3);
+        const stockouts = p.inventory_pts;
         
         return {
-          day: `${16 + i} Aug`,
+          day: `${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}`,
           failures,
-          downtime: Math.round(failures * 1.5 + Math.random() * 3),
+          downtime: Math.round(failures * 1.5 + Math.random() * 2), // We still estimate downtime based on failures since it's not stored
           stockouts,
           mismatches: Math.round(stockouts * 0.3 + Math.random()),
         };
       });
 
-      const trend = Array.from({ length: 90 }, (_, i) => ({
-        t: i,
-        label: `D-${90 - i}`,
-        score: pulse + (i % 10 - 5) * 2,
-      }));
+      const trend = history.map((p: any) => {
+        const date = new Date(p.calculated_at);
+        return {
+          t: new Date(p.calculated_at).getTime(),
+          label: `${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}`,
+          score: p.score,
+        };
+      });
 
       return { store, series, trend };
     },

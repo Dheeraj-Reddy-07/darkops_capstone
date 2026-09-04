@@ -60,6 +60,8 @@ function StoreNetwork() {
 
   const { data, isLoading, error } = useStores();
 
+  const [visibleRows, setVisibleRows] = useState(60);
+
   // Derive unique cities and zones from store data
   const cities = useMemo(() => {
     if (!data?.stores) return [];
@@ -72,6 +74,9 @@ function StoreNetwork() {
   }, [data?.stores]);
 
   const rows = useMemo(() => {
+    // When filters change, reset the visible rows count
+    setVisibleRows(60);
+    
     if (!data?.stores) return [];
     return data.stores.filter((s) => {
         if (city !== "all" && s.city !== city) return false;
@@ -88,7 +93,6 @@ function StoreNetwork() {
             s.manager.toLowerCase().includes(q)
           );
         }
-        return true;
         return true;
       }).sort((a, b) => a.pulse - b.pulse);
   }, [data, city, zone, status, band, query]);
@@ -231,7 +235,7 @@ function StoreNetwork() {
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 60).map((s) => (
+              {rows.slice(0, visibleRows).map((s) => (
                 <tr
                   key={s.id}
                   className={cn(
@@ -275,10 +279,18 @@ function StoreNetwork() {
             </tbody>
           </TableShell>
         )}
-        {rows.length > 60 ? (
-          <p className="num border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-            Showing first 60 of {rows.length} matching stores
-          </p>
+        {rows.length > visibleRows ? (
+          <div className="flex items-center justify-between border-t border-border px-4 py-2.5">
+            <p className="num text-xs text-muted-foreground">
+              Showing first {visibleRows} of {rows.length} matching stores
+            </p>
+            <button
+              onClick={() => setVisibleRows(prev => Math.min(rows.length, prev + 60))}
+              className="rounded-sm border border-border bg-surface-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Show more
+            </button>
+          </div>
         ) : null}
       </Panel>
     </>

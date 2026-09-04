@@ -8,7 +8,7 @@ DarkOps is a comprehensive operational intelligence platform for dark store netw
 - **Operations Queue**: Live case management with SLA risk prioritization, agent workload balancing, and automated escalation
 - **Dark Store Network**: Detailed store performance metrics, equipment health monitoring, and work order management
 - **Fraud Detection**: AI-powered fraud review system with confidence scoring and decision tracking
-- **Role-Based Access Control**: Granular permissions for EXECUTIVE, OPERATIONS, FRAUD_ANALYST, STORE_MANAGER, and CUSTOMER roles
+- **Role-Based Access Control**: Granular permissions for PLATFORM_ADMIN, EXECUTIVE, OPERATIONS, CUSTOMER_SUPPORT, STORE_MANAGER, and CUSTOMER roles
 
 ## 🛠️ Tech Stack
 
@@ -97,7 +97,7 @@ The backend API will be available at `http://localhost:5000`
 | PLATFORM_ADMIN | admin@darkops.com | demo123 |
 | EXECUTIVE | exec@darkops.com | demo123 |
 | OPERATIONS | manager@darkops.com | demo123 |
-| FRAUD_ANALYST | fraud@darkops.com | demo123 |
+| CUSTOMER_SUPPORT | agent.a@darkops.com | demo123 |
 | STORE_MANAGER | storemanager@darkops.com | demo123 |
 | CUSTOMER | customer@darkops.com | demo123 |
 
@@ -138,7 +138,7 @@ darkops_capstone/
 - **PLATFORM_ADMIN**: Full system access
 - **EXECUTIVE**: Read access to all dashboards
 - **OPERATIONS**: Case management, store monitoring
-- **FRAUD_ANALYST**: Fraud review access
+- **CUSTOMER_SUPPORT**: Support agent workspace, ticket resolution
 - **STORE_MANAGER**: Own store management
 - **CUSTOMER**: Personal order/complaint access
 

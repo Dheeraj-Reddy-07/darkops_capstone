@@ -1,37 +1,49 @@
 import { Request, Response, NextFunction } from 'express';
-import { createSupabaseServerClient } from '../lib/supabase';
+import { createSupabaseServiceRoleClient } from '../lib/supabase';
 import { DeterministicInsightsProvider } from '../services/insights.service';
 
 export const getMetrics = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServerClient(req, res);
+    // Use service role to bypass RLS — auth is already verified by middleware before this runs
+    const supabase = createSupabaseServiceRoleClient();
     
     // Get basic counts and pulse data
-    const [{ count: storeCount }, { data: pulseData }, { count: activeCases }] = await Promise.all([
+    const [{ count: storeCount }, { data: rawPulseData }, { count: activeCases }] = await Promise.all([
       supabase.from('stores').select('*', { count: 'exact', head: true }),
-      supabase.from('pulse_scores').select('score, store_id'),
+      supabase.from('pulse_scores').select('score, store_id, calculated_at'),
       supabase.from('complaints').select('*', { count: 'exact', head: true }).in('status', ['unassigned', 'assigned', 'in_progress', 'escalated_l2'])
     ]);
+
+    // Group pulse data by store and take the latest
+    const latestPulseScores = new Map<string, any>();
+    if (rawPulseData) {
+      rawPulseData.forEach(p => {
+        const existing = latestPulseScores.get(p.store_id);
+        if (!existing || new Date(p.calculated_at).getTime() > new Date(existing.calculated_at).getTime()) {
+          latestPulseScores.set(p.store_id, p);
+        }
+      });
+    }
+    const pulseData = Array.from(latestPulseScores.values());
 
     // Calculate pulse metrics
     let avgPulse = 0;
     let criticalStores = 0;
     let atRiskStores = 0;
     
-    if (pulseData && pulseData.length > 0) {
+    if (pulseData.length > 0) {
       const sum = pulseData.reduce((acc, curr) => acc + curr.score, 0);
       avgPulse = Math.round(sum / pulseData.length);
       criticalStores = pulseData.filter(p => p.score < 60).length;
       atRiskStores = pulseData.filter(p => p.score >= 60 && p.score < 80).length;
     }
 
-    // Get city-level stats
+    // Count distinct cities across all stores (is_active is not reliably set by seed)
     const { data: storesByCity } = await supabase
       .from('stores')
-      .select('city')
-      .is('is_active', true);
-    
-    const cityCount = new Set(storesByCity?.map(s => s.city) || []).size;
+      .select('city');
+
+    const cityCount = new Set(storesByCity?.map((s) => s.city) || []).size;
 
     // Get city stats for city-wise complaints
     const { data: cityComplaints } = await supabase
@@ -92,21 +104,26 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
         id,
         name,
         city,
-        pulse_scores!inner(score),
+        pulse_scores!inner(score, calculated_at),
         store_metrics_snapshots!inner(sla_pct, refund_rate_pct)
-      `)
-      .order('pulse_scores(score)', { ascending: true })
-      .limit(5);
+      `);
 
-    const worstStores = worstStoresData?.map((s: any) => ({
-      id: s.id,
-      name: s.name,
-      city: s.city,
-      pulse: s.pulse_scores?.[0]?.score || 0,
-      sla: s.store_metrics_snapshots?.[0]?.sla_pct || 0,
-      refundRate: s.store_metrics_snapshots?.[0]?.refund_rate_pct || 0,
-      prevPulse: s.pulse_scores?.[0]?.score || 0, // Will need historical data for true previous
-    })) || [];
+    const worstStores = worstStoresData?.map((s: any) => {
+      // Sort pulse scores descending so we get the most recent one first
+      const sortedPulseScores = s.pulse_scores?.sort((a: any, b: any) => new Date(b.calculated_at).getTime() - new Date(a.calculated_at).getTime()) || [];
+      const currentPulse = sortedPulseScores[0]?.score || 0;
+      const prevPulse = sortedPulseScores[7]?.score || currentPulse; // ~7 days ago
+
+      return {
+        id: s.id,
+        name: s.name,
+        city: s.city,
+        pulse: currentPulse,
+        sla: s.store_metrics_snapshots?.[0]?.sla_pct || 0,
+        refundRate: s.store_metrics_snapshots?.[0]?.refund_rate_pct || 0,
+        prevPulse: prevPulse, 
+      };
+    }).sort((a, b) => a.pulse - b.pulse).slice(0, 5) || [];
 
     // Get red alerts
     const { data: alerts } = await supabase

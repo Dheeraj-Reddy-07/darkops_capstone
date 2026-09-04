@@ -16,7 +16,7 @@ export const getStores = async (req: Request, res: Response, next: NextFunction)
           sla_pct, refund_rate_pct, open_issues, avg_resolution_mins
         ),
         pulse_scores (
-          score, equipment_pts, sla_pts, refunds_pts, delivery_pts, picker_pts, inventory_pts
+          score, equipment_pts, sla_pts, refunds_pts, delivery_pts, picker_pts, inventory_pts, calculated_at
         )
       `, { count: 'exact' });
 
@@ -32,13 +32,18 @@ export const getStores = async (req: Request, res: Response, next: NextFunction)
     const { data, error, count } = await dbQuery;
     if (error) throw new HTTPError(500, 'DATABASE_ERROR', `Database error: ${error.message}`);
 
-    const formattedData = data.map(store => ({
-      ...store,
-      metrics: store.store_metrics_snapshots?.[0] || null,
-      pulse_scores: store.pulse_scores?.[0] || null,
-      pulse: store.pulse_scores?.[0]?.score || null,
-      store_metrics_snapshots: undefined,
-    }));
+    const formattedData = data.map(store => {
+      // Sort pulse scores descending so we get the most recent one first
+      const sortedPulseScores = store.pulse_scores?.sort((a: any, b: any) => new Date(b.calculated_at).getTime() - new Date(a.calculated_at).getTime()) || [];
+      
+      return {
+        ...store,
+        metrics: store.store_metrics_snapshots?.[0] || null,
+        pulse_scores: sortedPulseScores[0] || null,
+        pulse: sortedPulseScores[0]?.score || null,
+        store_metrics_snapshots: undefined,
+      };
+    });
 
     res.status(200).json({
       data: formattedData,
@@ -78,7 +83,8 @@ export const getStoreById = async (req: Request, res: Response, next: NextFuncti
     const formattedData = {
       ...data,
       metrics: data.store_metrics_snapshots?.[0] || null,
-      pulse: data.pulse_scores?.[0] || null,
+      pulse: data.pulse_scores?.sort((a: any, b: any) => new Date(b.calculated_at).getTime() - new Date(a.calculated_at).getTime())[0] || null,
+      pulseHistory: data.pulse_scores?.sort((a: any, b: any) => new Date(a.calculated_at).getTime() - new Date(b.calculated_at).getTime()) || [],
       store_metrics_snapshots: undefined,
       pulse_scores: undefined
     };

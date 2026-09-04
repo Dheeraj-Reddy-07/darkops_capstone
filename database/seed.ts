@@ -25,6 +25,9 @@ async function seed() {
     { email: "exec@darkops.com", name: "Network Exec", role: "EXECUTIVE" },
     { email: "manager@darkops.com", name: "Ops Manager", role: "OPERATIONS" },
     { email: "support@darkops.com", name: "Customer Support", role: "CUSTOMER_SUPPORT" },
+    { email: "agent.a@darkops.com", name: "Priya Sharma", role: "CUSTOMER_SUPPORT" },
+    { email: "agent.b@darkops.com", name: "Rohan Mehta", role: "CUSTOMER_SUPPORT" },
+    { email: "agent.c@darkops.com", name: "Sneha Patel", role: "CUSTOMER_SUPPORT" },
     { email: "customer@darkops.com", name: "Test Customer", role: "CUSTOMER" },
     { email: "storemanager@darkops.com", name: "Store Manager", role: "STORE_MANAGER" },
   ];
@@ -45,42 +48,57 @@ async function seed() {
       continue;
     }
     
-    // Profile doesn't exist, try to create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Profile doesn't exist — use admin API (service role) to create auth user immediately,
+    // bypassing email confirmation. This is required for seed accounts.
+    const { data: adminAuthData, error: adminAuthError } = await supabase.auth.admin.createUser({
       email: tu.email,
       password: "password123",
+      email_confirm: true,         // marks email as confirmed immediately
+      user_metadata: { full_name: tu.name },
     });
-    
-    if (authError) {
-      console.log(`Auth User creation error for ${tu.email}: ${authError.message}`);
-      // Create profile with deterministic ID for demo purposes
-      const userId = `user-${tu.email.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+    if (adminAuthError) {
+      // If admin create failed (e.g. user already exists in auth but not profiles), try to list user
+      console.warn(`Admin createUser failed for ${tu.email}: ${adminAuthError.message}`);
+
+      // Attempt to look up existing auth user by email via admin listUsers
+      const { data: listData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const existingAuthUser = listData?.users?.find((u: any) => u.email === tu.email);
+
+      if (existingAuthUser) {
+        const profileData: any = {
+          id: existingAuthUser.id,
+          email: tu.email,
+          full_name: tu.name,
+          role: tu.role,
+          store_id: tu.role === "STORE_MANAGER" ? "DS-1462" : null,
+        };
+        const { error: profileErr } = await supabase.from("profiles").upsert(profileData);
+        if (profileErr) console.error(`Profile upsert error for ${tu.email}:`, profileErr.message);
+        else {
+          createdProfiles[tu.email] = profileData;
+          console.log(`Recovered existing auth user for ${tu.email}: ${existingAuthUser.id}`);
+        }
+      } else {
+        console.error(`Could not create or find auth user for ${tu.email} — skipping.`);
+      }
+      continue;
+    }
+
+    const userId = adminAuthData.user?.id;
+    if (userId) {
       const profileData: any = {
         id: userId,
         email: tu.email,
         full_name: tu.name,
         role: tu.role,
-        store_id: tu.role === "STORE_MANAGER" ? "DS-1462" : null
+        store_id: tu.role === "STORE_MANAGER" ? "DS-1462" : null,
       };
-      
       const { error: profileErr } = await supabase.from("profiles").upsert(profileData);
-      if (profileErr) console.error("Profile insertion error:", profileErr.message);
-      else createdProfiles[tu.email] = { ...profileData };
-    } else {
-      const userId = authData.user?.id;
-      
-      if (userId) {
-        const profileData: any = {
-          id: userId,
-          email: tu.email,
-          full_name: tu.name,
-          role: tu.role,
-          store_id: tu.role === "STORE_MANAGER" ? "DS-1462" : null
-        };
-        
-        const { error: profileErr } = await supabase.from("profiles").upsert(profileData);
-        if (profileErr) console.error("Profile insertion error:", profileErr.message);
-        else createdProfiles[tu.email] = { ...profileData };
+      if (profileErr) console.error(`Profile upsert error for ${tu.email}:`, profileErr.message);
+      else {
+        createdProfiles[tu.email] = profileData;
+        console.log(`Created auth user + profile for ${tu.email}: ${userId}`);
       }
     }
   }
@@ -94,6 +112,7 @@ async function seed() {
     manager_name: s.manager,
     pickers_on_shift: s.pickers,
     riders_assigned: s.riders,
+    is_active: true,
     manager_profile_id: s.id === "DS-1462" ? createdProfiles["storemanager@darkops.com"]?.id : null
   }));
   await supabase.from("stores").upsert(storeRows);
@@ -297,48 +316,64 @@ async function seed() {
       open_issues: openIssues,
     };
   });
-  await supabase.from("store_metrics_snapshots").upsert(metricsRows, { onConflict: "store_id" });
+  await supabase.from("store_metrics_snapshots").insert(metricsRows);
 
   // 12. Pulse Scores - calculate from actual metrics using real formula
   await supabase.from("pulse_scores").delete().in('store_id', STORES.map(s => s.id));
-  const pulseRows = metricsRows.map((m) => {
-    // Calculate deduction points from actual metrics
-    // Equipment: each failure = 3 points
-    const equipmentPts = Math.min(30, m.equipment_failures_14d * 3);
+  const pulseRows = metricsRows.flatMap((m) => {
+    // We will generate 30 days of historical pulse scores
+    const history = [];
     
-    // SLA: each % below 95 = 0.5 points
-    const slaPts = Math.max(0, (95 - m.sla_pct) * 0.5);
+    // We want a slight trend. Generate a random delta (-2 to 2) per day
+    // We'll calculate the base (today's) points first:
+    const equipmentBase = Math.round(Math.min(25, m.equipment_failures_14d * 3));
+    const slaBase = Math.round(Math.min(25, Math.max(0, (95 - m.sla_pct) * 0.5)));
+    const refundsBase = Math.round(Math.min(20, Math.max(0, (m.refund_rate_pct - 2) * 1)));
+    const deliveryBase = Math.round(Math.min(15, m.delivery_delays * 0.5));
+    const pickerBase = Math.round(Math.min(10, Math.max(0, (m.picker_delay_mins - 2.5) * 2)));
+    const inventoryBase = Math.round(Math.min(10, m.inventory_issues * 1));
     
-    // Refunds: each % above 2 = 1 point
-    const refundsPts = Math.max(0, (m.refund_rate_pct - 2) * 1);
+    // Go back 30 days
+    for (let day = 30; day >= 0; day--) {
+      const calculatedAt = new Date(Date.now() - day * 86400000).toISOString();
+      
+      // Add some random noise that decays into the past
+      // To ensure we don't violate constraints, we must clamp again
+      const noise = () => Math.round((Math.random() - 0.5) * 3);
+      
+      const equipmentPts = Math.round(Math.min(25, Math.max(0, equipmentBase + (day > 0 ? noise() : 0))));
+      const slaPts = Math.round(Math.min(25, Math.max(0, slaBase + (day > 0 ? noise() : 0))));
+      const refundsPts = Math.round(Math.min(20, Math.max(0, refundsBase + (day > 0 ? noise() : 0))));
+      const deliveryPts = Math.round(Math.min(15, Math.max(0, deliveryBase + (day > 0 ? noise() : 0))));
+      const pickerPts = Math.round(Math.min(10, Math.max(0, pickerBase + (day > 0 ? noise() : 0))));
+      const inventoryPts = Math.round(Math.min(10, Math.max(0, inventoryBase + (day > 0 ? noise() : 0))));
+      
+      const totalDeduction = equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
+      const pulse = Math.max(12, Math.min(100, 100 - totalDeduction));
+      
+      history.push({
+        store_id: m.store_id,
+        score: pulse,
+        equipment_pts: equipmentPts,
+        sla_pts: slaPts,
+        refunds_pts: refundsPts,
+        delivery_pts: deliveryPts,
+        picker_pts: pickerPts,
+        inventory_pts: inventoryPts,
+        calculated_at: calculatedAt
+      });
+    }
     
-    // Delivery: each delay > 20min = 0.5 points
-    const deliveryPts = Math.min(20, m.delivery_delays * 0.5);
-    
-    // Picker: each minute above 2.5 = 2 points
-    const pickerPts = Math.max(0, (m.picker_delay_mins - 2.5) * 2);
-    
-    // Inventory: each issue = 1 point
-    const inventoryPts = Math.min(15, m.inventory_issues * 1);
-    
-    // Total deduction
-    const totalDeduction = equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
-    
-    // Pulse score = 100 - total deduction (min 0, max 100)
-    const pulse = Math.max(0, Math.min(100, Math.round(100 - totalDeduction)));
-    
-    return {
-      store_id: m.store_id,
-      score: pulse,
-      equipment_pts: Math.round(equipmentPts),
-      sla_pts: Math.round(slaPts),
-      refunds_pts: Math.round(refundsPts),
-      delivery_pts: Math.round(deliveryPts),
-      picker_pts: Math.round(pickerPts),
-      inventory_pts: Math.round(inventoryPts),
-    };
+    return history;
   });
-  await supabase.from("pulse_scores").upsert(pulseRows, { onConflict: "store_id" });
+  
+  // We have 31 days per store, 200 stores = 6200 rows.
+  // Insert in chunks to avoid overwhelming the API.
+  const chunkSize = 1000;
+  for (let i = 0; i < pulseRows.length; i += chunkSize) {
+    const chunk = pulseRows.slice(i, i + chunkSize);
+    await supabase.from("pulse_scores").insert(chunk);
+  }
 
   // 13. Work Orders - correlated with store health (more issues for low pulse stores)
   const workOrderRows = pulseRows
@@ -429,7 +464,448 @@ async function seed() {
     await supabase.from("notifications").insert(notificationRows);
   }
 
+  console.log("Seeding support workspace: agents, tickets, and activity...");
+
+  // 16. Support Tickets — distributed across 3 agents + unassigned
+  const agentAId = createdProfiles["agent.a@darkops.com"]?.id;
+  const agentBId = createdProfiles["agent.b@darkops.com"]?.id;
+  const agentCId = createdProfiles["agent.c@darkops.com"]?.id;
+
+  if (!agentAId || !agentBId || !agentCId) {
+    console.warn("Support agents not found — skipping ticket seed. Run migration first and ensure agents are registered.");
+    console.log("Agent A:", agentAId, "Agent B:", agentBId, "Agent C:", agentCId);
+  } else {
+    const slaIn = (mins: number) => new Date(Date.now() + mins * 60000).toISOString();
+    const slaAgo = (mins: number) => new Date(Date.now() - mins * 60000).toISOString();
+    const createdAgo = (mins: number) => new Date(Date.now() - mins * 60000).toISOString();
+
+    // Delete any previously seeded tickets by ticket_number to allow idempotent re-runs
+    const seedTicketNumbers = ['TKT-001','TKT-002','TKT-003','TKT-004','TKT-005','TKT-006','TKT-007','TKT-008','TKT-009','TKT-010','TKT-011','TKT-012','TKT-013','TKT-014','TKT-015','TKT-016','TKT-017','TKT-018','TKT-019','TKT-020','TKT-021','TKT-022','TKT-023','TKT-024','TKT-025'];
+    await supabase.from('support_tickets').delete().in('ticket_number', seedTicketNumbers);
+
+    // Insert tickets WITHOUT id — Supabase will generate UUIDs
+    const supportTickets = [
+      // ── Agent A (Priya Sharma) — 5 tickets ───────────────────────────────────
+      { ticket_number: 'TKT-001', title: 'Refund validation failed – duplicate order claim',
+        complaint_id: complaintRows[0]?.id || null, assigned_to: agentAId, created_by: agentAId,
+        status: 'in_progress', priority: 'P1', queue: 'refunds',
+        sla_deadline: slaIn(18), created_at: createdAgo(92), updated_at: createdAgo(10) },
+      { ticket_number: 'TKT-002', title: 'Missing item – 1L Amul milk not delivered',
+        complaint_id: complaintRows[1]?.id || null, assigned_to: agentAId, created_by: agentAId,
+        status: 'open', priority: 'P2', queue: 'general',
+        sla_deadline: slaIn(74), created_at: createdAgo(46), updated_at: createdAgo(46) },
+      { ticket_number: 'TKT-003', title: 'Late delivery – order 47 mins overdue',
+        complaint_id: complaintRows[2]?.id || null, assigned_to: agentAId, created_by: agentAId,
+        status: 'open', priority: 'P2', queue: 'general',
+        sla_deadline: slaAgo(42), created_at: createdAgo(72), updated_at: createdAgo(72) },
+      { ticket_number: 'TKT-004', title: 'Wrong items packed – customer received incorrect order',
+        complaint_id: complaintRows[3]?.id || null, assigned_to: agentAId, created_by: agentAId,
+        status: 'open', priority: 'P3', queue: 'general',
+        sla_deadline: slaIn(145), created_at: createdAgo(15), updated_at: createdAgo(15) },
+      { ticket_number: 'TKT-005', title: 'Damaged packaging – items spoiled on delivery',
+        complaint_id: complaintRows[4]?.id || null, assigned_to: agentAId, created_by: agentAId,
+        resolved_by: agentAId, status: 'resolved', priority: 'P3', queue: 'general',
+        sla_deadline: slaAgo(5), created_at: createdAgo(180), updated_at: createdAgo(30),
+        resolution_notes: 'Refund of ₹120 approved and processed. Customer notified.',
+        resolution_time_minutes: 150 },
+      // ── Agent B (Rohan Mehta) — 4 tickets ────────────────────────────────────
+      { ticket_number: 'TKT-006', title: 'Cold chain failure – yogurt expired on delivery',
+        complaint_id: complaintRows[5]?.id || null, assigned_to: agentBId, created_by: agentBId,
+        status: 'in_progress', priority: 'P1', queue: 'refunds',
+        sla_deadline: slaIn(6), created_at: createdAgo(110), updated_at: createdAgo(5) },
+      { ticket_number: 'TKT-007', title: 'Reorder request – auto-fulfillment failed twice',
+        complaint_id: complaintRows[6]?.id || null, assigned_to: agentBId, created_by: agentBId,
+        status: 'open', priority: 'P2', queue: 'reorders',
+        sla_deadline: slaIn(52), created_at: createdAgo(28), updated_at: createdAgo(28) },
+      { ticket_number: 'TKT-008', title: 'High-value refund – ₹2,400 dispute unresolved',
+        complaint_id: complaintRows[7]?.id || null, assigned_to: agentBId, created_by: agentBId,
+        status: 'escalated', priority: 'P1', queue: 'escalated',
+        sla_deadline: slaAgo(88), created_at: createdAgo(200), updated_at: createdAgo(40) },
+      { ticket_number: 'TKT-009', title: 'Delivery partner dispute – undelivered order',
+        complaint_id: complaintRows[8]?.id || null, assigned_to: agentBId, created_by: agentBId,
+        status: 'awaiting_customer', priority: 'P3', queue: 'general',
+        sla_deadline: slaIn(280), created_at: createdAgo(60), updated_at: createdAgo(20) },
+      // ── Agent C (Sneha Patel) — 3 tickets ─────────────────────────────────────
+      { ticket_number: 'TKT-010', title: 'Substitution rejected – customer unhappy with replacement',
+        complaint_id: complaintRows[9]?.id || null, assigned_to: agentCId, created_by: agentCId,
+        status: 'open', priority: 'P2', queue: 'general',
+        sla_deadline: slaIn(95), created_at: createdAgo(25), updated_at: createdAgo(25) },
+      { ticket_number: 'TKT-011', title: 'Inventory discrepancy – item shown in app, out of stock at store',
+        complaint_id: complaintRows[10]?.id || null, assigned_to: agentCId, created_by: agentCId,
+        status: 'open', priority: 'P3', queue: 'operational',
+        sla_deadline: slaIn(210), created_at: createdAgo(30), updated_at: createdAgo(30) },
+      { ticket_number: 'TKT-012', title: 'Double charge – payment processed twice for same order',
+        complaint_id: complaintRows[11]?.id || null, assigned_to: agentCId, created_by: agentCId,
+        resolved_by: agentCId, status: 'resolved', priority: 'P1', queue: 'refunds',
+        sla_deadline: slaAgo(20), created_at: createdAgo(300), updated_at: createdAgo(60),
+        resolution_notes: 'Confirmed duplicate charge via payment gateway. Full refund issued. Customer notified.',
+        resolution_time_minutes: 240 },
+      // ── Unassigned — 2 tickets ────────────────────────────────────────────────
+      { ticket_number: 'TKT-013', title: 'First-time customer complaint – app crash during checkout',
+        complaint_id: complaintRows[12]?.id || null, assigned_to: null, created_by: null,
+        status: 'open', priority: 'P2', queue: 'general',
+        sla_deadline: slaIn(88), created_at: createdAgo(32), updated_at: createdAgo(32) },
+      { ticket_number: 'TKT-014', title: 'Wallet credit not applied – promo code dispute',
+        complaint_id: complaintRows[13]?.id || null, assigned_to: null, created_by: null,
+        status: 'open', priority: 'P3', queue: 'refunds',
+        sla_deadline: slaIn(380), created_at: createdAgo(10), updated_at: createdAgo(10) },
+      // ── Additional tickets for more realistic volume ───────────────────────────────
+      // Agent A additional tickets
+      { ticket_number: 'TKT-015', title: 'Payment gateway timeout – order stuck in processing',
+        complaint_id: null, assigned_to: agentAId, created_by: agentAId,
+        status: 'open', priority: 'P2', queue: 'operational',
+        sla_deadline: slaIn(65), created_at: createdAgo(55), updated_at: createdAgo(55) },
+      { ticket_number: 'TKT-016', title: 'Customer unable to apply coupon – discount not working',
+        complaint_id: null, assigned_to: agentAId, created_by: agentAId,
+        status: 'open', priority: 'P3', queue: 'general',
+        sla_deadline: slaIn(200), created_at: createdAgo(40), updated_at: createdAgo(40) },
+      { ticket_number: 'TKT-017', title: 'Order cancellation failed – charged despite cancellation',
+        complaint_id: null, assigned_to: agentAId, created_by: agentAId,
+        status: 'in_progress', priority: 'P1', queue: 'refunds',
+        sla_deadline: slaIn(25), created_at: createdAgo(85), updated_at: createdAgo(15) },
+      // Agent B additional tickets
+      { ticket_number: 'TKT-018', title: 'Store delivery zone issue – customer outside coverage area',
+        complaint_id: null, assigned_to: agentBId, created_by: agentBId,
+        status: 'awaiting_customer', priority: 'P3', queue: 'operational',
+        sla_deadline: slaIn(180), created_at: createdAgo(95), updated_at: createdAgo(25) },
+      { ticket_number: 'TKT-019', title: 'Account suspension dispute – customer claims unauthorized activity',
+        complaint_id: null, assigned_to: agentBId, created_by: agentBId,
+        status: 'escalated', priority: 'P1', queue: 'escalated',
+        sla_deadline: slaAgo(120), created_at: createdAgo(250), updated_at: createdAgo(60) },
+      { ticket_number: 'TKT-020', title: 'Bulk order discount not applied – corporate account issue',
+        complaint_id: null, assigned_to: agentBId, created_by: agentBId,
+        status: 'open', priority: 'P2', queue: 'refunds',
+        sla_deadline: slaIn(95), created_at: createdAgo(35), updated_at: createdAgo(35) },
+      // Agent C additional tickets
+      { ticket_number: 'TKT-021', title: 'Delivery time slot not respected – arrived 2 hours late',
+        complaint_id: null, assigned_to: agentCId, created_by: agentCId,
+        status: 'open', priority: 'P2', queue: 'general',
+        sla_deadline: slaIn(85), created_at: createdAgo(45), updated_at: createdAgo(45) },
+      { ticket_number: 'TKT-022', title: 'Quality complaint – vegetables received spoiled',
+        complaint_id: null, assigned_to: agentCId, created_by: agentCId,
+        status: 'in_progress', priority: 'P2', queue: 'refunds',
+        sla_deadline: slaIn(70), created_at: createdAgo(60), updated_at: createdAgo(20) },
+      { ticket_number: 'TKT-023', title: 'Wrong store delivery – order sent to wrong location',
+        complaint_id: null, assigned_to: agentCId, created_by: agentCId,
+        resolved_by: agentCId, status: 'resolved', priority: 'P1', queue: 'operational',
+        sla_deadline: slaAgo(15), created_at: createdAgo(120), updated_at: createdAgo(10),
+        resolution_notes: 'Confirmed routing error. Store delivery credit issued to customer.',
+        resolution_time_minutes: 110 },
+      // Additional unassigned tickets
+      { ticket_number: 'TKT-024', title: 'Payment method not accepted – UPI not working',
+        complaint_id: null, assigned_to: null, created_by: null,
+        status: 'open', priority: 'P2', queue: 'operational',
+        sla_deadline: slaIn(110), created_at: createdAgo(20), updated_at: createdAgo(20) },
+      { ticket_number: 'TKT-025', title: 'Item out of stock – customer wants raincheck',
+        complaint_id: null, assigned_to: null, created_by: null,
+        status: 'open', priority: 'P3', queue: 'general',
+        sla_deadline: slaIn(240), created_at: createdAgo(15), updated_at: createdAgo(15) },
+    ];
+
+    const { data: insertedTickets, error: ticketErr } = await supabase
+      .from('support_tickets')
+      .insert(supportTickets)
+      .select('id, ticket_number');
+
+    if (ticketErr) {
+      console.error('Support tickets seed error:', ticketErr.message);
+    } else {
+      console.log(`Seeded ${insertedTickets?.length} support tickets across 3 agents + 2 unassigned`);
+
+      // Build a map: ticket_number -> uuid
+      const tkt: Record<string, string> = {};
+      (insertedTickets || []).forEach((t: any) => { tkt[t.ticket_number] = t.id; });
+
+      // 17. ticket_activity — realistic event log for each ticket
+      const activityRows: any[] = [];
+
+      const mkAct = (tn: string, actor_id: string | null, event_type: string, payload: any, minsAgo: number) => {
+        const ticket_id = tkt[tn];
+        if (!ticket_id) return null;
+        return { ticket_id, actor_id, event_type, payload, created_at: createdAgo(minsAgo) };
+      };
+
+      const push = (act: any) => { if (act) activityRows.push(act); };
+
+      // TKT-001 — Priya / P1 / In Progress
+      push(mkAct('TKT-001', null, 'created', { title: 'Ticket auto-created from failed automation' }, 92));
+      push(mkAct('TKT-001', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 91));
+      push(mkAct('TKT-001', agentAId, 'status_changed', { from: 'open', to: 'in_progress' }, 10));
+      push(mkAct('TKT-001', agentAId, 'note_added', { note: 'Contacted payment gateway for transaction evidence. Awaiting response.' }, 8));
+
+      // TKT-002 — Priya / P2 / Open
+      push(mkAct('TKT-002', null, 'created', { title: 'Ticket created from customer complaint' }, 46));
+      push(mkAct('TKT-002', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 45));
+
+      // TKT-003 — Priya / P2 / SLA Breached
+      push(mkAct('TKT-003', null, 'created', { title: 'Ticket created from late delivery report' }, 72));
+      push(mkAct('TKT-003', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 71));
+
+      // TKT-004 — Priya / P3 / Open
+      push(mkAct('TKT-004', null, 'created', { title: 'Ticket created from wrong items complaint' }, 15));
+      push(mkAct('TKT-004', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 14));
+
+      // TKT-005 — Priya / Resolved
+      push(mkAct('TKT-005', null, 'created', { title: 'Ticket created from damaged goods report' }, 180));
+      push(mkAct('TKT-005', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 179));
+      push(mkAct('TKT-005', agentAId, 'status_changed', { from: 'open', to: 'in_progress' }, 60));
+      push(mkAct('TKT-005', agentAId, 'resolved', { note: 'Refund of ₹120 approved and processed. Customer notified.' }, 30));
+
+      // TKT-006 — Rohan / P1 / In Progress (SLA at risk)
+      push(mkAct('TKT-006', null, 'created', { title: 'Cold chain failure auto-escalated' }, 110));
+      push(mkAct('TKT-006', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 109));
+      push(mkAct('TKT-006', agentBId, 'status_changed', { from: 'open', to: 'in_progress' }, 5));
+
+      // TKT-007 — Rohan / P2 / Open
+      push(mkAct('TKT-007', null, 'created', { title: 'Reorder fulfillment failure escalated' }, 28));
+      push(mkAct('TKT-007', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 27));
+
+      // TKT-008 — Rohan / P1 / Escalated / SLA Breached
+      push(mkAct('TKT-008', null, 'created', { title: 'High-value dispute created' }, 200));
+      push(mkAct('TKT-008', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 199));
+      push(mkAct('TKT-008', agentBId, 'status_changed', { from: 'open', to: 'in_progress' }, 80));
+      push(mkAct('TKT-008', agentBId, 'status_changed', { from: 'in_progress', to: 'escalated' }, 40));
+      push(mkAct('TKT-008', agentBId, 'note_added', { note: 'Escalated to L2 — requires payment gateway review for ₹2,400 duplicate charge.' }, 40));
+
+      // TKT-009 — Rohan / P3 / Awaiting Customer
+      push(mkAct('TKT-009', null, 'created', { title: 'Delivery dispute opened' }, 60));
+      push(mkAct('TKT-009', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 59));
+      push(mkAct('TKT-009', agentBId, 'status_changed', { from: 'open', to: 'awaiting_customer' }, 20));
+      push(mkAct('TKT-009', agentBId, 'note_added', { note: 'Requested delivery photo proof from customer. Awaiting response within 24h.' }, 20));
+
+      // TKT-010 — Sneha / P2 / Open
+      push(mkAct('TKT-010', null, 'created', { title: 'Substitution complaint opened' }, 25));
+      push(mkAct('TKT-010', agentCId, 'assigned', { to: 'Sneha Patel', from: null }, 24));
+
+      // TKT-011 — Sneha / P3 / Open
+      push(mkAct('TKT-011', null, 'created', { title: 'Inventory discrepancy reported' }, 30));
+      push(mkAct('TKT-011', agentCId, 'assigned', { to: 'Sneha Patel', from: null }, 29));
+
+      // TKT-012 — Sneha / P1 / Resolved
+      push(mkAct('TKT-012', null, 'created', { title: 'Double charge dispute raised' }, 300));
+      push(mkAct('TKT-012', agentCId, 'assigned', { to: 'Sneha Patel', from: null }, 299));
+      push(mkAct('TKT-012', agentCId, 'status_changed', { from: 'open', to: 'in_progress' }, 120));
+      push(mkAct('TKT-012', agentCId, 'resolved', { note: 'Full refund issued after payment gateway confirmed duplicate charge.' }, 60));
+
+      // TKT-013, TKT-014 — Unassigned
+      push(mkAct('TKT-013', null, 'created', { title: 'New ticket from app crash report' }, 32));
+      push(mkAct('TKT-014', null, 'created', { title: 'Wallet promo dispute opened' }, 10));
+
+      // Additional tickets activity
+      // TKT-015 — Agent A / P2 / Open
+      push(mkAct('TKT-015', null, 'created', { title: 'Payment gateway timeout reported' }, 55));
+      push(mkAct('TKT-015', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 54));
+
+      // TKT-016 — Agent A / P3 / Open
+      push(mkAct('TKT-016', null, 'created', { title: 'Coupon code complaint opened' }, 40));
+      push(mkAct('TKT-016', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 39));
+
+      // TKT-017 — Agent A / P1 / In Progress
+      push(mkAct('TKT-017', null, 'created', { title: 'Order cancellation failure reported' }, 85));
+      push(mkAct('TKT-017', agentAId, 'assigned', { to: 'Priya Sharma', from: null }, 84));
+      push(mkAct('TKT-017', agentAId, 'status_changed', { from: 'open', to: 'in_progress' }, 15));
+
+      // TKT-018 — Agent B / P3 / Awaiting Customer
+      push(mkAct('TKT-018', null, 'created', { title: 'Delivery zone dispute opened' }, 95));
+      push(mkAct('TKT-018', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 94));
+      push(mkAct('TKT-018', agentBId, 'status_changed', { from: 'open', to: 'awaiting_customer' }, 25));
+
+      // TKT-019 — Agent B / P1 / Escalated
+      push(mkAct('TKT-019', null, 'created', { title: 'Account suspension dispute raised' }, 250));
+      push(mkAct('TKT-019', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 249));
+      push(mkAct('TKT-019', agentBId, 'status_changed', { from: 'open', to: 'in_progress' }, 120));
+      push(mkAct('TKT-019', agentBId, 'status_changed', { from: 'in_progress', to: 'escalated' }, 60));
+
+      // TKT-020 — Agent B / P2 / Open
+      push(mkAct('TKT-020', null, 'created', { title: 'Bulk order discount complaint' }, 35));
+      push(mkAct('TKT-020', agentBId, 'assigned', { to: 'Rohan Mehta', from: null }, 34));
+
+      // TKT-021 — Agent C / P2 / Open
+      push(mkAct('TKT-021', null, 'created', { title: 'Delivery time slot complaint' }, 45));
+      push(mkAct('TKT-021', agentCId, 'assigned', { to: 'Sneha Patel', from: null }, 44));
+
+      // TKT-022 — Agent C / P2 / In Progress
+      push(mkAct('TKT-022', null, 'created', { title: 'Quality complaint - spoiled vegetables' }, 60));
+      push(mkAct('TKT-022', agentCId, 'assigned', { to: 'Sneha Patel', from: null }, 59));
+      push(mkAct('TKT-022', agentCId, 'status_changed', { from: 'open', to: 'in_progress' }, 20));
+
+      // TKT-023 — Agent C / P1 / Resolved
+      push(mkAct('TKT-023', null, 'created', { title: 'Wrong store delivery reported' }, 120));
+      push(mkAct('TKT-023', agentCId, 'assigned', { to: 'Sneha Patel', from: null }, 119));
+      push(mkAct('TKT-023', agentCId, 'status_changed', { from: 'open', to: 'in_progress' }, 30));
+      push(mkAct('TKT-023', agentCId, 'resolved', { note: 'Confirmed routing error. Store delivery credit issued to customer.' }, 10));
+
+      // TKT-024, TKT-025 — Unassigned
+      push(mkAct('TKT-024', null, 'created', { title: 'Payment method issue reported' }, 20));
+      push(mkAct('TKT-025', null, 'created', { title: 'Out of stock raincheck request' }, 15));
+
+      if (activityRows.length > 0) {
+        const { error: actErr } = await supabase.from('ticket_activity').insert(activityRows);
+        if (actErr) console.error('Ticket activity seed error:', actErr.message);
+        else console.log(`Seeded ${activityRows.length} ticket activity events`);
+      }
+
+      // 18. Notifications for agents — SLA alerts
+      const tkt001Id = tkt['TKT-001'];
+      const tkt003Id = tkt['TKT-003'];
+      const tkt006Id = tkt['TKT-006'];
+      const agentNotifs = [
+        tkt001Id && {
+          recipient_id: agentAId,
+          title: 'TKT-001 SLA approaching — act soon',
+          meta: JSON.stringify({ ticket_id: tkt001Id, ticket_number: 'TKT-001' }),
+          link_type: 'support_ticket', link_ref: tkt001Id,
+        },
+        tkt003Id && {
+          recipient_id: agentAId,
+          title: 'TKT-003 SLA breached — take immediate action',
+          meta: JSON.stringify({ ticket_id: tkt003Id, ticket_number: 'TKT-003' }),
+          link_type: 'support_ticket', link_ref: tkt003Id,
+        },
+        tkt006Id && {
+          recipient_id: agentBId,
+          title: 'TKT-006 SLA at risk — 6 min remaining',
+          meta: JSON.stringify({ ticket_id: tkt006Id, ticket_number: 'TKT-006' }),
+          link_type: 'support_ticket', link_ref: tkt006Id,
+        },
+      ].filter(Boolean);
+
+      if (agentNotifs.length > 0) {
+        const { error: notifErr } = await supabase.from('notifications').insert(agentNotifs);
+        if (notifErr) console.error('Agent notifications seed error:', notifErr.message);
+        else console.log(`Seeded ${agentNotifs.length} agent notifications`);
+      }
+
+      // 19. Failed Automation Queue — realistic intake queue with more volume
+      // Use valid complaint IDs from the seeded complaints
+      const failedAutomationRows = [
+        {
+          complaint_id: complaintRows[0]?.id,
+          failure_reason: 'refund_validation',
+          failure_step: 'validation',
+          urgency_score: 92,
+          sentiment: 'negative',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Customer has high refund history (12 refunds, ₹4,500 total)',
+          created_at: createdAgo(1380), // 23 hours ago
+        },
+        {
+          complaint_id: complaintRows[1]?.id,
+          failure_reason: 'refund_validation',
+          failure_step: 'validation',
+          urgency_score: 85,
+          sentiment: 'negative',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Refund amount (₹2,800) exceeds threshold (₹2,000)',
+          created_at: createdAgo(1380), // 23 hours ago
+        },
+        {
+          complaint_id: complaintRows[2]?.id,
+          failure_reason: 'duplicate_detection',
+          failure_step: 'classification',
+          urgency_score: 78,
+          sentiment: 'neutral',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Possible duplicate complaint - 3 similar complaints in 7 days',
+          created_at: createdAgo(120), // 2 hours ago
+        },
+        {
+          complaint_id: complaintRows[3]?.id,
+          failure_reason: 'fraud_detection',
+          failure_step: 'validation',
+          urgency_score: 95,
+          sentiment: 'negative',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Suspicious activity pattern: new account, high value, rush order',
+          created_at: createdAgo(90), // 1.5 hours ago
+        },
+        {
+          complaint_id: complaintRows[4]?.id,
+          failure_reason: 'category_classification',
+          failure_step: 'classification',
+          urgency_score: 65,
+          sentiment: 'neutral',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Unable to classify complaint category - confidence 30%, ambiguous keywords',
+          created_at: createdAgo(60), // 1 hour ago
+        },
+        {
+          complaint_id: complaintRows[5]?.id,
+          failure_reason: 'customer_verification',
+          failure_step: 'validation',
+          urgency_score: 88,
+          sentiment: 'negative',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Customer identity verification failed - 3 attempts, phone mismatch, email bounce',
+          created_at: createdAgo(45), // 45 minutes ago
+        },
+        {
+          complaint_id: complaintRows[6]?.id,
+          failure_reason: 'store_integration',
+          failure_step: 'auto_assignment',
+          urgency_score: 72,
+          sentiment: 'neutral',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Store API timeout - DS-1567 /inventory endpoint, 5 retry attempts',
+          created_at: createdAgo(30), // 30 minutes ago
+        },
+        {
+          complaint_id: complaintRows[7]?.id,
+          failure_reason: 'payment_validation',
+          failure_step: 'validation',
+          urgency_score: 82,
+          sentiment: 'negative',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Payment transaction verification failed - TXN-789456 via Razorpay',
+          created_at: createdAgo(15), // 15 minutes ago
+        },
+        {
+          complaint_id: complaintRows[8]?.id,
+          failure_reason: 'auto_assignment',
+          failure_step: 'auto_assignment',
+          urgency_score: 70,
+          sentiment: 'neutral',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'No available agents in queue - all agents at capacity',
+          created_at: createdAgo(10), // 10 minutes ago
+        },
+        {
+          complaint_id: complaintRows[9]?.id,
+          failure_reason: 'sentiment_analysis',
+          failure_step: 'classification',
+          urgency_score: 75,
+          sentiment: 'neutral',
+          resolved_at: null,
+          resolved_by: null,
+          notes: 'Sentiment analysis inconclusive - mixed signals in customer message',
+          created_at: createdAgo(5), // 5 minutes ago
+        },
+      ];
+
+      // Clear existing failed automation data
+      await supabase.from('failed_automation').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      const { error: failedAutoErr } = await supabase.from('failed_automation').insert(failedAutomationRows);
+      if (failedAutoErr) {
+        console.error('Failed automation seed error:', failedAutoErr.message);
+      } else {
+        console.log(`Seeded ${failedAutomationRows.length} failed automation records`);
+      }
+    }
+  }
+
   console.log("Seed completed successfully!");
 }
 
 seed().catch(console.error);
+
+

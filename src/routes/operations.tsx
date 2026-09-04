@@ -67,6 +67,7 @@ const tooltipStyle = {
   border: "1px solid var(--border)",
   borderRadius: 6,
   fontSize: 12,
+  color: "var(--popover-foreground)",
 };
 
 function OperationsQueue() {
@@ -77,12 +78,12 @@ function OperationsQueue() {
   const { data, isLoading, error } = useCases();
   
   // Get current user ID for "My queue" filtering
-  const { data: { user } } = useQuery({
-    queryKey: ['current-user'],
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user-auth'],
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
       const { data: { user } } = await supabase.auth.getUser();
-      return { user };
+      return user;
     },
   });
 
@@ -90,7 +91,7 @@ function OperationsQueue() {
     if (!data?.cases) return [];
     return data.cases.filter((c) => {
       if (tab === "Escalated" && !c.status.includes("escalated")) return false;
-      if (tab === "My queue" && c.agentId !== user?.id) return false;
+      if (tab === "My queue" && c.agentId !== currentUser?.id) return false;
       if (tab.startsWith("P") && tab.length === 2 && c.priority !== tab) return false;
       if (query) {
         const q = query.toLowerCase();
@@ -104,7 +105,7 @@ function OperationsQueue() {
       }
       return true;
     }).sort((a, b) => b.ageMins - a.ageMins);
-  }, [tab, query, user?.id, data?.cases]);
+  }, [tab, query, currentUser?.id, data?.cases]);
 
   if (isLoading) return <div className="p-8">Loading live queue...</div>;
   if (error || !data) return <div className="p-8 text-crit">Failed to load operations queue.</div>;
@@ -173,7 +174,11 @@ function OperationsQueue() {
                     <Cell key={i} fill={PIE_COLORS[i]} />
                   ))}
                 </Pie>
-                <RTooltip contentStyle={tooltipStyle} />
+                <RTooltip 
+                  contentStyle={tooltipStyle} 
+                  itemStyle={{ color: "var(--foreground)" }}
+                  labelStyle={{ color: "var(--foreground)", fontWeight: 500, marginBottom: 4 }}
+                />
               </PieChart>
             </ResponsiveContainer>
             <ul className="flex-1 space-y-2">
@@ -202,7 +207,7 @@ function OperationsQueue() {
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="name" {...axis} interval={0} />
                 <YAxis {...axis} width={44} />
-                <RTooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--surface-2)" }} />
+                <RTooltip contentStyle={tooltipStyle} itemStyle={{ color: "var(--popover-foreground)" }} cursor={{ fill: "var(--surface-2)" }} />
                 <Bar dataKey="value" name="Cases" fill="var(--chart-1)" maxBarSize={34} />
               </BarChart>
             </ResponsiveContainer>

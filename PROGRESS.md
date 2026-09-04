@@ -569,4 +569,166 @@
 4. **Case Queue Filtering Showing 0 Cases** - Fixed hardcoded agent ID in "My queue" filter and changed escalated status check to use .includes()
 5. **Dark Stores Navigation Redirecting to Executive** - Fixed by adding OPERATIONS role permissions for stores.read.all in RBAC
 
-**Current Focus:** Project cleanup and GitHub repository setup
+**Current Focus:** Landing page premium redesign complete. GitHub repository setup pending.
+
+---
+
+## Phase 19: Landing Page Premium Redesign ✅ COMPLETED
+
+**Status:** Completed
+
+**Timestamp:** 2026-09-03
+
+**Changed:**
+- Completely redesigned public landing page (`src/routes/index.tsx`)
+- Removed all hardcoded operational metrics ("14", "47", "74/100", "8")
+- Removed "Executive Intelligence" — replaced with correct "Executive" module
+- Removed all PILLARS references to defunct architecture
+- Built new public API endpoint: `GET /api/v1/public/overview`
+- Connected landing page to real database data via TanStack Query
+- Implemented loading states, error states, and animated number reveals
+- Added seven sections: navbar, hero, live snapshot, four modules, personas, signal-to-action, CTA, footer
+- Exactly four modules: Executive, Operations, Dark Stores, Fraud
+- Hero eyebrow populated from live API store count
+- All live metrics come from real Supabase aggregate queries (no Math.random, no fake arrays)
+- Full responsive layout: 1440px, 1280px, 1024px, 768px, 390px, 360px
+- Accessibility: semantic HTML, aria-labels, keyboard navigation, focus states, reduced-motion support
+- Footer "All systems operational" is static — no fake health endpoint
+
+**Files changed:**
+- `src/routes/index.tsx` — complete rewrite (landing page)
+- `server/controllers/public.controller.ts` — NEW: safe aggregate public endpoint
+- `server/routes/public.routes.ts` — NEW: public route registration
+- `server/index.ts` — registered `/api/v1/public` routes
+
+**Database changes:** None (reads existing stores, complaints, pulse_scores, fraud_reviews tables)
+
+**Backend changes:** One new unauthenticated endpoint `GET /api/v1/public/overview` using service role client. Returns only: store_count, active_cases, avg_pulse, pending_fraud. No PII.
+
+**Tests run:**
+- `npm run lint` — Pre-existing 5057 prettier violations throughout codebase (not introduced). Lint on changed files (3 new files): PASS after prettier --write
+- `npm run build:client` — PASS (✓ 2908 modules, 23.56s)
+- `npm run build:server` — PASS (tsc clean)
+
+**Manual checks performed:**
+- No "Executive Intelligence" in any src file — CONFIRMED
+- No "Executive Insights" in any src file — CONFIRMED
+- No hardcoded operational metrics in landing page — CONFIRMED
+- No Math.random() — CONFIRMED
+- Exactly four modules (Executive, Operations, Dark Stores, Fraud) — CONFIRMED
+- Sign in CTA routes to /login — CONFIRMED in code
+- Explore platform CTA scrolls to #modules — CONFIRMED in code
+- Loading state renders while API fetches — CONFIRMED in code
+- Error state renders on API failure — CONFIRMED in code
+- Client build produces valid output — CONFIRMED
+
+**Known issues:**
+- The full `npm run lint` still shows 5051 pre-existing prettier errors across the codebase. These existed before Phase 19 and are not introduced by this work.
+- Chunk size warning in build (pre-existing, not introduced by landing page — JS bundle is 1.6MB from recharts and other dependencies)
+
+**Next:** None. All phases complete.
+
+---
+
+## Phase 20: Support Agent Workspace Rebuild 🔄 IN PROGRESS
+
+**Status:** Implementation complete, migration + seed pending
+
+**Timestamp:** 2026-09-04
+
+**Problem:** The `/support` route was a generic department dashboard. It showed all tickets as if one person owned everything, had no identity-aware queues, no real team visibility, and a basic ticket detail with no workflow. It also used `SupportShell` (a minimal navbar) separate from the main `AppShell`, depriving agents of notifications and proper navigation.
+
+**Goal:** Build a real enterprise support agent workspace (Jira/Zendesk/ServiceNow model):
+- Agent sees their own queue vs. team queue
+- Tickets have real SLA countdowns
+- Ticket detail with activity timeline, attachments, assign-to-me, status transitions, resolve with note
+- All actions backed by database and activity log
+
+**Phase 1 — Database Migration:**
+- Created `database/migrations/019_support_agent_workspace.sql`
+  - `title` column on `support_tickets`
+  - `ticket_activity` table (actor join, event_type, JSONB payload)
+  - `ticket_attachments` table (Supabase Storage backed)
+  - Fixed RLS: `CUSTOMER_SUPPORT` ALL policy, `OPERATIONS` SELECT policy on support_tickets
+  - RLS on both new tables
+- MUST BE RUN in Supabase SQL editor before seed
+
+**Phase 2 — Seed Data:**
+- Added 3 CUSTOMER_SUPPORT agents: Priya Sharma, Rohan Mehta, Sneha Patel
+- Created 14 deterministic support tickets distributed across agents + 2 unassigned
+- Distribution: Agent A: 5, Agent B: 4, Agent C: 3, Unassigned: 2
+- SLA states: on_track, at_risk (< 30 min), breached (several tickets)
+- Priority mix: P1 (3), P2 (5), P3 (6) across tickets
+- Status mix: open, in_progress, awaiting_customer, escalated, resolved
+- Seeded `ticket_activity` events for each ticket (created/assigned/status_changed/note_added/resolved)
+- Seeded notifications for Priya (SLA alerts) and Rohan
+- Demo login: `agent.a@darkops.com` / `password123`
+
+**Phase 3 — Backend API:**
+- Complete rewrite of `server/controllers/support.controller.ts`
+- New endpoints: getMyStats, getMyTickets, getTeamTickets, getUnassignedTickets, getMyResolvedTickets
+- New endpoints: getTicketActivity, updateTicketStatus, assignTicket, resolveTicket, addTicketNote
+- New endpoints: getAttachmentUploadUrl, createAttachmentRecord, getAttachmentDownloadUrl
+- All endpoints enforce CUSTOMER_SUPPORT or PLATFORM_ADMIN role
+- Agent can only see/modify their own tickets (ownership enforced server-side)
+- Supabase Storage signed URLs for attachment upload/download
+- `server/routes/support.routes.ts` updated with all new routes + rate limits
+
+**Phase 4 — Navigation:**
+- Removed `SupportShell` fork from `__root.tsx` — `/support` now uses `AppShell`
+- Updated `NAV_BY_ROLE.CUSTOMER_SUPPORT` label to "My Queue"
+- Added contextual `workspaceLabel` variable to AppShell (Support/Operations/etc.)
+- CUSTOMER_SUPPORT agents now see full navbar with notifications and profile menu
+- Added `customers.read.own` to CUSTOMER_SUPPORT permissions in `rbac.ts`
+
+**Phase 5 — Support Workspace UI:**
+- Complete rewrite of `src/routes/support.index.tsx`
+- Agent identity bar (welcome message + open count)
+- 4 real KPI cards (My Open, Urgent, SLA at Risk, Overdue) — all from `/support/me/stats`
+- Tabbed view: My Tickets | Team Queue | Unassigned | Resolved
+- Full filter bar: Search, Status, Priority, Queue, SLA — with URL param preservation
+- Ticket table with SLA countdown display, priority badges, status chips
+- One-click "Claim" for unassigned tickets
+- Team Queue shows "You" vs named agents for clear ownership
+
+**Phase 6 — Ticket Detail UI:**
+- Complete rewrite of `src/routes/support.tickets.$id.tsx`
+- Back-to-workspace navigation breadcrumb
+- SLA breach/at-risk banner
+- Issue summary panel
+- Customer & Order Context panel (customer name/email, order details, store, refund amount)
+- Activity timeline (chronological, real events from ticket_activity, with icons and actor names)
+- Attachments panel with Supabase Storage upload/download (signed URLs)
+- Internal note form (adds activity event)
+- Assignment panel: "You" vs named assignee, "Assign to me" button
+- Actions panel: status change dropdown (only valid next states), attach proof, resolve
+- Resolution form with required note (min 5 chars)
+- Resolved summary panel showing resolution note, resolved by, time to resolve
+- Details panel: queue, created, updated, SLA deadline, created by
+
+**Files changed:**
+- `database/migrations/019_support_agent_workspace.sql` — NEW
+- `database/seed.ts` — Added 3 agents + 14 tickets + ticket_activity + notifications
+- `server/controllers/support.controller.ts` — Complete rewrite
+- `server/routes/support.routes.ts` — Complete rewrite (12 routes)
+- `server/lib/rbac.ts` — Added customers.read.own to CUSTOMER_SUPPORT
+- `src/routes/__root.tsx` — Removed SupportShell fork
+- `src/components/layout/app-shell.tsx` — Added workspaceLabel, updated CUSTOMER_SUPPORT nav
+- `src/routes/support.index.tsx` — Complete rewrite (workspace UI)
+- `src/routes/support.tickets.$id.tsx` — Complete rewrite (ticket detail)
+
+**Build results:**
+- `npm run build:client` — PASS (✓ 2925 modules, 4.56s)
+- `npx tsc --noEmit --project tsconfig.server.json` — PASS (clean)
+
+**Pending:**
+- Run migration `019_support_agent_workspace.sql` in Supabase SQL editor
+- Run `npm run seed` to populate agents, tickets, and activity
+- Create Supabase Storage bucket `ticket-attachments` for attachment upload
+- Manual E2E test
+
+**Known issues:**
+- Attachments UI is built but requires `ticket-attachments` storage bucket to exist in Supabase
+- `ticket_activity` feed requires migration 019 to be applied first
+- Seed will skip ticket section if agents were not created (prints warning)
+

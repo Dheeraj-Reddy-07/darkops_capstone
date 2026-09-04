@@ -14,7 +14,6 @@ import appCss from "../styles.css?url";
 import { AppShell } from "@/components/layout/app-shell";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { CustomerShell } from "@/components/layout/customer-shell";
-import { SupportShell } from "@/components/layout/support-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -87,7 +86,6 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isCustomer = pathname.startsWith("/customer");
-  const isSupport = pathname.startsWith("/support");
   const isAdmin = pathname.startsWith("/admin");
   const navigate = useRouter().navigate;
   
@@ -159,10 +157,6 @@ function RootComponent() {
         <CustomerShell>
           <Outlet />
         </CustomerShell>
-      ) : isSupport ? (
-        <SupportShell>
-          <Outlet />
-        </SupportShell>
       ) : isAdmin ? (
         <AdminShell>
           <Outlet />

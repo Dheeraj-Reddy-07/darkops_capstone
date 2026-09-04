@@ -178,7 +178,9 @@ function PulseDetail() {
                   border: "1px solid var(--border)",
                   borderRadius: 6,
                   fontSize: 12,
+                  color: "var(--popover-foreground)",
                 }}
+                itemStyle={{ color: "var(--popover-foreground)" }}
               />
               <Area
                 type="monotone"

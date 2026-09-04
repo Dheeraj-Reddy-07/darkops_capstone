@@ -124,7 +124,7 @@ export const getCases = async (req: Request, res: Response, next: NextFunction) 
 
 export const getCaseById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServerClient(req, res);
+    const supabase = createSupabaseServiceRoleClient();
     const { id } = req.params;
 
     // Fetch case with related data including assigned agent name and fraud review
@@ -135,7 +135,7 @@ export const getCaseById = async (req: Request, res: Response, next: NextFunctio
         customers(full_name, id),
         stores(name, city, id),
         assigned_agent:profiles!assigned_agent_id(id, full_name),
-        case_events(*)
+        complaint_status_history(*)
       `)
       .eq('id', id)
       .single();

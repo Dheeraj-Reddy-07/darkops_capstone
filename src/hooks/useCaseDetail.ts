@@ -45,7 +45,7 @@ export function useCaseDetail(id: string) {
         agentName: row.agent_name || null,
         agentHub: 'Ops Hub',
         fraudReview: row.fraud_review || null,
-        events: row.case_events || [],
+        events: row.complaint_status_history || [],
       };
     },
   });
@@ -101,7 +101,7 @@ export function useAgents() {
   return useQuery({
     queryKey: ['agents'],
     queryFn: async () => {
-      const response = await fetchApi('/operations/agents');
+      const response = await fetchApi('/cases/agents');
       return (response.data || []) as Array<{ id: string; name: string; hub: string; load: number; capacity: number }>;
     },
     staleTime: 5 * 60 * 1000, // agents list is relatively stable

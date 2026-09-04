@@ -22,14 +22,14 @@ export const searchEntities = async (req: Request, res: Response, next: NextFunc
     const { data: cases } = await supabase
       .from('complaints')
       .select('id, complaint_id, summary, store_id')
-      .or(`id.eq.${q},complaint_id.ilike.%${q}%,summary.ilike.%${q}%`)
+      .or(`complaint_id.ilike.%${q}%,summary.ilike.%${q}%`)
       .limit(5);
 
     // Search fraud
     const { data: fraud } = await supabase
       .from('fraud_reviews')
       .select('id, customer_name, confidence_score')
-      .or(`id.eq.${q},customer_name.ilike.%${q}%`)
+      .or(`customer_name.ilike.%${q}%`)
       .limit(5);
 
     res.status(200).json({

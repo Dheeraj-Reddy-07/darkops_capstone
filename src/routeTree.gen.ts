@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OperationsRouteImport } from './routes/operations'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAuditLogsRouteImport } from './routes/admin.audit-logs'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -41,6 +42,11 @@ const LoginRoute = LoginRouteImport.update({
 const OperationsRoute = OperationsRouteImport.update({
   id: '/operations',
   path: '/operations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/operations': typeof OperationsRoute
+  '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/operations': typeof OperationsRoute
+  '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/operations': typeof OperationsRoute
+  '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/operations'
+    | '/settings'
     | '/admin/audit-logs'
     | '/admin/users'
     | '/cases/$id'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/operations'
+    | '/settings'
     | '/admin/audit-logs'
     | '/admin/users'
     | '/cases/$id'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/operations'
+    | '/settings'
     | '/admin/audit-logs'
     | '/admin/users'
     | '/cases/$id'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   OperationsRoute: typeof OperationsRoute
+  SettingsRoute: typeof SettingsRoute
   AdminAuditLogsRoute: typeof AdminAuditLogsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   CasesIdRoute: typeof CasesIdRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/operations'
       fullPath: '/operations'
       preLoaderRoute: typeof OperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -399,6 +419,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   OperationsRoute: OperationsRoute,
+  SettingsRoute: SettingsRoute,
   AdminAuditLogsRoute: AdminAuditLogsRoute,
   AdminUsersRoute: AdminUsersRoute,
   CasesIdRoute: CasesIdRoute,

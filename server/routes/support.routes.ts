@@ -1,12 +1,24 @@
 import { Router } from 'express';
 import {
-  getSupportTickets,
+  // New agent workspace endpoints
+  getMyStats,
+  getMyTickets,
+  getTeamTickets,
+  getUnassignedTickets,
+  getMyResolvedTickets,
+  getTicketActivity,
+  updateTicketStatus,
+  assignTicket,
+  resolveTicket,
+  addTicketNote,
+  getAttachmentUploadUrl,
+  createAttachmentRecord,
+  getAttachmentDownloadUrl,
+  // Legacy / kept endpoints
   getSupportTicketById,
   getFailedAutomationQueue,
   createSupportTicket,
-  updateSupportTicket,
-  getTicketHistory,
-  resolveFailedAutomation
+  resolveFailedAutomation,
 } from '../controllers/support.controller';
 import { requireAuth, requirePermission } from '../middleware/auth';
 import { rateLimit } from '../middleware/rateLimit';
@@ -15,15 +27,33 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Support tickets
-router.get('/tickets', rateLimit(50, 60000), requirePermission('support.read'), getSupportTickets);
-router.get('/tickets/:id', rateLimit(50, 60000), requirePermission('support.read'), getSupportTicketById);
-router.post('/tickets', rateLimit(20, 60000), requirePermission('support.review'), createSupportTicket);
-router.put('/tickets/:id', rateLimit(20, 60000), requirePermission('support.decide'), updateSupportTicket);
-router.get('/tickets/:id/history', rateLimit(50, 60000), requirePermission('support.read'), getTicketHistory);
+// ── Agent personal workspace ─────────────────────────────────────────────────
+router.get('/me/stats',         rateLimit(60, 60000), requirePermission('support.read'), getMyStats);
+router.get('/me/tickets',       rateLimit(60, 60000), requirePermission('support.read'), getMyTickets);
+router.get('/me/resolved',      rateLimit(60, 60000), requirePermission('support.read'), getMyResolvedTickets);
 
-// Failed automation queue
-router.get('/failed-automation', rateLimit(50, 60000), requirePermission('support.read'), getFailedAutomationQueue);
+// ── Team and unassigned queues ───────────────────────────────────────────────
+router.get('/team/tickets',      rateLimit(60, 60000), requirePermission('support.read'), getTeamTickets);
+router.get('/unassigned/tickets',rateLimit(60, 60000), requirePermission('support.read'), getUnassignedTickets);
+
+// ── Ticket detail and mutations ──────────────────────────────────────────────
+router.get('/tickets/:id',                  rateLimit(60, 60000),  requirePermission('support.read'),   getSupportTicketById);
+router.get('/tickets/:id/activity',         rateLimit(60, 60000),  requirePermission('support.read'),   getTicketActivity);
+router.patch('/tickets/:id/status',         rateLimit(30, 60000),  requirePermission('support.decide'), updateTicketStatus);
+router.patch('/tickets/:id/assign',         rateLimit(30, 60000),  requirePermission('support.decide'), assignTicket);
+router.post('/tickets/:id/resolve',         rateLimit(20, 60000),  requirePermission('support.decide'), resolveTicket);
+router.post('/tickets/:id/notes',           rateLimit(30, 60000),  requirePermission('support.review'), addTicketNote);
+
+// ── Attachments ──────────────────────────────────────────────────────────────
+router.get('/tickets/:id/attachments/upload-url',            rateLimit(20, 60000), requirePermission('support.review'), getAttachmentUploadUrl);
+router.post('/tickets/:id/attachments',                       rateLimit(20, 60000), requirePermission('support.review'), createAttachmentRecord);
+router.get('/tickets/:id/attachments/:attachmentId/download', rateLimit(30, 60000), requirePermission('support.read'),   getAttachmentDownloadUrl);
+
+// ── Ticket creation ──────────────────────────────────────────────────────────
+router.post('/tickets', rateLimit(20, 60000), requirePermission('support.review'), createSupportTicket);
+
+// ── Failed automation queue ──────────────────────────────────────────────────
+router.get('/failed-automation',             rateLimit(60, 60000), requirePermission('support.read'),   getFailedAutomationQueue);
 router.put('/failed-automation/:id/resolve', rateLimit(20, 60000), requirePermission('support.decide'), resolveFailedAutomation);
 
 export default router;
