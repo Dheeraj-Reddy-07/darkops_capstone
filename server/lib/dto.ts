@@ -44,6 +44,16 @@ export function toOrderDTO(order: any) {
  * Customer complaint DTO - removes sensitive internal fields
  */
 export function toComplaintDTO(complaint: any) {
+  const createdAtMs = complaint.created_at ? new Date(complaint.created_at).getTime() : Date.now();
+  const nowMs = Date.now();
+  // SLA targets: P1 = 15m, P2 = 30m, P3 = 120m (2h), P4 = 240m (4h)
+  const slaMinsMap: Record<string, number> = { P1: 15, P2: 30, P3: 120, P4: 240 };
+  const slaMins = slaMinsMap[complaint.priority] || 120;
+  const slaDueMs = createdAtMs + slaMins * 60 * 1000;
+  const isBreached =
+    (complaint.status === "unassigned" || complaint.status === "assigned" || complaint.status === "in_progress") &&
+    nowMs > slaDueMs;
+
   return {
     id: complaint.id,
     complaint_ref: complaint.complaint_ref,
@@ -59,8 +69,11 @@ export function toComplaintDTO(complaint: any) {
     type: complaint.type,
     created_at: complaint.created_at,
     updated_at: complaint.updated_at,
-    // Order value (for display)
+    resolution: complaint.resolution || null,
     order_value_paise: complaint.order_value_paise,
+    sla_due_at: new Date(slaDueMs).toISOString(),
+    sla_breached: isBreached,
+    is_live_call_eligible: isBreached,
     // Attachments (metadata only)
     attachments: complaint.complaint_attachments
       ? complaint.complaint_attachments.map((att: any) => ({

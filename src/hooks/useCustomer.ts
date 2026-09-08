@@ -124,6 +124,9 @@ export interface CustomerComplaint {
   resolution?: string | undefined;
   storeName?: string | undefined;
   orderValue?: number | undefined;
+  slaBreached?: boolean | undefined;
+  isLiveCallEligible?: boolean | undefined;
+  slaDueAt?: string | undefined;
 }
 
 export interface ComplaintDetail extends CustomerComplaint {
@@ -152,7 +155,7 @@ export function useCustomerComplaints() {
     queryFn: async () => {
       const response = await fetchApi("/customers/me/complaints");
 
-      const complaints = response.data.map((row: any) => ({
+      const complaints: CustomerComplaint[] = response.data.map((row: any) => ({
         id: row.id,
         complaintRef: row.complaint_ref,
         orderId: row.order_id,
@@ -164,6 +167,9 @@ export function useCustomerComplaints() {
         createdAt: format(new Date(row.created_at), "dd MMM, HH:mm 'IST'"),
         resolution: row.resolution,
         storeName: row.store_name,
+        slaBreached: row.sla_breached,
+        isLiveCallEligible: row.is_live_call_eligible,
+        slaDueAt: row.sla_due_at ? format(new Date(row.sla_due_at), "HH:mm 'IST'") : undefined,
       }));
       return complaints;
     },
@@ -189,6 +195,9 @@ export function useCustomerComplaintById(complaintId: string) {
         createdAt: format(new Date(response.data.created_at), "dd MMM, HH:mm 'IST'"),
         resolution: response.data.resolution,
         storeName: response.data.store_name,
+        slaBreached: response.data.sla_breached,
+        isLiveCallEligible: response.data.is_live_call_eligible,
+        slaDueAt: response.data.sla_due_at ? format(new Date(response.data.sla_due_at), "HH:mm 'IST'") : undefined,
         orderValue: response.data.order_value_paise
           ? response.data.order_value_paise / 100
           : undefined,
@@ -230,6 +239,7 @@ export function useSubmitComplaint() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customer-complaints"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-orders"] });
     },
   });
 }

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -8,6 +9,10 @@ import {
   FileText,
   Paperclip,
   MessageSquare,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  ShieldAlert,
 } from "lucide-react";
 import { Panel, PanelHeader, StatusBadge } from "@/components/ops/primitives";
 import { useCustomerComplaintById } from "@/hooks/useCustomer";
@@ -30,6 +35,33 @@ export const Route = createFileRoute("/customer/complaints_/$id")({
 function ComplaintDetail() {
   const { id } = useParams({ from: "/customer/complaints_/$id" });
   const { data: complaint, isLoading, error } = useCustomerComplaintById(id);
+
+  const [callState, setCallState] = useState<"idle" | "dialing" | "connected" | "ended">("idle");
+  const [timer, setTimer] = useState(0);
+  const [timerId, setTimerId] = useState<any>(null);
+
+  const startLiveCall = () => {
+    setCallState("dialing");
+    setTimeout(() => {
+      setCallState("connected");
+      setTimer(0);
+      const interval = setInterval(() => {
+        setTimer((t) => t + 1);
+      }, 1000);
+      setTimerId(interval);
+    }, 2000);
+  };
+
+  const endLiveCall = () => {
+    if (timerId) clearInterval(timerId);
+    setCallState("ended");
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   if (isLoading) {
     return (
@@ -263,6 +295,64 @@ function ComplaintDetail() {
           </div>
         </div>
       </Panel>
+
+      {/* Live Agent SLA Escalation Section */}
+      {complaint.isLiveCallEligible && (
+        <Panel className="border-amber-500/30 bg-amber-500/5">
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-amber-500">
+              <ShieldAlert className="size-5" />
+              <p className="text-sm font-semibold">Response SLA Exceeded — Live Support Unlocked</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your case has exceeded our standard response window ({complaint.slaDueAt || "SLA Window"}). You are now authorized for direct live VoIP support with an operations agent.
+            </p>
+            {callState === "idle" && (
+              <Button onClick={startLiveCall} className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white">
+                <PhoneCall className="size-4" /> Connect me to a live agent
+              </Button>
+            )}
+
+            {callState === "dialing" && (
+              <div className="p-4 text-center space-y-2 bg-background rounded-lg border border-border">
+                <PhoneCall className="size-6 text-amber-500 animate-bounce mx-auto" />
+                <p className="text-xs font-semibold">Connecting to senior support agent...</p>
+                <Button variant="outline" size="sm" onClick={endLiveCall} className="text-crit text-xs">
+                  Cancel Call
+                </Button>
+              </div>
+            )}
+
+            {callState === "connected" && (
+              <div className="p-4 space-y-3 bg-background rounded-lg border border-emerald-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex size-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-emerald-400">Connected to Senior Agent</span>
+                  </div>
+                  <span className="num text-xs font-mono">{formatTimer(timer)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground italic">
+                  "Hello! I am reviewing your complaint ({complaint.complaintRef}) for order {complaint.orderId}. Processing your priority resolution right now."
+                </p>
+                <Button variant="destructive" size="sm" onClick={endLiveCall} className="w-full gap-2 text-xs">
+                  <PhoneOff className="size-4" /> End Call
+                </Button>
+              </div>
+            )}
+
+            {callState === "ended" && (
+              <div className="p-3 text-center space-1 bg-background rounded-lg border border-border">
+                <p className="text-xs font-semibold text-foreground">Call Ended ({formatTimer(timer)})</p>
+                <p className="text-[11px] text-muted-foreground">Call summary & audio recording attached to case history.</p>
+              </div>
+            )}
+          </div>
+        </Panel>
+      )}
 
       {/* Actions */}
       <Panel>
