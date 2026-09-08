@@ -135,13 +135,15 @@ async function processRefund(
         .eq("id", complaintId);
 
       // Status history
-      await adminClient.from("complaint_status_history").insert({
-        complaint_id: complaintId,
-        from_status: "unassigned",
-        to_status: "resolved",
-        changed_by: null,
-        note: `Auto-resolved: refund approved (confidence: ${confidence}, prior_claims: ${priorClaims}, amount: Rs ${orderAmountPaise / 100})`,
-      }).catch(() => {});
+      try {
+        await adminClient.from("complaint_status_history").insert({
+          complaint_id: complaintId,
+          from_status: "unassigned",
+          to_status: "resolved",
+          changed_by: null,
+          note: `Auto-resolved: refund approved (confidence: ${confidence}, prior_claims: ${priorClaims}, amount: Rs ${orderAmountPaise / 100})`,
+        });
+      } catch {}
 
       // Notify customer via profile lookup
       if (complaint.customer_id) {
@@ -152,13 +154,15 @@ async function processRefund(
           .maybeSingle();
 
         if (customerProfile?.profile_id) {
-          await adminClient.from("notifications").insert({
-            recipient_id: customerProfile.profile_id,
-            title: "Your complaint has been resolved",
-            meta: JSON.stringify({ complaint_ref: complaint.complaint_ref, resolution: "Refund approved" }),
-            link_type: "complaint",
-            link_ref: complaintId,
-          }).catch(() => {});
+          try {
+            await adminClient.from("notifications").insert({
+              recipient_id: customerProfile.profile_id,
+              title: "Your complaint has been resolved",
+              meta: JSON.stringify({ complaint_ref: complaint.complaint_ref, resolution: "Refund approved" }),
+              link_type: "complaint",
+              link_ref: complaintId,
+            });
+          } catch {}
         }
       }
 

@@ -333,34 +333,46 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
     }
 
     // Insert initial status history entry
-    await adminClient.from("complaint_status_history").insert({
-      complaint_id: complaintId,
-      from_status: null,
-      to_status: "unassigned",
-      changed_by: auth.user.id,
-      note: "Complaint submitted by customer",
-    }).catch((err: any) => console.error("[createComplaint] Status history error:", err));
+    try {
+      await adminClient.from("complaint_status_history").insert({
+        complaint_id: complaintId,
+        from_status: null,
+        to_status: "unassigned",
+        changed_by: auth.user.id,
+        note: "Complaint submitted by customer",
+      });
+    } catch (err: any) {
+      console.error("[createComplaint] Status history error:", err);
+    }
 
     // Create customer notification (recipient_id = auth user profile id)
-    await adminClient.from("notifications").insert({
-      recipient_id: auth.user.id,
-      title: `Complaint received: ${summary}`,
-      meta: JSON.stringify({ complaint_id: complaintId, complaint_ref: complaintRef }),
-      link_type: "complaint",
-      link_ref: complaintId,
-    }).catch((err: any) => console.error("[createComplaint] Notification error:", err));
+    try {
+      await adminClient.from("notifications").insert({
+        recipient_id: auth.user.id,
+        title: `Complaint received: ${summary}`,
+        meta: JSON.stringify({ complaint_id: complaintId, complaint_ref: complaintRef }),
+        link_type: "complaint",
+        link_ref: complaintId,
+      });
+    } catch (err: any) {
+      console.error("[createComplaint] Notification error:", err);
+    }
 
     // Create support ticket (only columns that exist in the schema)
     const ticketId = `TKT-${Date.now()}`;
     const ticketQueue = dbComplaintType === "refund" ? "refunds" : dbComplaintType === "reorder" ? "reorders" : "general";
-    await adminClient.from("support_tickets").insert({
-      id: ticketId,
-      complaint_id: complaintId,
-      title: `${summary} – ${order_id}`,
-      status: "open",
-      priority: "P3",
-      queue: ticketQueue,
-    }).catch((err: any) => console.error("[createComplaint] Ticket insert error:", err));
+    try {
+      await adminClient.from("support_tickets").insert({
+        id: ticketId,
+        complaint_id: complaintId,
+        title: `${summary} – ${order_id}`,
+        status: "open",
+        priority: "P3",
+        queue: ticketQueue,
+      });
+    } catch (err: any) {
+      console.error("[createComplaint] Ticket insert error:", err);
+    }
 
     // Log ticket activity
     await adminClient.from("ticket_activity").insert({

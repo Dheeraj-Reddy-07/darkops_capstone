@@ -193,16 +193,17 @@ export const intakeComplaint = async (req: Request, res: Response, next: NextFun
     }
 
     // 7. Insert initial status history
-    await adminClient
-      .from("complaint_status_history")
-      .insert({
+    try {
+      await adminClient.from("complaint_status_history").insert({
         complaint_id: complaintId,
         from_status: null,
         to_status: "unassigned",
         changed_by: null,
         note: "Complaint received via external intake API",
-      })
-      .catch((e: any) => console.error("[INTAKE] Status history error:", e));
+      });
+    } catch (e: any) {
+      console.error("[INTAKE] Status history error:", e);
+    }
 
     // 8. Fire async processing (non-blocking)
     processComplaint(complaintId).catch((e) =>

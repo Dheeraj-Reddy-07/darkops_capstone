@@ -119,22 +119,32 @@ function RootComponent() {
   const useAdminShell =
     isAdmin || (userRole === "PLATFORM_ADMIN" && pathname.startsWith("/dark-stores"));
 
-  // RBAC check for protected routes - must be called before any early returns
+  // Navigation & RBAC side effects
   useEffect(() => {
-    if (!userRole || !session) return;
+    if (loading || profileLoading) return;
 
-    if (!canAccessRoute(userRole as any, pathname)) {
-      const landingRoute = getLandingRoute(userRole);
-      if (landingRoute) {
-        navigate({ to: landingRoute, replace: true });
-      } else {
-        // Fallback to login if role is invalid
+    if (isPublicRoute(pathname)) {
+      if (session && userProfile) {
+        const landingRoute = getLandingRoute(userRole);
+        if (landingRoute) {
+          navigate({ to: landingRoute, replace: true });
+        }
+      }
+    } else {
+      if (!session) {
         navigate({ to: "/login", replace: true });
+      } else if (userRole && !canAccessRoute(userRole as any, pathname)) {
+        const landingRoute = getLandingRoute(userRole);
+        if (landingRoute) {
+          navigate({ to: landingRoute, replace: true });
+        } else {
+          navigate({ to: "/login", replace: true });
+        }
       }
     }
-  }, [pathname, userRole, session, navigate]);
+  }, [pathname, userRole, session, userProfile, loading, profileLoading, navigate]);
 
-  // Handle public routes with role-based redirect for authenticated users
+  // Handle public routes
   if (isPublicRoute(pathname)) {
     if (loading) {
       return (
@@ -145,15 +155,11 @@ function RootComponent() {
     }
 
     if (session && userProfile) {
-      const landingRoute = getLandingRoute(userRole);
-      if (landingRoute) {
-        navigate({ to: landingRoute, replace: true });
-        return (
-          <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
-            Redirecting to dashboard…
-          </div>
-        );
-      }
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
+          Redirecting to dashboard…
+        </div>
+      );
     }
 
     return (
@@ -175,7 +181,6 @@ function RootComponent() {
 
   // Block unauthenticated access to protected routes
   if (!session) {
-    navigate({ to: "/login", replace: true });
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
         Redirecting to login…
