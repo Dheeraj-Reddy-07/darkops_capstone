@@ -265,17 +265,25 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
           "You currently do not have any complaint records. If you experience an issue with a recent order, you can submit a report from your Orders page.";
         suggestions = ["Where is my order?", "My account info"];
       } else {
-        const openCount = rawComplaints.filter(
+        const openComplaints = rawComplaints.filter(
           (c) => c.status !== "resolved" && c.status !== "closed",
-        ).length;
-        const resolvedCount = rawComplaints.length - openCount;
+        );
+        const resolvedCount = rawComplaints.length - openComplaints.length;
 
-        const latestComplaint = rawComplaints[0];
-        const safeStatus = getCustomerSafeStatus(latestComplaint);
-        const submittedAt = format(new Date(latestComplaint.created_at), "dd MMM, HH:mm 'IST'");
-        const storeName = (latestComplaint.stores as any)?.name || "Dark Store";
+        const targetComplaint = openComplaints.length > 0 ? openComplaints[0] : rawComplaints[0];
+        const safeStatus = getCustomerSafeStatus(targetComplaint);
+        const submittedAt = format(new Date(targetComplaint.created_at), "dd MMM, HH:mm 'IST'");
+        const storeName = (targetComplaint.stores as any)?.name || "Dark Store";
 
-        response = `You have **${rawComplaints.length}** total complaint(s) (**${openCount}** open, **${resolvedCount}** resolved).\n\n**Most Recent Complaint:**\n- **Reference:** ${latestComplaint.complaint_ref}\n- **Order:** ${latestComplaint.order_id} (${storeName})\n- **Issue:** ${latestComplaint.summary}\n- **Submitted:** ${submittedAt}\n- **Status:** ${safeStatus.label}\n- **Details:** ${safeStatus.details}`;
+        const summaryHeader =
+          openComplaints.length > 0
+            ? `You have **${openComplaints.length}** open complaint(s) out of **${rawComplaints.length}** total record(s).`
+            : `All **${rawComplaints.length}** of your complaint(s) have been resolved.`;
+
+        const sectionHeader =
+          openComplaints.length > 0 ? "Active Open Complaint:" : "Most Recent Complaint:";
+
+        response = `${summaryHeader}\n\n**${sectionHeader}**\n- **Reference:** ${targetComplaint.complaint_ref}\n- **Order:** ${targetComplaint.order_id} (${storeName})\n- **Category:** ${targetComplaint.summary}\n- **Submitted:** ${submittedAt}\n- **Status:** ${safeStatus.label}\n- **Details:** ${safeStatus.details}`;
 
         suggestions = ["Where is my order?", "Check complaint status", "My account info"];
       }

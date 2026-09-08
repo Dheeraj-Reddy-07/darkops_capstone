@@ -24,6 +24,24 @@ interface Message {
   timestamp: Date;
 }
 
+function FormattedChatMessage({ content }: { content: string }) {
+  const parts = content.split(/(\*\*.*?\*\*)/g);
+  return (
+    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return (
+            <strong key={i} className="font-semibold text-foreground">
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </div>
+  );
+}
+
 function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -149,7 +167,7 @@ function Chatbot() {
                   message.role === "user" ? "bg-primary text-primary-foreground" : "bg-surface-2",
                 )}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <FormattedChatMessage content={message.content} />
                 <p className="mt-1 text-[10px] opacity-60">
                   {message.timestamp.toLocaleTimeString("en-US", {
                     hour: "2-digit",
