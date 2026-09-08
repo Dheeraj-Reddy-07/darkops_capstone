@@ -1328,6 +1328,55 @@
 - Manual E2E testing required to verify PLATFORM_ADMIN access and non-admin denial
 - Manual testing required to verify light/dark theme compatibility
 
-**Next:** Manual E2E testing of Security Center with PLATFORM_ADMIN account
+---
+
+## Phase 42: DarkOps Complaint Intake API, Strict Auto-Resolution & Dynamic Customer AI Assistant ✅ COMPLETED
+
+**Status:** Completed
+
+**Completed:**
+
+### External Complaint Intake API (HMAC Authenticated)
+- Created `POST /api/v1/intake/complaints` in `server/controllers/intake.controller.ts` & `server/routes/intake.routes.ts`.
+- Validates SHA-256 HMAC payload signatures (`X-DarkOps-Signature`) and timestamp headers (`X-DarkOps-Timestamp`) with max skew enforcement.
+- Asynchronously fires `processComplaint` workflow upon valid intake ingestion.
+
+### Strict Decision Engine & Auto-Resolution Gates
+- Enforced 3-tier decision engine in `server/services/automation.service.ts`:
+  1. Customer prior claims in 90 days $\le 2$
+  2. Order amount $\le \text{Rs } 500$ ($50,000$ paise)
+  3. NLP classification confidence $\ge 40\%$
+- Auto-resolves with refund approval if ALL 3 conditions pass; otherwise safely routes to Support Agent queue with explicit escalation reason logging.
+
+### Read-Only Dynamic Customer AI Assistant
+- Completely refactored `server/controllers/chatbot.controller.ts` to be 100% read-only and backend data-driven.
+- Enforced identity derivation from authenticated session (`req.auth.user.id`) for strict customer data isolation (IDOR protected).
+- Removed all hardcoded business values, canned demo text, and static IDs (`ORD-DEMO-001`).
+- Dynamically responds to Order queries (active ETA, status, items) and Complaint queries (reference, status, submitted time, customer-safe resolution notes).
+- Blocks creation/action attempts ("Create complaint", "File refund") and directs customer to deterministic order report form.
+
+### SLA Expiry & Live Agent VoIP Call Simulation
+- Calculated customer-safe SLA breach status in `server/lib/dto.ts` and `src/hooks/useCustomer.ts`.
+- Unlocks **"Connect me to a live agent"** button on `src/routes/customer.complaints_.$id.tsx` ONLY when open complaint SLA is breached.
+- Integrated interactive simulated VoIP Call panel (`Connecting...` → `Connected to Agent` → `Duration timer` → `End call`).
+
+**Files changed:**
+- `server/controllers/intake.controller.ts` (new)
+- `server/routes/intake.routes.ts` (new)
+- `server/controllers/chatbot.controller.ts` (refactored)
+- `server/controllers/customers.controller.ts` (fixed `.catch` PostgrestFilterBuilder calls)
+- `server/services/automation.service.ts` (strict auto-resolution gate)
+- `server/lib/dto.ts` (SLA breach & live call eligibility DTO additions)
+- `src/hooks/useCustomer.ts` (SLA fields & query cache invalidations)
+- `src/routes/customer.complaints_.$id.tsx` (Live Agent VoIP simulation panel)
+- `src/routes/cases.$id.tsx` (Agent live VoIP call panel)
+- `src/routes/__root.tsx` (fixed render-phase `navigate` warning)
+- `README.md` (updated feature documentation)
+
+**Tests run:**
+- TypeScript type check (`npx tsc --noEmit`): PASSED (0 errors)
+- Client & Server build checks: PASSED
+- Git sync: Committed & pushed to `origin/main` (`https://github.com/Dheeraj-Reddy-07/darkops_capstone`)
 
 ---
+
