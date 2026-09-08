@@ -47,17 +47,17 @@ function Chatbot() {
     {
       role: "assistant",
       content:
-        "Hi there! I'm your DarkOps assistant. I can help you with your orders, complaints, and account information. What would you like to know?",
+        "Hi there! I'm your DarkOps Care Assistant. I can help you check your complaint status, explain resolution details, or look up order context for your reported issues. How can I help you today?",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([
-    "Where is my order?",
     "Check my complaint status",
-    "I received a wrong item",
-    "View my recent orders",
+    "Which order is my complaint about?",
+    "Do I have any open complaints?",
+    "My account info",
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

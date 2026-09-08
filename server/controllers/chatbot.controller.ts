@@ -157,7 +157,7 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       .order("created_at", { ascending: false });
 
     let response = "";
-    let suggestions = ["Where is my order?", "Check complaint status", "My account info"];
+    let suggestions = ["Check complaint status", "Which order is my complaint about?", "My account info"];
 
     // ── Intent 1: Action / Creation Attempts (Read-Only Guard) ────────────────
     const isActionAttempt =
@@ -168,16 +168,40 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       lastUserMessage.includes("refund me") ||
       lastUserMessage.includes("reorder") ||
       lastUserMessage.includes("open ticket") ||
-      lastUserMessage.includes("cancel order");
+      lastUserMessage.includes("cancel order") ||
+      lastUserMessage.includes("missing item") ||
+      lastUserMessage.includes("wrong item") ||
+      lastUserMessage.includes("damaged item");
 
     if (isActionAttempt) {
       response =
-        "I am a read-only support assistant and cannot create complaints or process refunds directly. To report an issue with an order, please go to your **Orders** tab, select the specific order, and click **Report Issue**. Our automated intelligence system will process your report immediately.";
-      suggestions = ["Where is my order?", "Check complaint status"];
+        "I am a read-only support assistant and cannot create complaints or process refunds directly. To report an issue with an order, please go to your **Orders** tab, select the specific order, and click **Report Issue**. Our automated intelligence layer will process your complaint immediately.";
+      suggestions = ["Check complaint status", "My account info"];
       return res.status(200).json({ message: response, suggestions });
     }
 
-    // ── Intent 2: Live Agent Escalation Queries ─────────────────────────────────
+    // ── Intent 2: Complaint Order Association / Context ───────────────────────
+    if (
+      lastUserMessage.includes("which order") ||
+      lastUserMessage.includes("associated order") ||
+      lastUserMessage.includes("complaint order") ||
+      lastUserMessage.includes("what order")
+    ) {
+      if (!rawComplaints || rawComplaints.length === 0) {
+        response = "You currently do not have any complaint records on file.";
+      } else {
+        const openComplaints = rawComplaints.filter(
+          (c) => c.status !== "resolved" && c.status !== "closed",
+        );
+        const target = openComplaints.length > 0 ? openComplaints[0] : rawComplaints[0];
+        const storeName = (target.stores as any)?.name || "Dark Store";
+        response = `Your complaint (**${target.complaint_ref}**) is associated with Order **${target.order_id}** from **${storeName}**.\n- **Issue:** ${target.summary}\n- **Detail:** ${target.detail}`;
+      }
+      suggestions = ["Check complaint status", "My account info"];
+      return res.status(200).json({ message: response, suggestions });
+    }
+
+    // ── Intent 3: Live Agent Escalation Queries ─────────────────────────────────
     if (
       lastUserMessage.includes("human") ||
       lastUserMessage.includes("agent") ||
@@ -191,64 +215,48 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
 
       if (openComplaints.length === 0) {
         response =
-          "You currently do not have any open complaints. If you have an issue with an order, please visit your Orders tab and select 'Report Issue'.";
-        suggestions = ["Where is my order?", "My account info"];
+          "You currently do not have any open complaints. To request support, please open your order under the Orders tab and select 'Report Issue'. Live support becomes available if an open case exceeds its SLA.";
+        suggestions = ["Check complaint status", "My account info"];
       } else {
         const eligibleComplaint = openComplaints.find(
           (c) => getCustomerSafeStatus(c).isLiveCallEligible,
         );
 
         if (eligibleComplaint) {
-          response = `Your complaint (${eligibleComplaint.complaint_ref}) for Order ${eligibleComplaint.order_id} has passed our standard SLA response window. Live support is now unlocked for your case! You can click 'Connect me to a live agent' on your Complaint details page.`;
-          suggestions = ["Check complaint status", "Where is my order?"];
+          response = `Your complaint (${eligibleComplaint.complaint_ref}) for Order ${eligibleComplaint.order_id} has passed our standard SLA response window. Live support is now unlocked! You can click 'Connect me to a live agent' on your Complaint details page.`;
+          suggestions = ["Check complaint status", "My account info"];
         } else {
           const mostRecent = openComplaints[0];
-          response = `Your complaint (${mostRecent.complaint_ref}) for Order ${mostRecent.order_id} is currently being reviewed by our support team. Standard review is within SLA. Live agent connection will become available if your case remains unresolved past SLA.`;
-          suggestions = ["Check complaint status", "Where is my order?"];
+          response = `Your complaint (${mostRecent.complaint_ref}) for Order ${mostRecent.order_id} is currently being reviewed by our support team within SLA. Live agent connection will automatically become available if your case remains unresolved past SLA.`;
+          suggestions = ["Check complaint status", "My account info"];
         }
       }
 
       return res.status(200).json({ message: response, suggestions });
     }
 
-    // ── Intent 3: Order Status Queries ─────────────────────────────────────────
+    // ── Intent 4: Order Boundary & Context Queries ─────────────────────────────
     if (
       lastUserMessage.includes("order") ||
       lastUserMessage.includes("delivery") ||
       lastUserMessage.includes("where") ||
       lastUserMessage.includes("track")
     ) {
-      if (!rawOrders || rawOrders.length === 0) {
-        response = "You currently do not have any order history in your account.";
-        suggestions = ["Check complaint status", "My account info"];
+      const activeOrder = rawOrders.find((o) => o.status !== "delivered");
+
+      if (activeOrder) {
+        const storeName = (activeOrder.stores as any)?.name || "Local Dark Store";
+        response = `Your active order (**${activeOrder.id}**) from **${storeName}** is currently **${activeOrder.status}**.\n\nFull order details are available under the **Orders** tab. I am here to help you check any complaint related to your orders.`;
+      } else if (rawOrders.length > 0) {
+        const mostRecent = rawOrders[0];
+        const storeName = (mostRecent.stores as any)?.name || "Local Dark Store";
+        response = `Your most recent order (**${mostRecent.id}**) from **${storeName}** is **${mostRecent.status}**.\n\nFull order history is available under the **Orders** tab. I am here to help you check your complaint records.`;
       } else {
-        const activeOrder = rawOrders.find((o) => o.status !== "delivered");
-
-        if (activeOrder) {
-          const storeName = (activeOrder.stores as any)?.name || "Local Dark Store";
-          const placedAtFormatted = format(new Date(activeOrder.placed_at), "dd MMM, HH:mm 'IST'");
-          const etaFormatted = activeOrder.eta_at
-            ? format(new Date(activeOrder.eta_at), "HH:mm 'IST'")
-            : "in progress";
-
-          response = `You have an active order (**${activeOrder.id}**) from **${storeName}**.\n\n- **Status:** ${activeOrder.status}\n- **Placed At:** ${placedAtFormatted}\n- **Estimated Delivery:** ${etaFormatted}\n- **Total Amount:** ₹${(activeOrder.total_amount_paise / 100).toFixed(2)}`;
-          suggestions = ["Check complaint status", "Where is my order?", "My account info"];
-        } else {
-          // Show recent order summary
-          const topOrders = rawOrders.slice(0, 3);
-          const orderSummary = topOrders
-            .map((o) => {
-              const storeName = (o.stores as any)?.name || "Local Dark Store";
-              const dateStr = format(new Date(o.placed_at), "dd MMM, HH:mm 'IST'");
-              return `- **${o.id}**: ${o.status} (₹${(o.total_amount_paise / 100).toFixed(2)}, ${storeName} · ${dateStr})`;
-            })
-            .join("\n");
-
-          response = `You have no active undelivered orders. Here are your most recent orders:\n\n${orderSummary}`;
-          suggestions = ["Check complaint status", "Where is my order?"];
-        }
+        response =
+          "Your complete order history is available under the **Orders** tab. I am here to help you check your complaint records or explain the status of a reported issue.";
       }
 
+      suggestions = ["Check complaint status", "Which order is my complaint about?", "My account info"];
       return res.status(200).json({ message: response, suggestions });
     }
 
