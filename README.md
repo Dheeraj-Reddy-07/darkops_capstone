@@ -4,6 +4,9 @@ DarkOps is a comprehensive operational intelligence platform for dark store netw
 
 ## 🚀 Features
 
+- **Complaint Intake API**: External HMAC-authenticated ingestion endpoint (`POST /api/v1/intake/complaints`) with SHA-256 payload verification.
+- **Automated Resolution Engine**: Strict threshold-gated auto-refund processing (Prior claims ≤ 2, order value ≤ ₹500, sentiment/NLP confidence ≥ 40%).
+- **Agent Escalation & Live VoIP Call Simulator**: Real-time agent escalation workspace featuring interactive live call status and voice sentiment transcription.
 - **Executive Dashboard**: Network-wide PulseScore monitoring, SLA compliance tracking, and critical store identification
 - **Operations Queue**: Live case management with SLA risk prioritization, agent workload balancing, and automated escalation
 - **Dark Store Network**: Detailed store performance metrics, equipment health monitoring, and work order management
@@ -188,9 +191,12 @@ PulseScore is a composite metric (0-100) based on:
 ### Fixed Issues
 
 1. **403 Forbidden on Executive Metrics** - Fixed by removing beforeLoad guard and using service role client
-2. **Route Flickering** - Fixed by adding OPERATIONS role to RBAC permissions
+2. **Route Flickering / Auth Redirect Flash** - Fixed by updating `normalizeRole` in `src/lib/auth-utils.ts` to match role key names instead of values
 3. **Empty Operations Dashboard** - Fixed pagination bug where page parameter was undefined
 4. **Case Queue Filtering** - Fixed hardcoded agent ID in "My queue" filter
+5. **HMAC Intake Security** - Implemented external HMAC SHA-256 signature and timestamp validation middleware
+6. **Strict Auto-Resolution Engine** - Enforced three-tier decision engine (prior claims ≤ 2, refund amount ≤ ₹500, NLP confidence ≥ 40%)
+7. **Agent Escalation Workflow** - Integrated live VoIP call simulator and sentiment transcription panel into case management view
 
 ### Current Workarounds
 

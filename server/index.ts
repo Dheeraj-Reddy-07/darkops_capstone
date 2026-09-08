@@ -101,6 +101,7 @@ import notificationsRoutes from "./routes/notifications.routes";
 import supportRoutes from "./routes/support.routes";
 import publicRoutes from "./routes/public.routes";
 import securityRoutes from "./routes/security.routes";
+import intakeRoutes from "./routes/intake.routes";
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/cases", casesRoutes);
@@ -114,6 +115,7 @@ app.use("/api/v1/notifications", notificationsRoutes);
 app.use("/api/v1/support", supportRoutes);
 app.use("/api/v1/public", publicRoutes);
 app.use("/api/v1/security", securityRoutes);
+app.use("/api/v1/intake", intakeRoutes); // External intake API (HMAC auth)
 
 // Centralized error handler with enhanced security
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

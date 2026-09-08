@@ -4,8 +4,6 @@
 import { createSupabaseServiceRoleClient } from "../lib/supabase";
 import {
   analyzeComplaint,
-  validateRefund,
-  validateReorder,
   calculatePriority,
   calculateSLADeadline,
 } from "./nlp.service";
@@ -110,32 +108,63 @@ async function processRefund(
   const adminClient = createSupabaseServiceRoleClient();
 
   try {
-    // Validate refund
-    const validation = validateRefund(
-      order?.total_amount_paise || 0,
-      complaint.refund_amount_paise || 0,
-      customer?.refund_history_paise || 0,
-      customer?.prior_claims_90d || 0,
-    );
+    const orderAmountPaise = order?.total_amount_paise || 0;
+    const priorClaims = customer?.prior_claims_90d || 0;
+    const confidence = nlpAnalysis.confidence || 0;
 
-    if (validation.can_auto_approve) {
-      // Auto-approve refund
-      await adminClient
-        .from("refund_requests")
-        .update({ status: "approved" })
-        .eq("complaint_id", complaintId);
+    // ── AUTO-RESOLUTION DECISION GATE (DarkOps final spec) ───────────────────
+    // Auto-resolve ONLY IF ALL THREE conditions pass:
+    //   1. History clean: prior_claims_90d <= 2
+    //   2. Amount <= threshold: order amount <= Rs 500 (50000 paise)
+    //   3. NLP confidence >= threshold: confidence >= 40
+    const historyClean = priorClaims <= 2;
+    const amountBelowThreshold = orderAmountPaise <= 50000; // Rs 500
+    const confidenceAboveThreshold = confidence >= 40;
+    const canAutoResolve = historyClean && amountBelowThreshold && confidenceAboveThreshold;
+
+    if (canAutoResolve) {
+      const resolution = `Refund auto-approved. Amount: Rs ${(orderAmountPaise / 100).toFixed(2)}. Your refund will be credited within 2-3 business days.`;
 
       await adminClient
         .from("complaints")
         .update({
           status: "resolved",
           automation_result: "Auto-approved refund",
+          resolution,
         })
         .eq("id", complaintId);
 
-      // Update PulseScore for the store (simplified - in production would trigger full recalculation)
+      // Status history
+      await adminClient.from("complaint_status_history").insert({
+        complaint_id: complaintId,
+        from_status: "unassigned",
+        to_status: "resolved",
+        changed_by: null,
+        note: `Auto-resolved: refund approved (confidence: ${confidence}, prior_claims: ${priorClaims}, amount: Rs ${orderAmountPaise / 100})`,
+      }).catch(() => {});
+
+      // Notify customer via profile lookup
+      if (complaint.customer_id) {
+        const { data: customerProfile } = await adminClient
+          .from("customers")
+          .select("profile_id")
+          .eq("id", complaint.customer_id)
+          .maybeSingle();
+
+        if (customerProfile?.profile_id) {
+          await adminClient.from("notifications").insert({
+            recipient_id: customerProfile.profile_id,
+            title: "Your complaint has been resolved",
+            meta: JSON.stringify({ complaint_ref: complaint.complaint_ref, resolution: "Refund approved" }),
+            link_type: "complaint",
+            link_ref: complaintId,
+          }).catch(() => {});
+        }
+      }
+
+      // Update PulseScore for the store
       if (complaint.store_id) {
-        await updateStorePulse(complaint.store_id, -2); // Small penalty for refund
+        await updateStorePulse(complaint.store_id, -2);
       }
 
       await logAudit({
@@ -144,7 +173,7 @@ async function processRefund(
         action: "refund.auto_approve",
         resourceType: "complaint",
         resourceId: complaintId,
-        metadata: { amount: complaint.refund_amount_paise },
+        metadata: { amount_paise: orderAmountPaise, confidence, prior_claims: priorClaims },
       });
 
       return {
@@ -153,13 +182,14 @@ async function processRefund(
         action_taken: "Refund auto-approved",
       };
     } else {
-      // Escalate to support
-      return await escalateToSupport(
-        complaintId,
-        complaint,
-        nlpAnalysis,
-        validation.reason || "Refund validation failed",
-      );
+      // Build escalation reason for ops team visibility
+      const reason = !historyClean
+        ? `Customer has ${priorClaims} prior claims in 90 days (threshold: <=2)`
+        : !amountBelowThreshold
+          ? `Order amount Rs ${orderAmountPaise / 100} exceeds auto-approve threshold of Rs 500`
+          : `NLP confidence ${confidence} below threshold of 40`;
+
+      return await escalateToSupport(complaintId, complaint, nlpAnalysis, reason);
     }
   } catch (error) {
     return await logFailedAutomation(

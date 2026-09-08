@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowUpRight, ShieldAlert } from "lucide-react";
+import { ArrowUpRight, ShieldAlert, Phone, PhoneCall, PhoneOff } from "lucide-react";
 import { Breadcrumbs, PageHeader } from "@/components/layout/page-header";
 import {
   Chip,
@@ -63,6 +63,116 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
       <p className="label-caps">{label}</p>
       <div className="mt-1 text-[13px] text-foreground">{value}</div>
     </div>
+  );
+}
+
+function LiveCallPanel({ customerName }: { customerName: string }) {
+  const [callState, setCallState] = useState<"idle" | "dialing" | "connected" | "ended">("idle");
+  const [timer, setTimer] = useState<number>(0);
+  const [timerId, setTimerId] = useState<any>(null);
+
+  const startCall = () => {
+    setCallState("dialing");
+    setTimeout(() => {
+      setCallState("connected");
+      setTimer(0);
+      const interval = setInterval(() => {
+        setTimer((t) => t + 1);
+      }, 1000);
+      setTimerId(interval);
+    }, 1500);
+  };
+
+  const endCall = () => {
+    if (timerId) clearInterval(timerId);
+    setCallState("ended");
+  };
+
+  const resetCall = () => {
+    setCallState("idle");
+    setTimer(0);
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <Panel>
+      <PanelHeader title="Agent Live VoIP Call" subtitle="Escalation stream & interactive voice agent" />
+      <div className="p-4 space-y-3">
+        {callState === "idle" && (
+          <div className="text-center py-3 space-y-2">
+            <div className="inline-flex items-center justify-center size-10 rounded-full bg-primary/10 text-primary">
+              <Phone className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-foreground">Simulate Customer Call</p>
+              <p className="text-[11px] text-muted-foreground">Direct L2 escalation VoIP bridge</p>
+            </div>
+            <Button onClick={startCall} size="sm" className="w-full gap-2 text-xs">
+              <PhoneCall className="size-3.5" /> Call {customerName}
+            </Button>
+          </div>
+        )}
+
+        {callState === "dialing" && (
+          <div className="text-center py-3 space-y-2">
+            <div className="inline-flex items-center justify-center size-10 rounded-full bg-amber-500/10 text-amber-500 animate-pulse">
+              <PhoneCall className="size-5 animate-bounce" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-foreground">Connecting to {customerName}...</p>
+              <p className="text-[11px] text-muted-foreground">Establishing secure RTP stream</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={endCall} className="w-full text-xs text-crit">
+              Cancel Call
+            </Button>
+          </div>
+        )}
+
+        {callState === "connected" && (
+          <div className="space-y-3 py-1">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-2">
+                <span className="relative flex size-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Live Call</span>
+              </div>
+              <span className="num text-xs font-bold text-foreground">{formatTimer(timer)}</span>
+            </div>
+
+            <div className="p-2.5 bg-muted/40 rounded text-[11px] space-y-1">
+              <p className="text-muted-foreground font-medium">Real-time NLP sentiment transcript:</p>
+              <p className="text-foreground italic">"Customer confirmed missing items. Escalation resolution approved."</p>
+            </div>
+
+            <Button variant="destructive" size="sm" onClick={endCall} className="w-full gap-2 text-xs">
+              <PhoneOff className="size-3.5" /> End Call
+            </Button>
+          </div>
+        )}
+
+        {callState === "ended" && (
+          <div className="text-center py-3 space-y-2">
+            <div className="inline-flex items-center justify-center size-10 rounded-full bg-muted text-muted-foreground">
+              <PhoneOff className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-foreground">Call Completed ({formatTimer(timer)})</p>
+              <p className="text-[11px] text-muted-foreground">Audio recording & transcript saved</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={resetCall} className="w-full text-xs">
+              Reset Call Simulator
+            </Button>
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }
 
@@ -350,6 +460,8 @@ function CaseDetail() {
               ) : null}
             </div>
           </Panel>
+
+          <LiveCallPanel customerName={record.customerName} />
         </aside>
       </div>
     </>

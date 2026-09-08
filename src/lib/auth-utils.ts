@@ -28,10 +28,10 @@ export const ROLE_ALIASES: Record<string, AppRole> = {
  */
 export function normalizeRole(role: string | null | undefined): AppRole | null {
   if (!role) return null;
-  const upperRole = role.toUpperCase();
-  // Check if it's already a canonical role
-  if (Object.values(ROLE_LANDING_ROUTES).includes(upperRole as AppRole)) {
-    return upperRole as AppRole;
+  const upperRole = role.toUpperCase() as AppRole;
+  // Check if it's already a canonical role (keys of the mapping)
+  if (Object.keys(ROLE_LANDING_ROUTES).includes(upperRole)) {
+    return upperRole;
   }
   // Check if it's an alias
   return ROLE_ALIASES[upperRole] || null;
