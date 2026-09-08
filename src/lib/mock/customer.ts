@@ -76,7 +76,11 @@ export const ACTIVE_ISSUE = {
 export const ISSUE_CATEGORIES = [
   { key: "wrong-item", label: "Wrong item", hint: "You received something you did not order" },
   { key: "missing-item", label: "Missing item", hint: "Part of your order did not arrive" },
-  { key: "late-delivery", label: "Late delivery", hint: "The order arrived after the promised time" },
+  {
+    key: "late-delivery",
+    label: "Late delivery",
+    hint: "The order arrived after the promised time",
+  },
   { key: "damaged-item", label: "Damaged item", hint: "Packaging or contents were damaged" },
   { key: "quality-issue", label: "Quality issue", hint: "Spoiled, expired or thawed product" },
   { key: "payment-issue", label: "Payment issue", hint: "Charge, refund or wallet problem" },

@@ -8,11 +8,15 @@ DarkOps is a comprehensive operational intelligence platform for dark store netw
 - **Operations Queue**: Live case management with SLA risk prioritization, agent workload balancing, and automated escalation
 - **Dark Store Network**: Detailed store performance metrics, equipment health monitoring, and work order management
 - **Fraud Detection**: AI-powered fraud review system with confidence scoring and decision tracking
+- **Customer Portal**: Self-service portal for order tracking, complaint submission, and chatbot assistance
+- **Security & Audit**: Comprehensive security monitoring, audit logging, and threat detection
+- **Theme Support**: Seamless dark and light mode toggle across the entire application
 - **Role-Based Access Control**: Granular permissions for PLATFORM_ADMIN, EXECUTIVE, OPERATIONS, CUSTOMER_SUPPORT, STORE_MANAGER, and CUSTOMER roles
 
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Framework**: TanStack Start (React Router)
 - **UI**: React 18, Tailwind CSS, shadcn/ui components
 - **State Management**: TanStack Query (React Query)
@@ -20,18 +24,20 @@ DarkOps is a comprehensive operational intelligence platform for dark store netw
 - **Icons**: Lucide React
 
 ### Backend
+
 - **Runtime**: Node.js with Express
 - **Database**: PostgreSQL with Supabase
 - **Authentication**: Supabase Auth with JWT
 - **API**: REST API with Express middleware
 
 ### Infrastructure
+
 - **Hosting**: Supabase (database + auth)
 - **Development**: Vite for frontend, tsx for backend
 
 ## 📋 Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 - Supabase account (for database and auth)
 - Environment variables configured
@@ -92,14 +98,14 @@ The backend API will be available at `http://localhost:5000`
 
 ## 👥 Test Users
 
-| Role | Email | Password |
-|------|-------|----------|
-| PLATFORM_ADMIN | admin@darkops.com | demo123 |
-| EXECUTIVE | exec@darkops.com | demo123 |
-| OPERATIONS | manager@darkops.com | demo123 |
-| CUSTOMER_SUPPORT | agent.a@darkops.com | demo123 |
-| STORE_MANAGER | storemanager@darkops.com | demo123 |
-| CUSTOMER | customer@darkops.com | demo123 |
+| Role             | Email                    | Password |
+| ---------------- | ------------------------ | -------- |
+| PLATFORM_ADMIN   | admin@darkops.com        | demo123  |
+| EXECUTIVE        | exec@darkops.com         | demo123  |
+| OPERATIONS       | manager@darkops.com      | demo123  |
+| CUSTOMER_SUPPORT | agent.a@darkops.com      | demo123  |
+| STORE_MANAGER    | storemanager@darkops.com | demo123  |
+| CUSTOMER         | customer@darkops.com     | demo123  |
 
 ## 📁 Project Structure
 
@@ -129,12 +135,14 @@ darkops_capstone/
 ## 🔐 Authentication & Authorization
 
 ### Authentication Flow
+
 1. User logs in via Supabase Auth
 2. JWT token stored in cookies
 3. Token validated on each API request
 4. User role fetched from profiles table
 
 ### Role-Based Access Control (RBAC)
+
 - **PLATFORM_ADMIN**: Full system access
 - **EXECUTIVE**: Read access to all dashboards
 - **OPERATIONS**: Case management, store monitoring
@@ -145,6 +153,7 @@ darkops_capstone/
 ## 🗄️ Database Schema
 
 Key tables:
+
 - `profiles` - User profiles and roles
 - `stores` - Dark store information
 - `complaints` - Customer complaints
@@ -157,7 +166,9 @@ Key tables:
 ## 📊 Key Metrics
 
 ### PulseScore Calculation
+
 PulseScore is a composite metric (0-100) based on:
+
 - Equipment health (25%)
 - SLA compliance (25%)
 - Refund rate (20%)
@@ -166,6 +177,7 @@ PulseScore is a composite metric (0-100) based on:
 - Inventory accuracy (5%)
 
 ### SLA Targets
+
 - P1 (Critical): 15 minutes
 - P2 (High): 30 minutes
 - P3 (Medium): 2 hours
@@ -174,12 +186,14 @@ PulseScore is a composite metric (0-100) based on:
 ## 🐛 Known Issues & Fixes
 
 ### Fixed Issues
+
 1. **403 Forbidden on Executive Metrics** - Fixed by removing beforeLoad guard and using service role client
 2. **Route Flickering** - Fixed by adding OPERATIONS role to RBAC permissions
 3. **Empty Operations Dashboard** - Fixed pagination bug where page parameter was undefined
 4. **Case Queue Filtering** - Fixed hardcoded agent ID in "My queue" filter
 
 ### Current Workarounds
+
 - Service role client used in controllers to bypass RLS for demo purposes
 - Cache clearing on route changes to prevent stale data
 

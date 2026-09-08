@@ -13,9 +13,5 @@
       "@/*": ["src/*"]
     }
   },
-  "include": [
-    "server/**/*",
-    "src/types/**/*",
-    "database/seed.ts"
-  ]
+  "include": ["server/**/*", "src/types/**/*", "database/seed.ts"]
 }

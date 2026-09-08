@@ -48,6 +48,7 @@ Derived from the existing mock data structures and product workflows observed in
 ### Identity & RBAC
 
 #### `profiles`
+
 ```sql
 CREATE TABLE profiles (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -64,6 +65,7 @@ CREATE TABLE profiles (
 ```
 
 #### Role Enum
+
 ```sql
 CREATE TYPE app_role AS ENUM (
   'ADMIN',
@@ -81,6 +83,7 @@ CREATE TYPE app_role AS ENUM (
 ### Stores
 
 #### `stores`
+
 ```sql
 CREATE TABLE stores (
   id                    TEXT PRIMARY KEY,          -- e.g. "DS-1462"
@@ -98,7 +101,9 @@ CREATE TABLE stores (
 ```
 
 #### `store_metrics_snapshots`
+
 Hourly snapshot of key operational metrics (avoids expensive real-time aggregation).
+
 ```sql
 CREATE TABLE store_metrics_snapshots (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -120,6 +125,7 @@ CREATE TABLE store_metrics_snapshots (
 ### PulseScore
 
 #### `pulse_scores`
+
 ```sql
 CREATE TABLE pulse_scores (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -146,6 +152,7 @@ CREATE TABLE pulse_scores (
 ### Customers & Orders
 
 #### `customers`
+
 ```sql
 CREATE TABLE customers (
   id                TEXT PRIMARY KEY,              -- e.g. "CU-771204"
@@ -163,6 +170,7 @@ CREATE TABLE customers (
 ```
 
 #### `orders`
+
 ```sql
 CREATE TABLE orders (
   id                TEXT PRIMARY KEY,              -- e.g. "ORD-884213"
@@ -190,7 +198,9 @@ CREATE TYPE order_status AS ENUM (
 ### Complaints & Cases
 
 #### `complaints`
+
 The unified case record — one complaint per customer issue.
+
 ```sql
 CREATE TABLE complaints (
   id                  TEXT PRIMARY KEY,            -- e.g. "CS-4100"
@@ -232,7 +242,9 @@ CREATE TYPE sla_state AS ENUM ('on_track','at_risk','breached');
 ```
 
 #### `complaint_status_history`
+
 Immutable status change log.
+
 ```sql
 CREATE TABLE complaint_status_history (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -246,6 +258,7 @@ CREATE TABLE complaint_status_history (
 ```
 
 #### `complaint_comments`
+
 ```sql
 CREATE TABLE complaint_comments (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -261,7 +274,9 @@ CREATE TABLE complaint_comments (
 ### Operations
 
 #### `work_orders`
+
 Maintenance/repair tickets raised against store assets.
+
 ```sql
 CREATE TABLE work_orders (
   id              TEXT PRIMARY KEY,               -- e.g. "WO-77412"
@@ -284,7 +299,9 @@ CREATE TYPE work_order_status AS ENUM (
 ```
 
 #### `alerts`
+
 Network-wide operational alerts (the "Red Alerts" panel).
+
 ```sql
 CREATE TABLE alerts (
   id              TEXT PRIMARY KEY,               -- e.g. "ALT-48219"
@@ -302,6 +319,7 @@ CREATE TABLE alerts (
 ### Fraud & Risk
 
 #### `fraud_reviews`
+
 ```sql
 CREATE TABLE fraud_reviews (
   id                    TEXT PRIMARY KEY,          -- complaint_ref e.g. "CMP-482000"
@@ -325,6 +343,7 @@ CREATE TYPE fraud_decision AS ENUM (
 ```
 
 #### `fraud_risk_factors`
+
 ```sql
 CREATE TABLE fraud_risk_factors (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -336,6 +355,7 @@ CREATE TABLE fraud_risk_factors (
 ```
 
 #### `fraud_review_history`
+
 ```sql
 CREATE TABLE fraud_review_history (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -352,6 +372,7 @@ CREATE TABLE fraud_review_history (
 ### Notifications
 
 #### `notifications`
+
 ```sql
 CREATE TABLE notifications (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -370,7 +391,9 @@ CREATE TABLE notifications (
 ### Audit
 
 #### `audit_logs`
+
 Append-only. No UPDATE/DELETE allowed (enforced by RLS).
+
 ```sql
 CREATE TABLE audit_logs (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -390,21 +413,21 @@ CREATE TABLE audit_logs (
 
 ## Key Relationships Summary
 
-| Child Table | Parent | FK | Notes |
-|---|---|---|---|
-| profiles | auth.users | id | 1:1 |
-| stores | — | — | Root entity |
-| pulse_scores | stores | store_id | Many per store (history) |
-| store_metrics_snapshots | stores | store_id | Hourly snapshots |
-| customers | profiles | profile_id | Optional (ops agents see all) |
-| orders | customers, stores | customer_id, store_id | |
-| complaints | customers, orders, stores | | Central entity |
-| complaint_status_history | complaints | complaint_id | Immutable |
-| complaint_comments | complaints | complaint_id | |
-| work_orders | stores | store_id | |
-| alerts | stores | store_id | Optional (network-wide alerts) |
-| fraud_reviews | complaints, customers | | |
-| fraud_risk_factors | fraud_reviews | fraud_review_id | |
-| fraud_review_history | fraud_reviews | fraud_review_id | |
-| notifications | profiles | recipient_id | |
-| audit_logs | profiles | actor_id | Append-only |
+| Child Table              | Parent                    | FK                    | Notes                          |
+| ------------------------ | ------------------------- | --------------------- | ------------------------------ |
+| profiles                 | auth.users                | id                    | 1:1                            |
+| stores                   | —                         | —                     | Root entity                    |
+| pulse_scores             | stores                    | store_id              | Many per store (history)       |
+| store_metrics_snapshots  | stores                    | store_id              | Hourly snapshots               |
+| customers                | profiles                  | profile_id            | Optional (ops agents see all)  |
+| orders                   | customers, stores         | customer_id, store_id |                                |
+| complaints               | customers, orders, stores |                       | Central entity                 |
+| complaint_status_history | complaints                | complaint_id          | Immutable                      |
+| complaint_comments       | complaints                | complaint_id          |                                |
+| work_orders              | stores                    | store_id              |                                |
+| alerts                   | stores                    | store_id              | Optional (network-wide alerts) |
+| fraud_reviews            | complaints, customers     |                       |                                |
+| fraud_risk_factors       | fraud_reviews             | fraud_review_id       |                                |
+| fraud_review_history     | fraud_reviews             | fraud_review_id       |                                |
+| notifications            | profiles                  | recipient_id          |                                |
+| audit_logs               | profiles                  | actor_id              | Append-only                    |

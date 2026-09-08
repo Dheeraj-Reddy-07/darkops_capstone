@@ -1,8 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  ArrowLeft, Clock, User, AlertTriangle, CheckCircle2,
-  Paperclip, MessageSquare, Tag, Building2, Package,
-  ShoppingCart, Upload, X, ChevronDown, Loader2
+  ArrowLeft,
+  Clock,
+  User,
+  AlertTriangle,
+  CheckCircle2,
+  Paperclip,
+  MessageSquare,
+  Tag,
+  Building2,
+  Package,
+  ShoppingCart,
+  Upload,
+  X,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import {
   Panel,
@@ -54,8 +66,11 @@ function formatSla(deadline: string | null): string {
 
 function formatTs(ts: string): string {
   return new Date(ts).toLocaleString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -85,7 +100,7 @@ function SlaBanner({ deadline }: { deadline: string | null }) {
         "flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium",
         state === "breached"
           ? "border-crit/40 bg-crit-soft/20 text-crit"
-          : "border-warn/40 bg-warn-soft/20 text-warn"
+          : "border-warn/40 bg-warn-soft/20 text-warn",
       )}
     >
       <AlertTriangle className="size-4 flex-shrink-0" />
@@ -107,12 +122,41 @@ const EVENT_LABELS: Record<string, string> = {
 
 function EventIcon({ type }: { type: string }) {
   const base = "flex size-7 items-center justify-center rounded-full border";
-  if (type === "created") return <span className={cn(base, "border-border bg-surface-3")}><Tag className="size-3.5 text-muted-foreground" /></span>;
-  if (type === "assigned") return <span className={cn(base, "border-primary/30 bg-primary/10")}><User className="size-3.5 text-primary" /></span>;
-  if (type === "status_changed") return <span className={cn(base, "border-info/30 bg-info/10")}><Clock className="size-3.5 text-info" /></span>;
-  if (type === "resolved") return <span className={cn(base, "border-ok/30 bg-ok/10")}><CheckCircle2 className="size-3.5 text-ok" /></span>;
-  if (type === "attachment_added") return <span className={cn(base, "border-border bg-surface-3")}><Paperclip className="size-3.5 text-muted-foreground" /></span>;
-  return <span className={cn(base, "border-border bg-surface-3")}><MessageSquare className="size-3.5 text-muted-foreground" /></span>;
+  if (type === "created")
+    return (
+      <span className={cn(base, "border-border bg-surface-3")}>
+        <Tag className="size-3.5 text-muted-foreground" />
+      </span>
+    );
+  if (type === "assigned")
+    return (
+      <span className={cn(base, "border-primary/30 bg-primary/10")}>
+        <User className="size-3.5 text-primary" />
+      </span>
+    );
+  if (type === "status_changed")
+    return (
+      <span className={cn(base, "border-info/30 bg-info/10")}>
+        <Clock className="size-3.5 text-info" />
+      </span>
+    );
+  if (type === "resolved")
+    return (
+      <span className={cn(base, "border-ok/30 bg-ok/10")}>
+        <CheckCircle2 className="size-3.5 text-ok" />
+      </span>
+    );
+  if (type === "attachment_added")
+    return (
+      <span className={cn(base, "border-border bg-surface-3")}>
+        <Paperclip className="size-3.5 text-muted-foreground" />
+      </span>
+    );
+  return (
+    <span className={cn(base, "border-border bg-surface-3")}>
+      <MessageSquare className="size-3.5 text-muted-foreground" />
+    </span>
+  );
 }
 
 function EventDescription({ event }: { event: any }) {
@@ -120,12 +164,17 @@ function EventDescription({ event }: { event: any }) {
   const actorName = actor?.full_name || "System";
 
   if (event_type === "created") {
-    return <span><strong>{actorName}</strong> {payload?.title || "created this ticket"}</span>;
+    return (
+      <span>
+        <strong>{actorName}</strong> {payload?.title || "created this ticket"}
+      </span>
+    );
   }
   if (event_type === "assigned") {
     return (
       <span>
-        <strong>{actorName}</strong> assigned to <strong>{payload?.to_name || payload?.to || "unknown"}</strong>
+        <strong>{actorName}</strong> assigned to{" "}
+        <strong>{payload?.to_name || payload?.to || "unknown"}</strong>
         {payload?.from && ` (from ${payload.from})`}
       </span>
     );
@@ -134,10 +183,11 @@ function EventDescription({ event }: { event: any }) {
     return (
       <span>
         <strong>{actorName}</strong> changed status from{" "}
-        <Chip className="inline">{payload?.from}</Chip>{" "}
-        to{" "}
+        <Chip className="inline">{payload?.from}</Chip> to{" "}
         <Chip className="inline">{payload?.to}</Chip>
-        {payload?.note && <span className="block mt-1 text-muted-foreground italic">"{payload.note}"</span>}
+        {payload?.note && (
+          <span className="block mt-1 text-muted-foreground italic">"{payload.note}"</span>
+        )}
       </span>
     );
   }
@@ -153,19 +203,30 @@ function EventDescription({ event }: { event: any }) {
     return (
       <span>
         <strong>{actorName}</strong> resolved this ticket
-        {payload?.note && <span className="block mt-1 text-muted-foreground italic">"{payload.note}"</span>}
+        {payload?.note && (
+          <span className="block mt-1 text-muted-foreground italic">"{payload.note}"</span>
+        )}
         {payload?.resolution_time_minutes && (
           <span className="block mt-0.5 text-xs text-muted-foreground">
-            Resolution time: {Math.floor(payload.resolution_time_minutes / 60)}h {payload.resolution_time_minutes % 60}m
+            Resolution time: {Math.floor(payload.resolution_time_minutes / 60)}h{" "}
+            {payload.resolution_time_minutes % 60}m
           </span>
         )}
       </span>
     );
   }
   if (event_type === "attachment_added") {
-    return <span><strong>{actorName}</strong> attached <strong>{payload?.filename}</strong></span>;
+    return (
+      <span>
+        <strong>{actorName}</strong> attached <strong>{payload?.filename}</strong>
+      </span>
+    );
   }
-  return <span><strong>{actorName}</strong> {EVENT_LABELS[event_type] || event_type}</span>;
+  return (
+    <span>
+      <strong>{actorName}</strong> {EVENT_LABELS[event_type] || event_type}
+    </span>
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -181,15 +242,26 @@ function TicketDetail() {
     staleTime: 60000,
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
       return profile as any;
     },
   });
 
   // Ticket data
-  const { data: ticket, isLoading, isError, refetch } = useQuery({
+  const {
+    data: ticket,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["support-ticket", id],
     queryFn: () => fetchApi(`/support/tickets/${id}`),
   });
@@ -286,7 +358,9 @@ function TicketDetail() {
     try {
       // Get signed upload URL
       const params = new URLSearchParams({ filename: file.name, content_type: file.type });
-      const { signed_url, storage_path } = await fetchApi(`/support/tickets/${id}/attachments/upload-url?${params}`);
+      const { signed_url, storage_path } = await fetchApi(
+        `/support/tickets/${id}/attachments/upload-url?${params}`,
+      );
 
       // Upload directly to Supabase Storage
       const uploadRes = await fetch(signed_url, {
@@ -319,7 +393,9 @@ function TicketDetail() {
 
   const handleDownload = async (attachmentId: string, filename: string) => {
     try {
-      const { signed_url } = await fetchApi(`/support/tickets/${id}/attachments/${attachmentId}/download`);
+      const { signed_url } = await fetchApi(
+        `/support/tickets/${id}/attachments/${attachmentId}/download`,
+      );
       const a = document.createElement("a");
       a.href = signed_url;
       a.download = filename;
@@ -387,15 +463,23 @@ function TicketDetail() {
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 text-xs",
-                  slaState === "breached" ? "text-crit" :
-                  slaState === "at_risk" ? "text-warn" : "text-ok"
+                  slaState === "breached"
+                    ? "text-crit"
+                    : slaState === "at_risk"
+                      ? "text-warn"
+                      : "text-ok",
                 )}
               >
-                <span className={cn(
-                  "size-1.5 rounded-full",
-                  slaState === "breached" ? "bg-crit" :
-                  slaState === "at_risk" ? "bg-warn animate-pulse" : "bg-ok"
-                )} />
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    slaState === "breached"
+                      ? "bg-crit"
+                      : slaState === "at_risk"
+                        ? "bg-warn animate-pulse"
+                        : "bg-ok",
+                  )}
+                />
                 {formatSla(ticket.sla_deadline)}
               </span>
             )}
@@ -405,10 +489,8 @@ function TicketDetail() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]">
-
         {/* LEFT: Issue summary, context, timeline, attachments */}
         <div className="space-y-5 min-w-0">
-
           {/* Issue Summary */}
           <Panel>
             <PanelHeader title="Issue Summary" />
@@ -416,7 +498,10 @@ function TicketDetail() {
               <div>
                 <div className="label-caps mb-1">Description</div>
                 <p className="text-sm text-foreground leading-relaxed">
-                  {ticket.complaints?.detail || ticket.complaints?.summary || ticket.title || "No description available."}
+                  {ticket.complaints?.detail ||
+                    ticket.complaints?.summary ||
+                    ticket.title ||
+                    "No description available."}
                 </p>
               </div>
               {ticket.complaints?.category && (
@@ -440,7 +525,9 @@ function TicketDetail() {
                       <User className="size-3.5 text-muted-foreground" />
                       <span className="text-sm text-foreground">{ticket.customer.full_name}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 ml-[22px]">{ticket.customer.email}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 ml-[22px]">
+                      {ticket.customer.email}
+                    </div>
                   </div>
                 )}
                 {ticket.order && (
@@ -451,8 +538,10 @@ function TicketDetail() {
                       <span className="num text-sm text-foreground">{ticket.order.id}</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 ml-[22px]">
-                      {ticket.order.items_preview || `${ticket.order.item_count} item${ticket.order.item_count !== 1 ? "s" : ""}`}
-                      {ticket.order.total_amount_paise > 0 && ` · ${formatCurrency(ticket.order.total_amount_paise)}`}
+                      {ticket.order.items_preview ||
+                        `${ticket.order.item_count} item${ticket.order.item_count !== 1 ? "s" : ""}`}
+                      {ticket.order.total_amount_paise > 0 &&
+                        ` · ${formatCurrency(ticket.order.total_amount_paise)}`}
                     </div>
                     <div className="text-xs text-muted-foreground ml-[22px]">
                       Placed: {formatTs(ticket.order.placed_at)}
@@ -521,7 +610,10 @@ function TicketDetail() {
                     Save note
                   </button>
                   <button
-                    onClick={() => { setShowNoteForm(false); setNoteText(""); }}
+                    onClick={() => {
+                      setShowNoteForm(false);
+                      setNoteText("");
+                    }}
                     className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface-2"
                   >
                     Cancel
@@ -564,13 +656,18 @@ function TicketDetail() {
             <PanelHeader
               title="Attachments"
               right={
-                !isResolved && isAssignedToMe && (
+                !isResolved &&
+                isAssignedToMe && (
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 disabled:opacity-50"
                   >
-                    {uploading ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+                    {uploading ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Upload className="size-3" />
+                    )}
                     {uploading ? "Uploading…" : "Attach file"}
                   </button>
                 )
@@ -594,10 +691,14 @@ function TicketDetail() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Paperclip className="size-3.5 text-muted-foreground flex-shrink-0" />
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-foreground truncate">{att.filename}</div>
+                          <div className="text-sm font-medium text-foreground truncate">
+                            {att.filename}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {att.uploader?.full_name || "Unknown"} · {formatRelative(att.uploaded_at)}
-                            {att.file_size_bytes && ` · ${(att.file_size_bytes / 1024).toFixed(1)} KB`}
+                            {att.uploader?.full_name || "Unknown"} ·{" "}
+                            {formatRelative(att.uploaded_at)}
+                            {att.file_size_bytes &&
+                              ` · ${(att.file_size_bytes / 1024).toFixed(1)} KB`}
                           </div>
                         </div>
                       </div>
@@ -619,7 +720,6 @@ function TicketDetail() {
 
         {/* RIGHT: Actions, assignment, metadata */}
         <div className="space-y-4">
-
           {/* Assignment Panel */}
           <Panel>
             <PanelHeader title="Assignment" />
@@ -629,13 +729,19 @@ function TicketDetail() {
                 {ticket.assigned_to_profile ? (
                   <div className="flex items-center gap-2">
                     <span className="flex size-7 items-center justify-center rounded-full bg-surface-3 text-[11px] font-semibold">
-                      {ticket.assigned_to_profile.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                      {ticket.assigned_to_profile.full_name
+                        ?.split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .slice(0, 2)}
                     </span>
                     <div>
                       <div className="text-sm font-medium text-foreground">
                         {isAssignedToMe ? "You" : ticket.assigned_to_profile.full_name}
                       </div>
-                      <div className="text-xs text-muted-foreground">{ticket.assigned_to_profile.email}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {ticket.assigned_to_profile.email}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -660,7 +766,6 @@ function TicketDetail() {
             <Panel>
               <PanelHeader title="Actions" />
               <div className="p-4 space-y-2">
-
                 {/* Status change */}
                 {nextStatuses.length > 0 && (
                   <div className="relative">
@@ -670,10 +775,11 @@ function TicketDetail() {
                       className="w-full flex items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs hover:bg-surface-3 transition-colors disabled:opacity-50"
                     >
                       <span className="font-medium">Change Status</span>
-                      {statusMutation.isPending
-                        ? <Loader2 className="size-3 animate-spin" />
-                        : <ChevronDown className="size-3" />
-                      }
+                      {statusMutation.isPending ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <ChevronDown className="size-3" />
+                      )}
                     </button>
                     {statusDropdownOpen && (
                       <div className="absolute z-20 left-0 right-0 top-full mt-1 rounded-md border border-border bg-background shadow-lg">
@@ -724,13 +830,16 @@ function TicketDetail() {
                       <button
                         onClick={() => resolveMutation.mutate()}
                         disabled={resolutionNote.trim().length < 5 || resolveMutation.isPending}
-                        className="flex items-center gap-1.5 rounded-md bg-ok px-3 py-1.5 text-xs font-medium text-white hover:bg-ok/90 disabled:opacity-50 transition-colors"
+                        className="flex items-center gap-1.5 rounded-md bg-ok px-3 py-1.5 text-xs font-medium text-ok-soft hover:bg-ok/90 disabled:opacity-50 transition-colors"
                       >
                         {resolveMutation.isPending && <Loader2 className="size-3 animate-spin" />}
                         Confirm resolve
                       </button>
                       <button
-                        onClick={() => { setShowResolveForm(false); setResolutionNote(""); }}
+                        onClick={() => {
+                          setShowResolveForm(false);
+                          setResolutionNote("");
+                        }}
                         className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface-2"
                       >
                         <X className="size-3" />
@@ -749,19 +858,24 @@ function TicketDetail() {
               <div className="p-4 space-y-3">
                 <div>
                   <div className="label-caps mb-1">Resolution Note</div>
-                  <p className="text-sm text-foreground leading-relaxed">{ticket.resolution_notes}</p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {ticket.resolution_notes}
+                  </p>
                 </div>
                 {ticket.resolved_by_profile && (
                   <div>
                     <div className="label-caps mb-1">Resolved by</div>
-                    <div className="text-sm text-foreground">{ticket.resolved_by_profile.full_name}</div>
+                    <div className="text-sm text-foreground">
+                      {ticket.resolved_by_profile.full_name}
+                    </div>
                   </div>
                 )}
                 {ticket.resolution_time_minutes && (
                   <div>
                     <div className="label-caps mb-1">Time to resolve</div>
                     <span className="num text-sm text-foreground">
-                      {Math.floor(ticket.resolution_time_minutes / 60)}h {ticket.resolution_time_minutes % 60}m
+                      {Math.floor(ticket.resolution_time_minutes / 60)}h{" "}
+                      {ticket.resolution_time_minutes % 60}m
                     </span>
                   </div>
                 )}
@@ -781,25 +895,32 @@ function TicketDetail() {
                   ? {
                       label: "SLA deadline",
                       value: (
-                        <span className={cn(
-                          "text-sm",
-                          slaState === "breached" ? "text-crit font-medium" :
-                          slaState === "at_risk" ? "text-warn font-medium" : "text-foreground"
-                        )}>
+                        <span
+                          className={cn(
+                            "text-sm",
+                            slaState === "breached"
+                              ? "text-crit font-medium"
+                              : slaState === "at_risk"
+                                ? "text-warn font-medium"
+                                : "text-foreground",
+                          )}
+                        >
                           {formatTs(ticket.sla_deadline)}
                         </span>
-                      )
+                      ),
                     }
                   : null,
                 ticket.created_by_profile
                   ? { label: "Created by", value: ticket.created_by_profile.full_name }
                   : null,
-              ].filter(Boolean).map((item: any) => (
-                <div key={item.label}>
-                  <div className="label-caps mb-0.5">{item.label}</div>
-                  <div className="text-sm text-foreground">{item.value}</div>
-                </div>
-              ))}
+              ]
+                .filter(Boolean)
+                .map((item: any) => (
+                  <div key={item.label}>
+                    <div className="label-caps mb-0.5">{item.label}</div>
+                    <div className="text-sm text-foreground">{item.value}</div>
+                  </div>
+                ))}
             </div>
           </Panel>
         </div>
@@ -813,17 +934,28 @@ function TicketDetail() {
 function StatusChip({ status }: { status: string }) {
   const s = status.toLowerCase();
   const tone =
-    s === "resolved" || s === "closed" ? "ok" :
-    s === "escalated" ? "crit" :
-    s === "in_progress" ? "info" :
-    s === "awaiting_customer" ? "warn" : "neutral";
+    s === "resolved" || s === "closed"
+      ? "ok"
+      : s === "escalated"
+        ? "crit"
+        : s === "in_progress"
+          ? "info"
+          : s === "awaiting_customer"
+            ? "warn"
+            : "neutral";
   const label =
-    s === "in_progress" ? "In Progress" :
-    s === "awaiting_customer" ? "Awaiting" :
-    s === "resolved" ? "Resolved" :
-    s === "closed" ? "Closed" :
-    s === "open" ? "Open" :
-    s === "escalated" ? "Escalated" :
-    s.charAt(0).toUpperCase() + s.slice(1);
+    s === "in_progress"
+      ? "In Progress"
+      : s === "awaiting_customer"
+        ? "Awaiting"
+        : s === "resolved"
+          ? "Resolved"
+          : s === "closed"
+            ? "Closed"
+            : s === "open"
+              ? "Open"
+              : s === "escalated"
+                ? "Escalated"
+                : s.charAt(0).toUpperCase() + s.slice(1);
   return <Chip tone={tone}>{label}</Chip>;
 }

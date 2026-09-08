@@ -21,7 +21,10 @@ export function StoreHeatmap() {
     cityMap.get(city)!.push(store);
   }
   const cities = Array.from(cityMap.keys()).sort();
-  const cols = [cities.slice(0, Math.ceil(cities.length / 2)), cities.slice(Math.ceil(cities.length / 2))];
+  const cols = [
+    cities.slice(0, Math.ceil(cities.length / 2)),
+    cities.slice(Math.ceil(cities.length / 2)),
+  ];
 
   if (stores.length === 0) {
     return (

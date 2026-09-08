@@ -11,9 +11,11 @@ Timestamps use ISO 8601 strings in UTC.
 ## 1. Authentication & Identity
 
 ### `GET /api/v1/me`
+
 Retrieves the profile and role of the currently authenticated user.
 
 **Response** (200 OK)
+
 ```json
 {
   "id": "uuid",
@@ -30,9 +32,11 @@ Retrieves the profile and role of the currently authenticated user.
 ## 2. Executive Dashboard
 
 ### `GET /api/v1/executive/overview`
+
 Requires role: `EXECUTIVE` or `ADMIN`.
 
 **Response** (200 OK)
+
 ```json
 {
   "store_count": 200,
@@ -49,9 +53,11 @@ Requires role: `EXECUTIVE` or `ADMIN`.
 ```
 
 ### `GET /api/v1/executive/alerts`
+
 Retrieves active network-level alerts.
 
 **Response** (200 OK)
+
 ```json
 [
   {
@@ -66,9 +72,11 @@ Retrieves active network-level alerts.
 ```
 
 ### `POST /api/v1/executive/insights`
+
 Submits a natural language query against operational data.
 
 **Request**
+
 ```json
 {
   "query": "Which stores in Bangalore have SLA below 90% today?"
@@ -76,16 +84,13 @@ Submits a natural language query against operational data.
 ```
 
 **Response** (200 OK)
+
 ```json
 {
   "answer": "There are 4 stores in Bengaluru with SLA below 90% today...",
-  "metrics": [
-    { "label": "Affected stores", "value": "4", "tone": "warn" }
-  ],
+  "metrics": [{ "label": "Affected stores", "value": "4", "tone": "warn" }],
   "causes": ["Rider shortage", "Rain"],
-  "stores": [
-    { "id": "DS-BLR-01", "note": "88% SLA" }
-  ],
+  "stores": [{ "id": "DS-BLR-01", "note": "88% SLA" }],
   "action": "Rebalance rider pool from Koramangala hub.",
   "sources": "stores, cases (last 24h)"
 }
@@ -96,9 +101,11 @@ Submits a natural language query against operational data.
 ## 3. Dark Stores
 
 ### `GET /api/v1/stores`
+
 List all stores. Filters via query params (`?city=Bengaluru&zone=South&status=critical`).
 
 **Response** (200 OK)
+
 ```json
 {
   "data": [
@@ -120,9 +127,11 @@ List all stores. Filters via query params (`?city=Bengaluru&zone=South&status=cr
 ```
 
 ### `GET /api/v1/stores/:id`
+
 Get full details for a single store, including current PulseScore components.
 
 **Response** (200 OK)
+
 ```json
 {
   "id": "DS-1462",
@@ -147,9 +156,11 @@ Get full details for a single store, including current PulseScore components.
 ```
 
 ### `GET /api/v1/stores/:id/work-orders`
+
 List work orders for a specific store.
 
 **Response** (200 OK)
+
 ```json
 [
   {
@@ -168,10 +179,12 @@ List work orders for a specific store.
 ## 4. Cases & Complaints
 
 ### `GET /api/v1/cases`
+
 List complaints in the queue.
 Supports pagination and filters (`?status=unassigned&priority=P1`).
 
 **Response** (200 OK)
+
 ```json
 {
   "data": [
@@ -193,23 +206,28 @@ Supports pagination and filters (`?status=unassigned&priority=P1`).
 ```
 
 ### `GET /api/v1/cases/:id`
+
 Detailed view of a case.
 
 ### `POST /api/v1/cases/:id/assign`
+
 Assign a case to an agent.
 Requires role: `OPERATIONS_MANAGER` (can assign to anyone) or `OPERATIONS_AGENT` (can self-assign).
 
 **Request**
+
 ```json
 {
-  "agent_id": "uuid" 
+  "agent_id": "uuid"
 }
 ```
 
 ### `POST /api/v1/cases/:id/escalate`
+
 Escalates a case to L2.
 
 **Request**
+
 ```json
 {
   "note": "Requires store manager intervention regarding damaged freezer."
@@ -217,9 +235,11 @@ Escalates a case to L2.
 ```
 
 ### `POST /api/v1/cases/:id/resolve`
+
 Resolves a case.
 
 **Request**
+
 ```json
 {
   "resolution": "Refund approved and inventory cycle count initiated.",
@@ -228,6 +248,7 @@ Resolves a case.
 ```
 
 ### `GET /api/v1/cases/:id/history`
+
 Returns the status transition history and audit log for a case.
 
 ---
@@ -235,10 +256,12 @@ Returns the status transition history and audit log for a case.
 ## 5. Fraud & Risk Review
 
 ### `GET /api/v1/fraud`
+
 List flagged fraud reviews.
 Requires role: `FRAUD_ANALYST`, `OPERATIONS_MANAGER`, `ADMIN`.
 
 **Response** (200 OK)
+
 ```json
 {
   "data": [
@@ -257,9 +280,11 @@ Requires role: `FRAUD_ANALYST`, `OPERATIONS_MANAGER`, `ADMIN`.
 ```
 
 ### `GET /api/v1/fraud/:id`
+
 Detailed view of a fraud risk case, including contributing factors.
 
 **Response** (200 OK)
+
 ```json
 {
   "id": "CMP-482000",
@@ -279,10 +304,12 @@ Detailed view of a fraud risk case, including contributing factors.
 ```
 
 ### `POST /api/v1/fraud/:id/decision`
+
 Record an analyst decision on a fraud case.
 Requires role: `FRAUD_ANALYST`.
 
 **Request**
+
 ```json
 {
   "decision": "denied",
@@ -295,16 +322,20 @@ Requires role: `FRAUD_ANALYST`.
 ## 6. Customer
 
 ### `GET /api/v1/customer/orders`
+
 Retrieves recent orders for the authenticated customer.
 Requires role: `CUSTOMER`.
 
 ### `GET /api/v1/customer/complaints`
+
 Retrieves open complaints and refund status for the authenticated customer.
 
 ### `POST /api/v1/customer/complaints`
+
 Submit a new complaint.
 
 **Request**
+
 ```json
 {
   "order_id": "ORD-884213",
@@ -318,10 +349,12 @@ Submit a new complaint.
 ## 7. Audit (Internal)
 
 ### `GET /api/v1/audit`
+
 Retrieve the immutable audit log.
 Requires role: `ADMIN`.
 
 **Response** (200 OK)
+
 ```json
 [
   {

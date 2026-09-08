@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
+import { createClient } from "@supabase/supabase-js";
+import * as dotenv from "dotenv";
 dotenv.config();
 
 async function checkDb() {
@@ -12,28 +12,28 @@ async function checkDb() {
   }
 
   const supabase = createClient(url, key);
-  
+
   // Check auth and current role
   console.log("Checking session role...");
-  const { data: claims, error: rpcErr } = await supabase.rpc('get_role');
+  const { data: claims, error: rpcErr } = await supabase.rpc("get_role");
   console.log("Role RPC result:", { claims, error: rpcErr });
-  
+
   const { data: user, error } = await supabase.auth.getUser();
   console.log("Auth user:", user, "Error:", error);
 
   // Check tables
-  const tables = ['profiles', 'fraud_reviews'];
-  
+  const tables = ["profiles", "fraud_reviews"];
+
   const results = {};
   for (const t of tables) {
-    const { data, error } = await supabase.from(t).select('id').limit(1);
+    const { data, error } = await supabase.from(t).select("id").limit(1);
     if (error) {
       results[t] = `Error: ${error.message}`;
     } else {
       results[t] = "Exists";
     }
   }
-  
+
   console.log(JSON.stringify(results, null, 2));
 }
 

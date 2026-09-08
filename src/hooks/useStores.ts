@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchApi } from '../lib/api';
+import { useQuery } from "@tanstack/react-query";
+import { fetchApi } from "../lib/api";
 
 export type StoreStatus = "critical" | "at-risk" | "healthy";
 
@@ -42,14 +42,14 @@ function statusFor(pulse: number): StoreStatus {
 
 export function useStores(enabled: boolean = true) {
   return useQuery({
-    queryKey: ['stores'],
+    queryKey: ["stores"],
     queryFn: async () => {
-      const response = await fetchApi('/stores?limit=200');
-      
+      const response = await fetchApi("/stores?limit=200");
+
       const stores: DarkStore[] = response.data.map((row: any) => {
         const pulse = row.pulse || 0;
         const pulseData = row.pulse_scores || {};
-        
+
         const breakdown: PulseBreakdown = {
           equipment: pulseData.equipment_pts || 0,
           sla: pulseData.sla_pts || 0,
@@ -64,7 +64,7 @@ export function useStores(enabled: boolean = true) {
           name: row.name,
           city: row.city,
           zone: row.zone,
-          manager: row.manager_name || 'Manager',
+          manager: row.manager_name || "Manager",
           pulse,
           prevPulse: pulse,
           sla: row.metrics?.sla_pct || 0,
@@ -82,11 +82,19 @@ export function useStores(enabled: boolean = true) {
         };
       });
 
-      const avgPulse = Math.round(stores.reduce((a, s) => a + s.pulse, 0) / Math.max(1, stores.length));
+      const avgPulse = Math.round(
+        stores.reduce((a, s) => a + s.pulse, 0) / Math.max(1, stores.length),
+      );
       const criticalStores = stores.filter((s) => s.status === "critical").length;
-      const avgSla = (stores.reduce((a, s) => a + s.sla, 0) / Math.max(1, stores.length)).toFixed(1);
-      const avgRefundRate = (stores.reduce((a, s) => a + s.refundRate, 0) / Math.max(1, stores.length)).toFixed(1);
-      const avgResolution = Math.round(stores.reduce((a, s) => a + s.avgResolutionMins, 0) / Math.max(1, stores.length));
+      const avgSla = (stores.reduce((a, s) => a + s.sla, 0) / Math.max(1, stores.length)).toFixed(
+        1,
+      );
+      const avgRefundRate = (
+        stores.reduce((a, s) => a + s.refundRate, 0) / Math.max(1, stores.length)
+      ).toFixed(1);
+      const avgResolution = Math.round(
+        stores.reduce((a, s) => a + s.avgResolutionMins, 0) / Math.max(1, stores.length),
+      );
 
       const worstStores = [...stores].sort((a, b) => a.pulse - b.pulse).slice(0, 5);
 
@@ -94,7 +102,7 @@ export function useStores(enabled: boolean = true) {
         stores,
         kpis: {
           storeCount: stores.length,
-          cityCount: new Set(stores.map(s => s.city)).size,
+          cityCount: new Set(stores.map((s) => s.city)).size,
           avgPulse,
           criticalStores,
           avgSla,

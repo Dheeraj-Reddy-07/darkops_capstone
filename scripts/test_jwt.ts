@@ -1,4 +1,4 @@
-import * as dotenv from 'dotenv';
+import * as dotenv from "dotenv";
 dotenv.config();
 
 async function testToken() {
@@ -7,14 +7,14 @@ async function testToken() {
 
   const res = await fetch(`${url}/rest/v1/profiles?select=id&limit=1`, {
     headers: {
-      'apikey': key!,
-      'Authorization': `Bearer ${key}`
-    }
+      apikey: key!,
+      Authorization: `Bearer ${key}`,
+    },
   });
 
   const text = await res.text();
-  console.log('Status:', res.status);
-  console.log('Body:', text);
+  console.log("Status:", res.status);
+  console.log("Body:", text);
 }
 
 testToken();

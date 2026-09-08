@@ -15,9 +15,11 @@ import { Route as OperationsRouteImport } from './routes/operations'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAuditLogsRouteImport } from './routes/admin.audit-logs'
+import { Route as AdminSecurityRouteImport } from './routes/admin.security'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as CasesIdRouteImport } from './routes/cases.$id'
 import { Route as CustomerIndexRouteImport } from './routes/customer.index'
+import { Route as CustomerChatRouteImport } from './routes/customer.chat'
 import { Route as CustomerProfileRouteImport } from './routes/customer.profile'
 import { Route as CustomerSupportRouteImport } from './routes/customer.support'
 import { Route as DarkStoresIndexRouteImport } from './routes/dark-stores.index'
@@ -25,6 +27,12 @@ import { Route as ExecutiveIndexRouteImport } from './routes/executive.index'
 import { Route as FraudIndexRouteImport } from './routes/fraud.index'
 import { Route as FraudIdRouteImport } from './routes/fraud.$id'
 import { Route as SupportIndexRouteImport } from './routes/support.index'
+import { Route as AdminSecurityEventsRouteImport } from './routes/admin.security.events'
+import { Route as AdminSecurityUserActivityRouteImport } from './routes/admin.security.user-activity'
+import { Route as CustomerComplaintsIndexRouteImport } from './routes/customer.complaints.index'
+import { Route as CustomerComplaintsIdRouteImport } from './routes/customer.complaints_.$id'
+import { Route as CustomerOrdersIndexRouteImport } from './routes/customer.orders.index'
+import { Route as CustomerOrdersIdRouteImport } from './routes/customer.orders_.$id'
 import { Route as DarkStoresIdIndexRouteImport } from './routes/dark-stores.$id.index'
 import { Route as DarkStoresIdPulseRouteImport } from './routes/dark-stores.$id.pulse'
 import { Route as SupportTicketsIdRouteImport } from './routes/support.tickets.$id'
@@ -59,6 +67,11 @@ const AdminAuditLogsRoute = AdminAuditLogsRouteImport.update({
   path: '/admin/audit-logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSecurityRoute = AdminSecurityRouteImport.update({
+  id: '/admin/security',
+  path: '/admin/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -72,6 +85,11 @@ const CasesIdRoute = CasesIdRouteImport.update({
 const CustomerIndexRoute = CustomerIndexRouteImport.update({
   id: '/customer/',
   path: '/customer/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerChatRoute = CustomerChatRouteImport.update({
+  id: '/customer/chat',
+  path: '/customer/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomerProfileRoute = CustomerProfileRouteImport.update({
@@ -109,6 +127,37 @@ const SupportIndexRoute = SupportIndexRouteImport.update({
   path: '/support/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSecurityEventsRoute = AdminSecurityEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AdminSecurityRoute,
+} as any)
+const AdminSecurityUserActivityRoute =
+  AdminSecurityUserActivityRouteImport.update({
+    id: '/user-activity',
+    path: '/user-activity',
+    getParentRoute: () => AdminSecurityRoute,
+  } as any)
+const CustomerComplaintsIndexRoute = CustomerComplaintsIndexRouteImport.update({
+  id: '/customer/complaints/',
+  path: '/customer/complaints/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerComplaintsIdRoute = CustomerComplaintsIdRouteImport.update({
+  id: '/customer/complaints_/$id',
+  path: '/customer/complaints/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerOrdersIndexRoute = CustomerOrdersIndexRouteImport.update({
+  id: '/customer/orders/',
+  path: '/customer/orders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerOrdersIdRoute = CustomerOrdersIdRouteImport.update({
+  id: '/customer/orders_/$id',
+  path: '/customer/orders/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DarkStoresIdIndexRoute = DarkStoresIdIndexRouteImport.update({
   id: '/dark-stores/$id/',
   path: '/dark-stores/$id/',
@@ -131,8 +180,10 @@ export interface FileRoutesByFullPath {
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
+  '/admin/security': typeof AdminSecurityRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
+  '/customer/chat': typeof CustomerChatRoute
   '/customer/profile': typeof CustomerProfileRoute
   '/customer/support': typeof CustomerSupportRoute
   '/fraud/$id': typeof FraudIdRoute
@@ -142,8 +193,14 @@ export interface FileRoutesByFullPath {
   '/executive/': typeof ExecutiveIndexRoute
   '/fraud/': typeof FraudIndexRoute
   '/support/': typeof SupportIndexRoute
+  '/admin/security/events': typeof AdminSecurityEventsRoute
+  '/admin/security/user-activity': typeof AdminSecurityUserActivityRoute
+  '/customer/complaints/$id': typeof CustomerComplaintsIdRoute
+  '/customer/orders/$id': typeof CustomerOrdersIdRoute
   '/dark-stores/$id/pulse': typeof DarkStoresIdPulseRoute
   '/support/tickets/$id': typeof SupportTicketsIdRoute
+  '/customer/complaints/': typeof CustomerComplaintsIndexRoute
+  '/customer/orders/': typeof CustomerOrdersIndexRoute
   '/dark-stores/$id/': typeof DarkStoresIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -152,8 +209,10 @@ export interface FileRoutesByTo {
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
+  '/admin/security': typeof AdminSecurityRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
+  '/customer/chat': typeof CustomerChatRoute
   '/customer/profile': typeof CustomerProfileRoute
   '/customer/support': typeof CustomerSupportRoute
   '/fraud/$id': typeof FraudIdRoute
@@ -163,8 +222,14 @@ export interface FileRoutesByTo {
   '/executive': typeof ExecutiveIndexRoute
   '/fraud': typeof FraudIndexRoute
   '/support': typeof SupportIndexRoute
+  '/admin/security/events': typeof AdminSecurityEventsRoute
+  '/admin/security/user-activity': typeof AdminSecurityUserActivityRoute
+  '/customer/complaints/$id': typeof CustomerComplaintsIdRoute
+  '/customer/orders/$id': typeof CustomerOrdersIdRoute
   '/dark-stores/$id/pulse': typeof DarkStoresIdPulseRoute
   '/support/tickets/$id': typeof SupportTicketsIdRoute
+  '/customer/complaints': typeof CustomerComplaintsIndexRoute
+  '/customer/orders': typeof CustomerOrdersIndexRoute
   '/dark-stores/$id': typeof DarkStoresIdIndexRoute
 }
 export interface FileRoutesById {
@@ -174,8 +239,10 @@ export interface FileRoutesById {
   '/operations': typeof OperationsRoute
   '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
+  '/admin/security': typeof AdminSecurityRouteWithChildren
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
+  '/customer/chat': typeof CustomerChatRoute
   '/customer/profile': typeof CustomerProfileRoute
   '/customer/support': typeof CustomerSupportRoute
   '/fraud/$id': typeof FraudIdRoute
@@ -185,8 +252,14 @@ export interface FileRoutesById {
   '/executive/': typeof ExecutiveIndexRoute
   '/fraud/': typeof FraudIndexRoute
   '/support/': typeof SupportIndexRoute
+  '/admin/security/events': typeof AdminSecurityEventsRoute
+  '/admin/security/user-activity': typeof AdminSecurityUserActivityRoute
+  '/customer/complaints_/$id': typeof CustomerComplaintsIdRoute
+  '/customer/orders_/$id': typeof CustomerOrdersIdRoute
   '/dark-stores/$id/pulse': typeof DarkStoresIdPulseRoute
   '/support/tickets/$id': typeof SupportTicketsIdRoute
+  '/customer/complaints/': typeof CustomerComplaintsIndexRoute
+  '/customer/orders/': typeof CustomerOrdersIndexRoute
   '/dark-stores/$id/': typeof DarkStoresIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -197,8 +270,10 @@ export interface FileRouteTypes {
     | '/operations'
     | '/settings'
     | '/admin/audit-logs'
+    | '/admin/security'
     | '/admin/users'
     | '/cases/$id'
+    | '/customer/chat'
     | '/customer/profile'
     | '/customer/support'
     | '/fraud/$id'
@@ -208,8 +283,14 @@ export interface FileRouteTypes {
     | '/executive/'
     | '/fraud/'
     | '/support/'
+    | '/admin/security/events'
+    | '/admin/security/user-activity'
+    | '/customer/complaints/$id'
+    | '/customer/orders/$id'
     | '/dark-stores/$id/pulse'
     | '/support/tickets/$id'
+    | '/customer/complaints/'
+    | '/customer/orders/'
     | '/dark-stores/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -218,8 +299,10 @@ export interface FileRouteTypes {
     | '/operations'
     | '/settings'
     | '/admin/audit-logs'
+    | '/admin/security'
     | '/admin/users'
     | '/cases/$id'
+    | '/customer/chat'
     | '/customer/profile'
     | '/customer/support'
     | '/fraud/$id'
@@ -229,8 +312,14 @@ export interface FileRouteTypes {
     | '/executive'
     | '/fraud'
     | '/support'
+    | '/admin/security/events'
+    | '/admin/security/user-activity'
+    | '/customer/complaints/$id'
+    | '/customer/orders/$id'
     | '/dark-stores/$id/pulse'
     | '/support/tickets/$id'
+    | '/customer/complaints'
+    | '/customer/orders'
     | '/dark-stores/$id'
   id:
     | '__root__'
@@ -239,8 +328,10 @@ export interface FileRouteTypes {
     | '/operations'
     | '/settings'
     | '/admin/audit-logs'
+    | '/admin/security'
     | '/admin/users'
     | '/cases/$id'
+    | '/customer/chat'
     | '/customer/profile'
     | '/customer/support'
     | '/fraud/$id'
@@ -250,8 +341,14 @@ export interface FileRouteTypes {
     | '/executive/'
     | '/fraud/'
     | '/support/'
+    | '/admin/security/events'
+    | '/admin/security/user-activity'
+    | '/customer/complaints_/$id'
+    | '/customer/orders_/$id'
     | '/dark-stores/$id/pulse'
     | '/support/tickets/$id'
+    | '/customer/complaints/'
+    | '/customer/orders/'
     | '/dark-stores/$id/'
   fileRoutesById: FileRoutesById
 }
@@ -261,8 +358,10 @@ export interface RootRouteChildren {
   OperationsRoute: typeof OperationsRoute
   SettingsRoute: typeof SettingsRoute
   AdminAuditLogsRoute: typeof AdminAuditLogsRoute
+  AdminSecurityRoute: typeof AdminSecurityRouteWithChildren
   AdminUsersRoute: typeof AdminUsersRoute
   CasesIdRoute: typeof CasesIdRoute
+  CustomerChatRoute: typeof CustomerChatRoute
   CustomerProfileRoute: typeof CustomerProfileRoute
   CustomerSupportRoute: typeof CustomerSupportRoute
   FraudIdRoute: typeof FraudIdRoute
@@ -272,8 +371,12 @@ export interface RootRouteChildren {
   ExecutiveIndexRoute: typeof ExecutiveIndexRoute
   FraudIndexRoute: typeof FraudIndexRoute
   SupportIndexRoute: typeof SupportIndexRoute
+  CustomerComplaintsIdRoute: typeof CustomerComplaintsIdRoute
+  CustomerOrdersIdRoute: typeof CustomerOrdersIdRoute
   DarkStoresIdPulseRoute: typeof DarkStoresIdPulseRoute
   SupportTicketsIdRoute: typeof SupportTicketsIdRoute
+  CustomerComplaintsIndexRoute: typeof CustomerComplaintsIndexRoute
+  CustomerOrdersIndexRoute: typeof CustomerOrdersIndexRoute
   DarkStoresIdIndexRoute: typeof DarkStoresIdIndexRoute
 }
 
@@ -321,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuditLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/security': {
+      id: '/admin/security'
+      path: '/admin/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AdminSecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/admin/users'
@@ -340,6 +450,13 @@ declare module '@tanstack/react-router' {
       path: '/customer'
       fullPath: '/customer/'
       preLoaderRoute: typeof CustomerIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer/chat': {
+      id: '/customer/chat'
+      path: '/customer/chat'
+      fullPath: '/customer/chat'
+      preLoaderRoute: typeof CustomerChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customer/profile': {
@@ -391,6 +508,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SupportIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/security/events': {
+      id: '/admin/security/events'
+      path: '/events'
+      fullPath: '/admin/security/events'
+      preLoaderRoute: typeof AdminSecurityEventsRouteImport
+      parentRoute: typeof AdminSecurityRoute
+    }
+    '/admin/security/user-activity': {
+      id: '/admin/security/user-activity'
+      path: '/user-activity'
+      fullPath: '/admin/security/user-activity'
+      preLoaderRoute: typeof AdminSecurityUserActivityRouteImport
+      parentRoute: typeof AdminSecurityRoute
+    }
+    '/customer/complaints/': {
+      id: '/customer/complaints/'
+      path: '/customer/complaints'
+      fullPath: '/customer/complaints/'
+      preLoaderRoute: typeof CustomerComplaintsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer/complaints_/$id': {
+      id: '/customer/complaints_/$id'
+      path: '/customer/complaints/$id'
+      fullPath: '/customer/complaints/$id'
+      preLoaderRoute: typeof CustomerComplaintsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer/orders/': {
+      id: '/customer/orders/'
+      path: '/customer/orders'
+      fullPath: '/customer/orders/'
+      preLoaderRoute: typeof CustomerOrdersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customer/orders_/$id': {
+      id: '/customer/orders_/$id'
+      path: '/customer/orders/$id'
+      fullPath: '/customer/orders/$id'
+      preLoaderRoute: typeof CustomerOrdersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dark-stores/$id/': {
       id: '/dark-stores/$id/'
       path: '/dark-stores/$id'
@@ -415,14 +574,30 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminSecurityRouteChildren {
+  AdminSecurityEventsRoute: typeof AdminSecurityEventsRoute
+  AdminSecurityUserActivityRoute: typeof AdminSecurityUserActivityRoute
+}
+
+const AdminSecurityRouteChildren: AdminSecurityRouteChildren = {
+  AdminSecurityEventsRoute: AdminSecurityEventsRoute,
+  AdminSecurityUserActivityRoute: AdminSecurityUserActivityRoute,
+}
+
+const AdminSecurityRouteWithChildren = AdminSecurityRoute._addFileChildren(
+  AdminSecurityRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   OperationsRoute: OperationsRoute,
   SettingsRoute: SettingsRoute,
   AdminAuditLogsRoute: AdminAuditLogsRoute,
+  AdminSecurityRoute: AdminSecurityRouteWithChildren,
   AdminUsersRoute: AdminUsersRoute,
   CasesIdRoute: CasesIdRoute,
+  CustomerChatRoute: CustomerChatRoute,
   CustomerProfileRoute: CustomerProfileRoute,
   CustomerSupportRoute: CustomerSupportRoute,
   FraudIdRoute: FraudIdRoute,
@@ -432,8 +607,12 @@ const rootRouteChildren: RootRouteChildren = {
   ExecutiveIndexRoute: ExecutiveIndexRoute,
   FraudIndexRoute: FraudIndexRoute,
   SupportIndexRoute: SupportIndexRoute,
+  CustomerComplaintsIdRoute: CustomerComplaintsIdRoute,
+  CustomerOrdersIdRoute: CustomerOrdersIdRoute,
   DarkStoresIdPulseRoute: DarkStoresIdPulseRoute,
   SupportTicketsIdRoute: SupportTicketsIdRoute,
+  CustomerComplaintsIndexRoute: CustomerComplaintsIndexRoute,
+  CustomerOrdersIndexRoute: CustomerOrdersIndexRoute,
   DarkStoresIdIndexRoute: DarkStoresIdIndexRoute,
 }
 export const routeTree = rootRouteImport

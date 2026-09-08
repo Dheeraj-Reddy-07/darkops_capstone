@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchApi } from '../lib/api';
+import { useQuery } from "@tanstack/react-query";
+import { fetchApi } from "../lib/api";
 
 export function useExecutive(enabled: boolean = false) {
   return useQuery({
-    queryKey: ['executive-metrics'],
+    queryKey: ["executive-metrics"],
     queryFn: async () => {
-      const response = await fetchApi('/executive/metrics');
-      
+      const response = await fetchApi("/executive/metrics");
+
       const kpis = {
         networkPulse: response.avg_pulse,
         openComplaints: response.active_cases,
@@ -18,16 +18,19 @@ export function useExecutive(enabled: boolean = false) {
         resolvedToday: response.resolved_today,
         pendingFraud: response.pending_fraud,
         // Calculate deltas from available data (deterministic)
-        openComplaintsDelta: response.active_cases > 0 ? Math.round(response.active_cases * 0.05) : 0,
+        openComplaintsDelta:
+          response.active_cases > 0 ? Math.round(response.active_cases * 0.05) : 0,
         complaints24h: response.active_cases,
         pulseDelta: response.avg_pulse > 0 ? Math.round((response.avg_pulse - 75) * 0.1) : 0, // Relative to baseline of 75
         slaDelta: response.sla_at_risk > 0 ? Math.round(response.sla_at_risk * 0.1) : 0,
         slaTarget: 95,
-        resolutionDelta: response.resolved_today > 0 ? Math.round(response.resolved_today * 0.1) : 0,
+        resolutionDelta:
+          response.resolved_today > 0 ? Math.round(response.resolved_today * 0.1) : 0,
         resolutionTarget: 60,
         refundDelta: response.pending_fraud > 0 ? Math.round(response.pending_fraud * 0.1) : 0,
         refundTarget: 2,
-        criticalDelta: response.critical_stores > 0 ? Math.round(response.critical_stores * 0.1) : 0,
+        criticalDelta:
+          response.critical_stores > 0 ? Math.round(response.critical_stores * 0.1) : 0,
       };
 
       const network = {
@@ -74,10 +77,10 @@ export function useExecutive(enabled: boolean = false) {
 
 export function useInsights() {
   return useQuery({
-    queryKey: ['insights'],
+    queryKey: ["insights"],
     queryFn: async () => {
-      const response = await fetchApi('/executive/insights');
+      const response = await fetchApi("/executive/insights");
       return response.insights;
-    }
+    },
   });
 }

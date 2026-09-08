@@ -53,7 +53,8 @@ function FraudQueue() {
 
   const rows = useMemo(() => {
     if (!data?.cases) return [];
-    return data.cases.filter((f) => {
+    return data.cases
+      .filter((f) => {
         if (decision !== "all" && f.decision !== decision) return false;
         if (band === "high" && f.confidence < 85) return false;
         if (band === "medium" && (f.confidence < 70 || f.confidence >= 85)) return false;
@@ -68,7 +69,8 @@ function FraudQueue() {
           );
         }
         return true;
-      }).sort((a, b) => b.confidence - a.confidence);
+      })
+      .sort((a, b) => b.confidence - a.confidence);
   }, [data, decision, band, query]);
 
   if (isLoading) return <div className="p-8">Loading fraud queue...</div>;
@@ -179,10 +181,7 @@ function FraudQueue() {
                   <Td className="num text-[13px]">
                     <span className="flex items-center gap-2">
                       <ShieldAlert
-                        className={cn(
-                          "size-3.5",
-                          f.confidence >= 85 ? "text-crit" : "text-warn",
-                        )}
+                        className={cn("size-3.5", f.confidence >= 85 ? "text-crit" : "text-warn")}
                       />
                       {f.id}
                     </span>
@@ -204,7 +203,11 @@ function FraudQueue() {
                         <span
                           className={cn(
                             "block h-1.5",
-                            f.confidence >= 85 ? "bg-crit" : f.confidence >= 70 ? "bg-warn" : "bg-info",
+                            f.confidence >= 85
+                              ? "bg-crit"
+                              : f.confidence >= 70
+                                ? "bg-warn"
+                                : "bg-info",
                           )}
                           style={{ width: `${f.confidence}%` }}
                         />
@@ -219,7 +222,9 @@ function FraudQueue() {
                       </span>
                     </span>
                   </Td>
-                  <Td className="max-w-[300px] truncate text-xs text-muted-foreground">{f.reason}</Td>
+                  <Td className="max-w-[300px] truncate text-xs text-muted-foreground">
+                    {f.reason}
+                  </Td>
                   <Td>
                     <StatusBadge status={f.decision} />
                   </Td>

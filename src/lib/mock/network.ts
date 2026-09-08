@@ -102,9 +102,39 @@ export const CITY_STATS = CITIES.map((city) => {
 export { WORST_STORES, NETWORK };
 
 export const NOTIFICATIONS = [
-  { id: "ALT-48219", title: "DS-1462 PulseScore dropped to 31", meta: "Kolkata Central DS · 18m ago", to: "store" as const, ref: "DS-1462" },
-  { id: "ALT-48217", title: "Cold chain failure at DS-2162", meta: "Mumbai Industrial Belt DS · 52m ago", to: "store" as const, ref: "DS-2162" },
-  { id: "ALT-48214", title: "Refund rate spike at DS-1525", meta: "Bengaluru Ring Road DS · 1h 20m ago", to: "store" as const, ref: "DS-1525" },
-  { id: "ALT-48211", title: "74 SLA breaches recorded today", meta: "Operations queue · 2h ago", to: "operations" as const, ref: "" },
-  { id: "ALT-48205", title: "214 complaints awaiting risk decision", meta: "Risk & Trust queue · 3h ago", to: "fraud" as const, ref: "" },
+  {
+    id: "ALT-48219",
+    title: "DS-1462 PulseScore dropped to 31",
+    meta: "Kolkata Central DS · 18m ago",
+    to: "store" as const,
+    ref: "DS-1462",
+  },
+  {
+    id: "ALT-48217",
+    title: "Cold chain failure at DS-2162",
+    meta: "Mumbai Industrial Belt DS · 52m ago",
+    to: "store" as const,
+    ref: "DS-2162",
+  },
+  {
+    id: "ALT-48214",
+    title: "Refund rate spike at DS-1525",
+    meta: "Bengaluru Ring Road DS · 1h 20m ago",
+    to: "store" as const,
+    ref: "DS-1525",
+  },
+  {
+    id: "ALT-48211",
+    title: "74 SLA breaches recorded today",
+    meta: "Operations queue · 2h ago",
+    to: "operations" as const,
+    ref: "",
+  },
+  {
+    id: "ALT-48205",
+    title: "214 complaints awaiting risk decision",
+    meta: "Risk & Trust queue · 3h ago",
+    to: "fraud" as const,
+    ref: "",
+  },
 ];

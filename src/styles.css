@@ -5,9 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * DarkOps design system - dark enterprise command center.
- * Charcoal surfaces, subtle borders, restrained blue accent.
+ * DarkOps design system — dual-theme semantic token architecture.
+ *
+ * DARK (default): Charcoal surfaces, subtle borders, restrained blue accent.
+ * LIGHT (LightOps): Off-white backgrounds, clean surfaces, enterprise-grade calm.
+ *
  * Semantic: green healthy / amber warning / red critical / blue active.
+ * All tokens are CSS custom properties consumed by Tailwind v4 @theme.
  */
 
 @theme inline {
@@ -74,12 +78,16 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ===================================================================
+   DARK THEME (Default — DarkOps identity)
+   Charcoal, restrained blue accent, depth via surface hierarchy.
+=================================================================== */
 :root {
   --radius: 0.375rem;
-  --font-ui:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
+  /* Page & surfaces */
   --background: oklch(0.155 0.004 265);
   --foreground: oklch(0.94 0.004 265);
 
@@ -88,6 +96,7 @@
   --surface-3: oklch(0.245 0.007 265);
   --hairline: oklch(0.28 0.007 265);
 
+  /* shadcn/ui tokens */
   --card: oklch(0.185 0.005 265);
   --card-foreground: oklch(0.94 0.004 265);
   --popover: oklch(0.205 0.006 265);
@@ -108,6 +117,7 @@
   --input: oklch(0.29 0.008 265);
   --ring: oklch(0.62 0.16 254);
 
+  /* Semantic status colors */
   --ok: oklch(0.74 0.16 155);
   --ok-soft: oklch(0.32 0.06 155);
   --warn: oklch(0.8 0.14 82);
@@ -118,12 +128,14 @@
   --info-soft: oklch(0.32 0.06 250);
   --neutral-chip: oklch(0.3 0.007 265);
 
+  /* Chart palette — readable on dark */
   --chart-1: oklch(0.66 0.15 250);
   --chart-2: oklch(0.74 0.16 155);
   --chart-3: oklch(0.8 0.14 82);
   --chart-4: oklch(0.66 0.19 22);
   --chart-5: oklch(0.6 0.02 265);
 
+  /* Sidebar tokens */
   --sidebar: oklch(0.175 0.005 265);
   --sidebar-foreground: oklch(0.9 0.004 265);
   --sidebar-primary: oklch(0.62 0.16 254);
@@ -134,13 +146,85 @@
   --sidebar-ring: oklch(0.62 0.16 254);
 }
 
+/* ===================================================================
+   LIGHT THEME (LightOps — enterprise-grade, calm, premium)
+   Off-white page, white card surfaces, deep gray text, subtle borders.
+   Blue accent remains consistent with DarkOps brand identity.
+=================================================================== */
+.light {
+  color-scheme: light;
+
+  /* Page & surfaces */
+  --background: oklch(0.97 0.003 265);
+  --foreground: oklch(0.18 0.008 265);
+
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.96 0.003 265);
+  --surface-3: oklch(0.93 0.004 265);
+  --hairline: oklch(0.88 0.004 265);
+
+  /* shadcn/ui tokens */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.008 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.008 265);
+
+  --primary: oklch(0.52 0.16 254);
+  --primary-foreground: oklch(0.98 0.005 265);
+  --secondary: oklch(0.93 0.004 265);
+  --secondary-foreground: oklch(0.25 0.008 265);
+  --muted: oklch(0.95 0.003 265);
+  --muted-foreground: oklch(0.52 0.01 265);
+  --accent: oklch(0.93 0.004 265);
+  --accent-foreground: oklch(0.25 0.008 265);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0.005 265);
+
+  --border: oklch(0.88 0.004 265);
+  --input: oklch(0.91 0.004 265);
+  --ring: oklch(0.52 0.16 254);
+
+  /* Semantic status colors — slightly deeper for better text contrast on light */
+  --ok: oklch(0.56 0.15 155);
+  --ok-soft: oklch(0.93 0.06 155);
+  --warn: oklch(0.6 0.14 75);
+  --warn-soft: oklch(0.95 0.06 82);
+  --crit: oklch(0.52 0.19 22);
+  --crit-soft: oklch(0.95 0.06 22);
+  --info: oklch(0.5 0.14 250);
+  --info-soft: oklch(0.93 0.06 250);
+  --neutral-chip: oklch(0.88 0.004 265);
+
+  /* Chart palette — slightly deeper to pop on white/light surfaces */
+  --chart-1: oklch(0.52 0.16 254);
+  --chart-2: oklch(0.56 0.15 155);
+  --chart-3: oklch(0.6 0.14 75);
+  --chart-4: oklch(0.52 0.19 22);
+  --chart-5: oklch(0.55 0.04 265);
+
+  /* Sidebar tokens */
+  --sidebar: oklch(0.97 0.003 265);
+  --sidebar-foreground: oklch(0.22 0.008 265);
+  --sidebar-primary: oklch(0.52 0.16 254);
+  --sidebar-primary-foreground: oklch(0.98 0.005 265);
+  --sidebar-accent: oklch(0.93 0.004 265);
+  --sidebar-accent-foreground: oklch(0.25 0.008 265);
+  --sidebar-border: oklch(0.88 0.004 265);
+  --sidebar-ring: oklch(0.52 0.16 254);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
   }
 
   html {
+    /* color-scheme is now managed per-theme via next-themes class strategy */
     color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
   }
 
   body {
@@ -150,8 +234,13 @@
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
     -webkit-font-smoothing: antialiased;
     font-size: 14px;
+    /* Smooth theme transitions — only colors, no layout shifts */
+    transition:
+      background-color 150ms ease,
+      color 100ms ease;
   }
 
+  /* Themed scrollbars */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;

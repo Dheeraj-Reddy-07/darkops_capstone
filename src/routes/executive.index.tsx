@@ -14,13 +14,7 @@ import {
 } from "recharts";
 import { AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Filter } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
-import {
-  Chip,
-  KpiCard,
-  LiveTag,
-  Panel,
-  PanelHeader,
-} from "@/components/ops/primitives";
+import { Chip, KpiCard, LiveTag, Panel, PanelHeader } from "@/components/ops/primitives";
 import { HeatmapLegend, StoreHeatmap } from "@/components/ops/heatmap";
 import { useExecutive } from "@/hooks/useExecutive";
 import { useStores } from "@/hooks/useStores";
@@ -100,52 +94,74 @@ function PulseDial({ score }: { score: number }) {
 }
 
 function ExecutiveOverview() {
-  const [timeFilter, setTimeFilter] = useState('30d');
+  const [timeFilter, setTimeFilter] = useState("30d");
   const location = useLocation();
-  const isOnExecutiveRoute = location.pathname === '/executive' || location.pathname === '/executive/';
-  
+  const isOnExecutiveRoute =
+    location.pathname === "/executive" || location.pathname === "/executive/";
+
   // Don't render if not on executive route
   if (!isOnExecutiveRoute) {
     return null;
   }
-  
+
   return <ExecutiveOverviewContent timeFilter={timeFilter} setTimeFilter={setTimeFilter} />;
 }
 
-function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: string; setTimeFilter: (val: string) => void }) {
+function ExecutiveOverviewContent({
+  timeFilter,
+  setTimeFilter,
+}: {
+  timeFilter: string;
+  setTimeFilter: (val: string) => void;
+}) {
   const { data: userProfile } = useQuery({
-    queryKey: ['current-user'],
+    queryKey: ["current-user"],
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
-      
+
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
-      
+
       return profile as any;
     },
   });
-  
+
   const userRole = userProfile?.role as string;
-  const canAccessExecutive = ['PLATFORM_ADMIN', 'EXECUTIVE'].includes(userRole);
-  const canAccessStores = ['PLATFORM_ADMIN', 'EXECUTIVE', 'OPERATIONS', 'STORE_MANAGER'].includes(userRole);
-  
+  const canAccessExecutive = ["PLATFORM_ADMIN", "EXECUTIVE"].includes(userRole);
+  const canAccessStores = ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "STORE_MANAGER"].includes(
+    userRole,
+  );
+
   // Only fetch executive data if user has permission
   const { data: execData, isLoading: execLoading } = useExecutive(canAccessExecutive);
   const { data: storesData, isLoading: storesLoading } = useStores(canAccessExecutive);
 
   if (!canAccessExecutive) {
-    return <div className="p-8 text-center text-muted-foreground">You don't have permission to view executive metrics.</div>;
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        You don't have permission to view executive metrics.
+      </div>
+    );
   }
 
   if (execLoading || storesLoading) return <div className="p-8">Loading executive metrics...</div>;
   if (!execData || !storesData) return <div className="p-8 text-crit">Failed to load metrics.</div>;
 
-  const { kpis: EXEC_KPIS, network: NETWORK, backlogDelta: BACKLOG_DELTA, volumeSeries: VOLUME_SERIES, redAlerts: RED_ALERTS, cityStats: CITY_STATS } = execData;
+  const {
+    kpis: EXEC_KPIS,
+    network: NETWORK,
+    backlogDelta: BACKLOG_DELTA,
+    volumeSeries: VOLUME_SERIES,
+    redAlerts: RED_ALERTS,
+    cityStats: CITY_STATS,
+  } = execData;
   const { worstStores: WORST_STORES, kpis: STORE_KPIS } = storesData;
 
   return (
@@ -154,7 +170,8 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
         <AlertTriangle className="size-4 text-crit" />
         <p className="text-[13px] font-medium">
           Network health declining - backlog up {EXEC_KPIS.openComplaintsDelta}%,{" "}
-          {NETWORK.criticalStores} stores need intervention, {EXEC_KPIS.slaBreached} SLA breaches today.
+          {NETWORK.criticalStores} stores need intervention, {EXEC_KPIS.slaBreached} SLA breaches
+          today.
         </p>
       </div>
 
@@ -167,13 +184,13 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
                   <Filter className="size-3.5" />
-                  {timeFilter === '7d' ? '7 days' : timeFilter === '30d' ? '30 days' : '90 days'}
+                  {timeFilter === "7d" ? "7 days" : timeFilter === "30d" ? "30 days" : "90 days"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTimeFilter('7d')}>7 days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTimeFilter('30d')}>30 days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTimeFilter('90d')}>90 days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTimeFilter("7d")}>7 days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTimeFilter("30d")}>30 days</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTimeFilter("90d")}>90 days</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <LiveTag seconds={15} />
@@ -253,7 +270,10 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="day" interval={4} {...axis} />
                 <YAxis {...axis} width={52} />
-                <RTooltip contentStyle={tooltipStyle} itemStyle={{ color: "var(--popover-foreground)" }} />
+                <RTooltip
+                  contentStyle={tooltipStyle}
+                  itemStyle={{ color: "var(--popover-foreground)" }}
+                />
                 <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={9} />
                 <Area
                   type="monotone"
@@ -277,10 +297,7 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
         </Panel>
 
         <Panel>
-          <PanelHeader
-            title="Red alerts"
-            subtitle="Needs a leadership decision."
-          />
+          <PanelHeader title="Red alerts" subtitle="Needs a leadership decision." />
           <div className="max-h-64 overflow-y-auto">
             <ul>
               {(RED_ALERTS || []).map((a: any) => (
@@ -334,11 +351,18 @@ function ExecutiveOverviewContent({ timeFilter, setTimeFilter }: { timeFilter: s
           />
           <div className="p-4">
             <ResponsiveContainer width="100%" height={288}>
-              <BarChart data={(CITY_STATS || []).slice(0, 10)} margin={{ left: -18, right: 8, top: 6 }}>
+              <BarChart
+                data={(CITY_STATS || []).slice(0, 10)}
+                margin={{ left: -18, right: 8, top: 6 }}
+              >
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="city" {...axis} interval={0} angle={0} height={40} />
                 <YAxis {...axis} width={52} />
-                <RTooltip contentStyle={tooltipStyle} itemStyle={{ color: "var(--popover-foreground)" }} cursor={{ fill: "var(--surface-2)" }} />
+                <RTooltip
+                  contentStyle={tooltipStyle}
+                  itemStyle={{ color: "var(--popover-foreground)" }}
+                  cursor={{ fill: "var(--surface-2)" }}
+                />
                 <Bar dataKey="complaints" name="Complaints" fill="var(--chart-1)" maxBarSize={34} />
               </BarChart>
             </ResponsiveContainer>

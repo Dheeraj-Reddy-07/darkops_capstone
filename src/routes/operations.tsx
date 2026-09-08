@@ -74,37 +74,41 @@ function OperationsQueue() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
-  
+
   const { data, isLoading, error } = useCases();
-  
+
   // Get current user ID for "My queue" filtering
   const { data: currentUser } = useQuery({
-    queryKey: ['current-user-auth'],
+    queryKey: ["current-user-auth"],
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       return user;
     },
   });
 
   const rows = useMemo(() => {
     if (!data?.cases) return [];
-    return data.cases.filter((c) => {
-      if (tab === "Escalated" && !c.status.includes("escalated")) return false;
-      if (tab === "My queue" && c.agentId !== currentUser?.id) return false;
-      if (tab.startsWith("P") && tab.length === 2 && c.priority !== tab) return false;
-      if (query) {
-        const q = query.toLowerCase();
-        return (
-          c.id.toLowerCase().includes(q) ||
-          c.complaintId.toLowerCase().includes(q) ||
-          c.summary.toLowerCase().includes(q) ||
-          c.storeName.toLowerCase().includes(q) ||
-          c.storeId.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    }).sort((a, b) => b.ageMins - a.ageMins);
+    return data.cases
+      .filter((c) => {
+        if (tab === "Escalated" && !c.status.includes("escalated")) return false;
+        if (tab === "My queue" && c.agentId !== currentUser?.id) return false;
+        if (tab.startsWith("P") && tab.length === 2 && c.priority !== tab) return false;
+        if (query) {
+          const q = query.toLowerCase();
+          return (
+            c.id.toLowerCase().includes(q) ||
+            c.complaintId.toLowerCase().includes(q) ||
+            c.summary.toLowerCase().includes(q) ||
+            c.storeName.toLowerCase().includes(q) ||
+            c.storeId.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => b.ageMins - a.ageMins);
   }, [tab, query, currentUser?.id, data?.cases]);
 
   if (isLoading) return <div className="p-8">Loading live queue...</div>;
@@ -121,11 +125,7 @@ function OperationsQueue() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
-        <KpiCard
-          label="Pending cases"
-          value={num(kpis.pending)}
-          footnote="open across all hubs"
-        />
+        <KpiCard label="Pending cases" value={num(kpis.pending)} footnote="open across all hubs" />
         <KpiCard
           label="Escalated cases"
           value={num(kpis.escalated)}
@@ -174,8 +174,8 @@ function OperationsQueue() {
                     <Cell key={i} fill={PIE_COLORS[i]} />
                   ))}
                 </Pie>
-                <RTooltip 
-                  contentStyle={tooltipStyle} 
+                <RTooltip
+                  contentStyle={tooltipStyle}
                   itemStyle={{ color: "var(--foreground)" }}
                   labelStyle={{ color: "var(--foreground)", fontWeight: 500, marginBottom: 4 }}
                 />
@@ -207,7 +207,11 @@ function OperationsQueue() {
                 <CartesianGrid stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="name" {...axis} interval={0} />
                 <YAxis {...axis} width={44} />
-                <RTooltip contentStyle={tooltipStyle} itemStyle={{ color: "var(--popover-foreground)" }} cursor={{ fill: "var(--surface-2)" }} />
+                <RTooltip
+                  contentStyle={tooltipStyle}
+                  itemStyle={{ color: "var(--popover-foreground)" }}
+                  cursor={{ fill: "var(--surface-2)" }}
+                />
                 <Bar dataKey="value" name="Cases" fill="var(--chart-1)" maxBarSize={34} />
               </BarChart>
             </ResponsiveContainer>
@@ -309,7 +313,9 @@ function OperationsQueue() {
                       <StatusBadge status={c.status} />
                     </Td>
                     <Td>
-                      <SlaIndicator state={c.sla === 'ok' ? 'on-track' : (c.sla as "at-risk" | "breached")} />
+                      <SlaIndicator
+                        state={c.sla === "ok" ? "on-track" : (c.sla as "at-risk" | "breached")}
+                      />
                     </Td>
                     <Td align="right">
                       <span

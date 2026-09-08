@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -14,10 +14,12 @@ import appCss from "../styles.css?url";
 import { AppShell } from "@/components/layout/app-shell";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { CustomerShell } from "@/components/layout/customer-shell";
+import { SupportShell } from "@/components/layout/support-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { canAccessRoute } from "@/lib/rbac";
+import { getLandingRoute, isPublicRoute, normalizeRole } from "@/lib/auth-utils";
 
 function NotFoundComponent() {
   return (
@@ -52,7 +54,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           This view didn't load
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          The operational data feed did not respond. Retry, or return to the executive overview.
+          The operational data feed did not respond. Retry, or return to the dashboard.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -64,12 +66,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Retry
           </button>
-          <a
-            href="/executive"
+          <Link
+            to="/"
             className="rounded-sm border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2"
           >
-            Executive overview
-          </a>
+            Back to home
+          </Link>
         </div>
       </div>
     </div>
@@ -87,57 +89,73 @@ function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isCustomer = pathname.startsWith("/customer");
   const isAdmin = pathname.startsWith("/admin");
+  const isSupport = pathname.startsWith("/support");
   const navigate = useRouter().navigate;
-  
+
   const { loading, session } = useAuthGuard();
 
-  // RBAC check for protected routes - must be called before any conditional returns
+  // Fetch user profile once - single source of truth for role
+  const { data: userProfile, isLoading: profileLoading } = useQuery({
+    queryKey: ["current-user-profile"],
+    queryFn: async () => {
+      if (!session) return null;
+      const supabase = createSupabaseBrowserClient();
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+      if (error) throw error;
+      return profile as any;
+    },
+    enabled: !!session,
+    retry: 1,
+  });
+
+  const normalizedRole = normalizeRole(userProfile?.role);
+  const userRole = normalizedRole || userProfile?.role;
+
+  // PLATFORM_ADMIN should use AdminShell for /dark-stores as well for consistent admin console
+  const useAdminShell =
+    isAdmin || (userRole === "PLATFORM_ADMIN" && pathname.startsWith("/dark-stores"));
+
+  // RBAC check for protected routes - must be called before any early returns
   useEffect(() => {
-    if (!session) return;
-    
-    const checkRBAC = async () => {
-      const supabase = createSupabaseBrowserClient();
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-      const role = (profile as any)?.role;
-      
-      if (!canAccessRoute(role, pathname)) {
-        // Redirect to appropriate dashboard based on role
-        let redirectPath = '/executive';
-        if (role === 'CUSTOMER') redirectPath = '/customer';
-        else if (role === 'STORE_MANAGER') redirectPath = '/dark-stores';
-        else if (role === 'CUSTOMER_SUPPORT') redirectPath = '/support';
-        else if (role === 'OPERATIONS' || role === 'OPERATIONS_AGENT' || role === 'OPERATIONS_MANAGER') redirectPath = '/operations';
-        else if (role === 'ADMIN') redirectPath = '/admin';
-        navigate({ to: redirectPath, replace: true });
+    if (!userRole || !session) return;
+
+    if (!canAccessRoute(userRole as any, pathname)) {
+      const landingRoute = getLandingRoute(userRole);
+      if (landingRoute) {
+        navigate({ to: landingRoute, replace: true });
+      } else {
+        // Fallback to login if role is invalid
+        navigate({ to: "/login", replace: true });
       }
-    };
-    
-    checkRBAC();
-  }, [pathname, session, navigate]);
-
-  if (loading) {
-    return <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">Authenticating...</div>;
-  }
-
-  // Public routes: render without shell; redirect authenticated users to role-based dashboard
-  const isPublicRoute = pathname === '/login' || pathname === '/';
-  if (isPublicRoute) {
-    // If already authenticated and on a public route, redirect to role-based dashboard
-    if (session) {
-      // Fetch user role for redirect
-      const supabase = createSupabaseBrowserClient();
-      supabase.from('profiles').select('role').eq('id', session.user.id).single().then(({ data }) => {
-        const role = (data as any)?.role;
-        let redirectPath = '/executive';
-        if (role === 'CUSTOMER') redirectPath = '/customer';
-        else if (role === 'STORE_MANAGER') redirectPath = '/dark-stores';
-        else if (role === 'CUSTOMER_SUPPORT') redirectPath = '/support';
-        else if (role === 'OPERATIONS' || role === 'OPERATIONS_AGENT' || role === 'OPERATIONS_MANAGER') redirectPath = '/operations';
-        else if (role === 'ADMIN') redirectPath = '/admin';
-        navigate({ to: redirectPath });
-      });
-      return <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">Redirecting…</div>;
     }
+  }, [pathname, userRole, session, navigate]);
+
+  // Handle public routes with role-based redirect for authenticated users
+  if (isPublicRoute(pathname)) {
+    if (loading) {
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
+          Loading...
+        </div>
+      );
+    }
+
+    if (session && userProfile) {
+      const landingRoute = getLandingRoute(userRole);
+      if (landingRoute) {
+        navigate({ to: landingRoute, replace: true });
+        return (
+          <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
+            Redirecting to dashboard…
+          </div>
+        );
+      }
+    }
+
     return (
       <QueryClientProvider client={queryClient}>
         <Outlet />
@@ -146,9 +164,45 @@ function RootComponent() {
     );
   }
 
+  // Show loading while auth or profile is resolving
+  if (loading || profileLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
+        Authenticating...
+      </div>
+    );
+  }
+
   // Block unauthenticated access to protected routes
   if (!session) {
-    return <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">Redirecting…</div>;
+    navigate({ to: "/login", replace: true });
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background text-sm text-muted-foreground">
+        Redirecting to login…
+      </div>
+    );
+  }
+
+  // If profile failed to load, show error
+  if (!userProfile) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background px-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">
+            Unable to load profile
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">Please try logging in again.</p>
+          <div className="mt-6">
+            <button
+              onClick={() => navigate({ to: "/login" })}
+              className="rounded-sm bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Go to login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -157,7 +211,11 @@ function RootComponent() {
         <CustomerShell>
           <Outlet />
         </CustomerShell>
-      ) : isAdmin ? (
+      ) : isSupport ? (
+        <SupportShell>
+          <Outlet />
+        </SupportShell>
+      ) : useAdminShell ? (
         <AdminShell>
           <Outlet />
         </AdminShell>

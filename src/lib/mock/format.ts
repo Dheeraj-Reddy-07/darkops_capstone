@@ -1,5 +1,5 @@
 export function inr(value: number, opts: { compact?: boolean } = {}) {
-  if (value === undefined || value === null) return '₹0';
+  if (value === undefined || value === null) return "₹0";
   if (opts.compact) {
     if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
     if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
@@ -9,17 +9,17 @@ export function inr(value: number, opts: { compact?: boolean } = {}) {
 }
 
 export function num(value: number) {
-  if (value === undefined || value === null) return '0';
+  if (value === undefined || value === null) return "0";
   return value.toLocaleString("en-IN");
 }
 
 export function pct(value: number, digits = 1) {
-  if (value === undefined || value === null) return '0%';
+  if (value === undefined || value === null) return "0%";
   return `${value.toFixed(digits)}%`;
 }
 
 export function minutesToDuration(mins: number) {
-  if (mins === undefined || mins === null) return '0m';
+  if (mins === undefined || mins === null) return "0m";
   if (mins < 60) return `${mins}m`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;

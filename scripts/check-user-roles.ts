@@ -17,9 +17,14 @@ async function checkUserRoles() {
   console.log("Checking user roles in profiles table...");
 
   const { data: profiles, error } = await supabase
-    .from('profiles')
-    .select('id, email, full_name, role')
-    .in('email', ['agent.a@darkops.com', 'agent.b@darkops.com', 'agent.c@darkops.com', 'support@darkops.com']);
+    .from("profiles")
+    .select("id, email, full_name, role")
+    .in("email", [
+      "agent.a@darkops.com",
+      "agent.b@darkops.com",
+      "agent.c@darkops.com",
+      "support@darkops.com",
+    ]);
 
   if (error) {
     console.error("Error fetching profiles:", error.message);
@@ -32,8 +37,8 @@ async function checkUserRoles() {
 
   console.log("\nChecking support_tickets table and assigned agents...");
   const { data: tickets, error: ticketError } = await supabase
-    .from('support_tickets')
-    .select('ticket_number, assigned_to, title')
+    .from("support_tickets")
+    .select("ticket_number, assigned_to, title")
     .limit(10);
 
   if (ticketError) {
@@ -41,7 +46,9 @@ async function checkUserRoles() {
   } else {
     console.log("Sample tickets:");
     tickets?.forEach((ticket: any) => {
-      console.log(`  ${ticket.ticket_number}: assigned_to=${ticket.assigned_to}, title=${ticket.title}`);
+      console.log(
+        `  ${ticket.ticket_number}: assigned_to=${ticket.assigned_to}, title=${ticket.title}`,
+      );
     });
   }
 }

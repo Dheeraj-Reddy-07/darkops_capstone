@@ -11,6 +11,7 @@ DarkOps is an operational intelligence platform for quick-commerce / dark-store 
 **Customers → Support → Operations → Dark Stores → Fraud → Executive Oversight**
 
 The platform helps organizations:
+
 - Identify operational problems in real-time
 - Investigate and resolve customer complaints
 - Monitor dark-store health via PulseScore
@@ -25,6 +26,7 @@ The platform helps organizations:
 ## Core Dashboards (4)
 
 ### 1. Executive Dashboard
+
 **Network-wide strategic overview**
 
 - Network KPIs (orders, complaints, SLA compliance, store health)
@@ -36,6 +38,7 @@ The platform helps organizations:
 **Removed:** Executive Insights page (was separate, now integrated or removed)
 
 ### 2. Operations Dashboard
+
 **Customer support / operational case management**
 
 - Active cases queue
@@ -48,9 +51,11 @@ The platform helps organizations:
 - Recent cases with filters and search
 
 ### 3. Dark Stores Dashboard
+
 **Store/network health and operational performance**
 
 **Network View:**
+
 - Store list with health indicators
 - Geographic/map/heatmap visualization
 - Health distribution
@@ -62,6 +67,7 @@ The platform helps organizations:
 - Equipment issues
 
 **Store Detail:**
+
 - Store health and PulseScore
 - Historical trend
 - Order volume
@@ -73,6 +79,7 @@ The platform helps organizations:
 - Recent incidents
 
 ### 4. Fraud Dashboard
+
 **Fraud/risk investigation and decisioning**
 
 - Fraud queue
@@ -91,9 +98,11 @@ The platform helps organizations:
 ## Role Model (5 Roles)
 
 ### ROLE 1 — PLATFORM_ADMIN
+
 **System-level administrator**
 
 **Can:**
+
 - Manage users
 - Manage roles
 - Manage system configuration
@@ -103,15 +112,18 @@ The platform helps organizations:
 - Troubleshoot the system
 
 **Navigation:**
+
 - Overview
 - Users
 - Stores
 - Audit logs
 
 ### ROLE 2 — EXECUTIVE
+
 **Strategic oversight**
 
 **Can see:**
+
 - Executive Dashboard
 - Network-level KPIs
 - Revenue/order trends
@@ -122,20 +134,24 @@ The platform helps organizations:
 - High-severity notifications
 
 **Should NOT see:**
+
 - Detailed customer support queues
 - Individual agent workload management
 - Detailed fraud decision workflow
 - Platform administration
 
 **Navigation:**
+
 - Executive
 - Notifications
 - Profile
 
 ### ROLE 3 — OPERATIONS
+
 **Combines operational management and frontline support**
 
 **Operations Manager scope:**
+
 - Regional/network operations
 - Assign cases
 - Monitor agents
@@ -144,25 +160,30 @@ The platform helps organizations:
 - View all stores
 
 **Support Agent scope:**
+
 - Only assigned cases
 - Customer information required to resolve those cases
 - Update/resolve assigned cases
 
 **Navigation (Manager):**
+
 - Operations
 - Dark Stores
 - Notifications
 - Profile
 
 **Navigation (Agent):**
+
 - My Cases
 - Notifications
 - Profile
 
 ### ROLE 4 — STORE_MANAGER
+
 **Store-specific operational management**
 
 **Can see:**
+
 - Dark Stores Dashboard (their assigned store(s) only)
 - Store health
 - PulseScore
@@ -174,6 +195,7 @@ The platform helps organizations:
 - Historical trends
 
 **Should NOT see:**
+
 - Other stores (unless explicitly permitted)
 - Customer-wide data
 - Fraud dashboard
@@ -181,14 +203,17 @@ The platform helps organizations:
 - Platform administration
 
 **Navigation:**
+
 - Dark Store
 - Notifications
 - Profile
 
 ### ROLE 5 — FRAUD_ANALYST
+
 **Fraud/risk investigation**
 
 **Can see:**
+
 - Fraud Dashboard
 - Fraud queue
 - Risk factors
@@ -198,12 +223,14 @@ The platform helps organizations:
 - Fraud-related alerts
 
 **Should NOT see:**
+
 - Executive dashboard
 - Unrelated operations controls
 - Platform administration
 - Unrelated store management
 
 **Navigation:**
+
 - Fraud
 - Notifications
 - Profile
@@ -213,6 +240,7 @@ The platform helps organizations:
 ## Customer Portal (Separate Experience)
 
 **Customer should see only:**
+
 - Their orders
 - Order tracking
 - Complaints
@@ -222,6 +250,7 @@ The platform helps organizations:
 - Profile/account settings
 
 **Must NEVER see:**
+
 - Internal operations
 - Executive data
 - Fraud data
@@ -230,6 +259,7 @@ The platform helps organizations:
 - System data
 
 **Navigation:**
+
 - My Orders
 - Support
 - Notifications
@@ -240,6 +270,7 @@ The platform helps organizations:
 ## Information Architecture
 
 ### Executive
+
 ```
 DarkOps
 ├── Executive
@@ -248,6 +279,7 @@ DarkOps
 ```
 
 ### Operations Manager
+
 ```
 DarkOps
 ├── Operations
@@ -257,6 +289,7 @@ DarkOps
 ```
 
 ### Support Agent
+
 ```
 DarkOps
 ├── My Cases
@@ -265,6 +298,7 @@ DarkOps
 ```
 
 ### Store Manager
+
 ```
 DarkOps
 ├── Dark Store
@@ -273,6 +307,7 @@ DarkOps
 ```
 
 ### Fraud Analyst
+
 ```
 DarkOps
 ├── Fraud
@@ -281,6 +316,7 @@ DarkOps
 ```
 
 ### Customer
+
 ```
 DarkOps
 ├── My Orders
@@ -290,6 +326,7 @@ DarkOps
 ```
 
 ### Platform Admin
+
 ```
 DarkOps
 ├── Overview
@@ -305,6 +342,7 @@ DarkOps
 ## Landing Page
 
 **Professional DarkOps landing page explaining:**
+
 - What DarkOps is
 - Operational problems it solves
 - Major platform capabilities
@@ -319,6 +357,7 @@ DarkOps
 ## Authentication Requirements
 
 **Must implement:**
+
 - Login
 - Logout
 - Session persistence
@@ -334,6 +373,7 @@ DarkOps
 
 **Critical requirement:**
 If user logs in as one user, logs out, then logs in as another user:
+
 - Entire application must switch to second user's permissions, navigation, data, dashboard, notifications, profile, settings
 - No stale state from previous account
 
@@ -342,6 +382,7 @@ If user logs in as one user, logs out, then logs in as another user:
 ## RBAC + Data Scope
 
 **Every protected operation must have:**
+
 1. Frontend permission gating
 2. Express middleware authorization
 3. Supabase RLS/data isolation
@@ -358,6 +399,7 @@ User manually entering `/executive`, `/fraud`, `/dark-stores`, `/cases/...` must
 **Populate from real database data:**
 
 ### Network KPIs
+
 - Orders
 - GMV/revenue
 - Complaint rate
@@ -367,6 +409,7 @@ User manually entering `/executive`, `/fraud`, `/dark-stores`, `/cases/...` must
 - Healthy stores %
 
 ### Trends
+
 - Orders over time
 - Complaints over time
 - SLA performance
@@ -374,10 +417,12 @@ User manually entering `/executive`, `/fraud`, `/dark-stores`, `/cases/...` must
 - Store health trend
 
 ### Network Health
+
 - Store health distribution
 - Regional performance
 
 ### Critical Alerts
+
 Only genuinely important events
 
 **Every number must have a database query behind it.**
@@ -389,6 +434,7 @@ Only genuinely important events
 **Answer:** "What operational work needs attention right now?"
 
 **Include:**
+
 - Active cases
 - Unassigned cases
 - Assigned cases
@@ -412,6 +458,7 @@ Only genuinely important events
 ## Dark Stores Dashboard Requirements
 
 **Network view:**
+
 - Store list
 - Geographic/map/heatmap visualization
 - Health distribution
@@ -423,6 +470,7 @@ Only genuinely important events
 - Equipment issues
 
 **Store detail:**
+
 - Store health
 - PulseScore
 - Historical trend
@@ -443,6 +491,7 @@ Only genuinely important events
 **Answer:** "What fraud/risk needs investigation?"
 
 **Include:**
+
 - Fraud queue
 - Risk score
 - Transaction value
@@ -455,6 +504,7 @@ Only genuinely important events
 - History
 
 **Actions must update the database:**
+
 ```
 Pending Review
       ↓
@@ -474,6 +524,7 @@ Escalated
 **Every seeded customer account must correspond to a real customer row.**
 
 **Customer should be able to:**
+
 1. Log in
 2. See their real orders
 3. Select an order
@@ -493,6 +544,7 @@ Escalated
 **Profile menu must be contextual and functional.**
 
 **Every authenticated user should have:**
+
 - Profile
 - Account information
 - Notification preferences
@@ -508,6 +560,7 @@ Escalated
 ## Notification System
 
 **Notifications must be:**
+
 - Stored in database
 - Tied to users/roles
 - Read/unread
@@ -519,24 +572,28 @@ Escalated
 **Examples:**
 
 ### Store Manager
+
 ```
 Store Health Alert
 DS-1462 PulseScore dropped below threshold.
 ```
 
 ### Executive
+
 ```
 Critical Store Alert
 3 stores entered critical health status.
 ```
 
 ### Operations
+
 ```
 SLA Risk
 27 complaints are approaching SLA breach.
 ```
 
 ### Fraud Analyst
+
 ```
 High Risk Review
 Transaction requires immediate review.
@@ -551,6 +608,7 @@ Transaction requires immediate review.
 **Audit every date filter.**
 
 **If it has real analytical purpose, make it functional:**
+
 ```
 Today
 7 days
@@ -570,6 +628,7 @@ Custom
 **Only expose search where it is useful.** Do not put "search store" on every role.
 
 **Examples:**
+
 - Operations → search cases/customers as permitted
 - Store Manager → search assigned/authorized stores
 - Fraud Analyst → search fraud cases
@@ -587,20 +646,25 @@ Custom
 **Examples:**
 
 ### Executive
+
 "Why did SLA compliance drop?"
 Assistant retrieves relevant aggregated metrics.
 
 ### Operations
+
 "Show me high-priority cases approaching SLA breach."
 
 ### Store Manager
+
 "Why is my PulseScore down?"
 Assistant retrieves that store's metrics.
 
 ### Fraud Analyst
+
 "Summarize the risk factors for this case."
 
 ### Customer
+
 "Where is my order?"
 Assistant can retrieve that customer's order information.
 
@@ -613,6 +677,7 @@ Assistant can retrieve that customer's order information.
 ## Database + Seed Data
 
 **Schema must have relationships for:**
+
 - profiles
 - roles
 - permissions
@@ -631,6 +696,7 @@ Assistant can retrieve that customer's order information.
 **Seed enough realistic data to make every dashboard meaningful.**
 
 **Seed enough variation to produce:**
+
 - Healthy stores
 - Warning stores
 - Critical stores
@@ -649,6 +715,7 @@ Assistant can retrieve that customer's order information.
 ## No Hardcoded Dashboard Data
 
 **Search for every:**
+
 ```
 42
 73%
@@ -659,11 +726,13 @@ Math.random()
 ```
 
 **Determine whether each value should be:**
+
 - Database-derived
 - Calculated from API data
 - Static UI configuration (only this category may remain static)
 
 **For every KPI/chart:**
+
 ```
 Database → Express API → TanStack Query → UI
 ```
@@ -673,6 +742,7 @@ Database → Express API → TanStack Query → UI
 ## UX Quality
 
 **Every page must have proper:**
+
 - Loading state
 - Empty state
 - Error state
@@ -685,6 +755,7 @@ Database → Express API → TanStack Query → UI
 - Responsive layout
 
 **Charts must have:**
+
 - Tooltips
 - Meaningful labels
 - Correct units
@@ -692,6 +763,7 @@ Database → Express API → TanStack Query → UI
 - Meaningful empty states
 
 **Tables must have:**
+
 - Sorting where useful
 - Filtering
 - Pagination where needed
@@ -702,6 +774,7 @@ Database → Express API → TanStack Query → UI
 ## Audit Logging
 
 **Important actions should produce immutable audit events:**
+
 - Login/security events where appropriate
 - Role changes
 - Case assignment
@@ -718,6 +791,7 @@ Database → Express API → TanStack Query → UI
 ## Security Verification
 
 **Verify:**
+
 - Service-role key never reaches client
 - RLS enabled
 - RLS tested
@@ -771,108 +845,126 @@ Database → Express API → TanStack Query → UI
 ## Implementation Phases
 
 ### Phase 1: Repository Audit ✅ (COMPLETED)
+
 - Inspected all routes, components, hooks, services, controllers
 - Inspected migrations, RLS, seed data, auth, RBAC
 - Identified hardcoded values, broken workflows, duplicated architecture
 - Created this specification
 
 ### Phase 2: Role/Permission/Data-Scope Architecture
+
 - Consolidate to 5 roles max
 - Update RBAC permissions
 - Update RLS policies
 - Update navigation configuration
 
 ### Phase 3: Database Schema + Migrations + RLS
+
 - Remove unnecessary roles
 - Enhance seed data with realistic correlations
 - Fix customer profile mapping
 - Add historical data for trends
 
 ### Phase 4: Realistic Deterministic Seed Data
+
 - Remove static metrics
 - Correlate pulse scores with store metrics
 - Generate realistic historical data
 - Seed notification-triggering conditions
 
 ### Phase 5: Authentication + Session Lifecycle
+
 - Test login/logout for all roles
 - Test session switching
 - Test role-based redirects
 - Test expired sessions
 
 ### Phase 6: Express Authorization/Data-Scope Middleware
+
 - Verify requireAuth works
 - Verify requirePermission works
 - Test unauthorized access
 - Test data scoping
 
 ### Phase 7: Backend APIs
+
 - Verify all endpoints return real data
 - Remove hardcoded values
 - Add missing endpoints
 - Test role-based filtering
 
 ### Phase 8: Notification System
+
 - Implement notification generation logic
 - Seed realistic notifications
 - Test notification delivery
 - Test read/unread states
 
 ### Phase 9: Dashboard Data Pipelines
+
 - Remove Math.random()
 - Remove hardcoded KPIs
 - Connect all charts to real data
 - Implement date filtering
 
 ### Phase 10: Persona-Specific Navigation and Layouts
+
 - Update NAV_BY_ROLE for 5 roles
 - Remove Executive Insights from navigation
 - Implement role-specific layouts
 - Test navigation for each role
 
 ### Phase 11: Dashboard UI Integration
+
 - Remove Executive Insights page
 - Fix store detail navigation
 - Fix customer profile
 - Implement proper loading/error/empty states
 
 ### Phase 12: Customer Portal
+
 - Fix customer profile not found
 - Test customer data isolation
 - Test complaint submission
 - Test order tracking
 
 ### Phase 13: Chatbot Architecture + Safe Implementation
+
 - Review DeterministicInsightsProvider
 - Implement safe data access
 - Test authorization bypass prevention
 - Remove or integrate properly
 
 ### Phase 14: Profile/Settings/Logout
+
 - Implement contextual profile menus
 - Add settings persistence
 - Test logout for all roles
 - Test session cleanup
 
 ### Phase 15: End-to-End Workflows
+
 - Test case assignment workflow
 - Test fraud decision workflow
 - Test store manager workflow
 - Test customer complaint workflow
 
 ### Phase 16: Security Audit
+
 - Test unauthorized API calls
 - Verify RLS enforcement
 - Check for secrets in frontend
 - Test CORS and security headers
 
 ### Phase 17: Browser QA
+
 - Test each persona independently
 - Test direct URL access
 - Test browser refresh
 - Test mobile responsiveness
 
 ### Phase 18: Production/Demo Polish
+
 - Remove all debug code
 - Polish UI/UX
 - Add proper error messages

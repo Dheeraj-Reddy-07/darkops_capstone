@@ -4,12 +4,7 @@ import { STORES, type DarkStore } from "./stores";
 
 export type Priority = "P1" | "P2" | "P3" | "P4";
 export type CaseStatus =
-  | "Unassigned"
-  | "Assigned"
-  | "In progress"
-  | "Awaiting customer"
-  | "Escalated - L2"
-  | "Resolved";
+  "Unassigned" | "Assigned" | "In progress" | "Awaiting customer" | "Escalated - L2" | "Resolved";
 export type SlaState = "on-track" | "at-risk" | "breached";
 export type RouteKind = "Refund" | "Reorder" | "Operational investigation";
 
@@ -113,12 +108,14 @@ const COMPLAINTS: Array<{ summary: string; category: string; detail: string }> =
   {
     summary: "Refund not credited after 5 days",
     category: "Payment issue",
-    detail: "Refund approved on 24 Aug but not settled to source. Payment gateway reference pending.",
+    detail:
+      "Refund approved on 24 Aug but not settled to source. Payment gateway reference pending.",
   },
   {
     summary: "Partial order cancelled at pack",
     category: "Missing item",
-    detail: "3 of 11 lines cancelled at pack due to stockout; customer was not notified pre-dispatch.",
+    detail:
+      "3 of 11 lines cancelled at pack due to stockout; customer was not notified pre-dispatch.",
   },
   {
     summary: "Barcode mismatch at handover",
@@ -317,10 +314,7 @@ export function caseTimeline(c: CaseRecord): TimelineEvent[] {
 
   events.push({
     label: "Resolution",
-    detail:
-      c.status === "Resolved"
-        ? c.resolution
-        : `Pending - SLA deadline ${c.slaDueIST} IST`,
+    detail: c.status === "Resolved" ? c.resolution : `Pending - SLA deadline ${c.slaDueIST} IST`,
     at: c.status === "Resolved" ? t(c.ageMins - 60) : "-",
     state: c.status === "Resolved" ? "done" : "pending",
     tone: c.sla === "breached" ? "crit" : "info",

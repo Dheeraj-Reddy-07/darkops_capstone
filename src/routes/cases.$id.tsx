@@ -12,7 +12,13 @@ import {
   StatusBadge,
 } from "@/components/ops/primitives";
 import { Timeline } from "@/components/ops/timeline";
-import { useCaseDetail, useAssignCase, useEscalateCase, useResolveCase, useAgents } from "@/hooks/useCaseDetail";
+import {
+  useCaseDetail,
+  useAssignCase,
+  useEscalateCase,
+  useResolveCase,
+  useAgents,
+} from "@/hooks/useCaseDetail";
 import { ageLabel, inr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,12 +80,13 @@ function CaseDetail() {
 
   const status = record.status;
   // Agent info is now embedded in the record from the API
-  const agent = record.agentId && record.agentName
-    ? { id: record.agentId, name: record.agentName, hub: record.agentHub || 'Unassigned' }
-    : null;
+  const agent =
+    record.agentId && record.agentName
+      ? { id: record.agentId, name: record.agentName, hub: record.agentHub || "Unassigned" }
+      : null;
   // Fraud link comes from the API response
   const fraud = record.fraudReview || null;
-  
+
   // Transform events for timeline
   const events = record.events.map((e: any) => ({
     time: "IST",
@@ -162,7 +169,8 @@ function CaseDetail() {
                 label="Delivery partner"
                 value={
                   <span>
-                    {record.partner} <span className="num text-muted-foreground">({record.partnerId})</span>
+                    {record.partner}{" "}
+                    <span className="num text-muted-foreground">({record.partnerId})</span>
                   </span>
                 }
               />
@@ -196,7 +204,10 @@ function CaseDetail() {
         <aside className="space-y-3">
           <Panel>
             <PanelHeader title="Case summary" />
-            <Field label="Order value" value={<span className="num">{inr(record.orderValue)}</span>} />
+            <Field
+              label="Order value"
+              value={<span className="num">{inr(record.orderValue)}</span>}
+            />
             <Field
               label="Refund exposure"
               value={<span className="num text-warn">{inr(record.refundAmount)}</span>}
@@ -287,7 +298,7 @@ function CaseDetail() {
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => {
-                        escalate.mutate({ id: record.id, level: 'L2' });
+                        escalate.mutate({ id: record.id, level: "L2" });
                         toast.warning(`${record.id} escalated to L2`, {
                           description: `Regional manager · ${record.city}`,
                         });

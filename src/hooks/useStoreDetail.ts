@@ -1,17 +1,17 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { fetchApi } from '../lib/api';
-import { queryClient } from '../lib/queryClient';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { fetchApi } from "../lib/api";
+import { queryClient } from "../lib/queryClient";
 
 export function useStoreDetail(id: string) {
   return useQuery({
-    queryKey: ['store', id],
+    queryKey: ["store", id],
     queryFn: async () => {
       const response = await fetchApi(`/stores/${id}`);
       const row = response;
-      
+
       const pulse = row.pulse?.score || 0;
       const pulseData = row.pulse || {};
-      
+
       const breakdown = {
         equipment: pulseData.equipment_pts || 0,
         sla: pulseData.sla_pts || 0,
@@ -26,7 +26,7 @@ export function useStoreDetail(id: string) {
         name: row.name,
         city: row.city,
         zone: row.zone,
-        manager: row.manager_name || 'Manager',
+        manager: row.manager_name || "Manager",
         pulse,
         prevPulse: row.metrics?.prev_pulse || pulse - 5,
         sla: row.metrics?.sla_pct || 0,
@@ -45,14 +45,14 @@ export function useStoreDetail(id: string) {
 
       const history = row.pulseHistory || [];
       const recentHistory = history.slice(-14);
-      
+
       const series = recentHistory.map((p: any) => {
         const date = new Date(p.calculated_at);
         const failures = Math.round(p.equipment_pts / 3);
         const stockouts = p.inventory_pts;
-        
+
         return {
-          day: `${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}`,
+          day: `${date.getDate()} ${date.toLocaleString("default", { month: "short" })}`,
           failures,
           downtime: Math.round(failures * 1.5 + Math.random() * 2), // We still estimate downtime based on failures since it's not stored
           stockouts,
@@ -64,7 +64,7 @@ export function useStoreDetail(id: string) {
         const date = new Date(p.calculated_at);
         return {
           t: new Date(p.calculated_at).getTime(),
-          label: `${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}`,
+          label: `${date.getDate()} ${date.toLocaleString("default", { month: "short" })}`,
           score: p.score,
         };
       });
@@ -78,7 +78,7 @@ export function useStoreDetail(id: string) {
 
 export function useStorePulse(id: string) {
   return useQuery({
-    queryKey: ['store', id, 'pulse'],
+    queryKey: ["store", id, "pulse"],
     queryFn: async () => {
       const response = await fetchApi(`/stores/${id}/pulse`);
       return response;
@@ -88,7 +88,7 @@ export function useStorePulse(id: string) {
 
 export function useStoreWorkOrders(id: string) {
   return useQuery({
-    queryKey: ['store', id, 'work-orders'],
+    queryKey: ["store", id, "work-orders"],
     queryFn: async () => {
       const response = await fetchApi(`/stores/${id}/work-orders`);
       return response.data;
@@ -100,12 +100,12 @@ export function useCreateWorkOrder() {
   return useMutation({
     mutationFn: async ({ storeId, asset_id, asset_name, priority, description }: any) => {
       return await fetchApi(`/stores/${storeId}/work-orders`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ asset_id, asset_name, priority, description }),
       });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['store', variables.storeId, 'work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ["store", variables.storeId, "work-orders"] });
     },
   });
 }

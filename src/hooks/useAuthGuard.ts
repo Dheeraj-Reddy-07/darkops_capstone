@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { Session } from '@supabase/supabase-js';
-
-const PUBLIC_ROUTES = ['/', '/login'];
+import { useEffect, useState } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Session } from "@supabase/supabase-js";
+import { isPublicRoute } from "@/lib/auth-utils";
 
 export function useAuthGuard() {
   const [session, setSession] = useState<Session | null>(null);
@@ -13,21 +12,23 @@ export function useAuthGuard() {
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
-    
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
-      if (!session && !PUBLIC_ROUTES.includes(pathname)) {
-        navigate({ to: '/login' });
+      if (!session && !isPublicRoute(pathname)) {
+        navigate({ to: "/login" });
       }
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (!session && !PUBLIC_ROUTES.includes(pathname)) {
-        navigate({ to: '/login' });
+      if (!session && !isPublicRoute(pathname)) {
+        navigate({ to: "/login" });
       }
     });
 

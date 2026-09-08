@@ -18,7 +18,7 @@ async function fixEmailConfirmation() {
 
   const demoEmails = [
     "admin@darkops.com",
-    "exec@darkops.com", 
+    "exec@darkops.com",
     "manager@darkops.com",
     "support@darkops.com",
     "agent.a@darkops.com",
@@ -36,7 +36,7 @@ async function fixEmailConfirmation() {
 
       if (existingUser) {
         console.log(`Found user ${email} (ID: ${existingUser.id})`);
-        
+
         // Update user to confirm email
         const { error: updateError } = await supabase.auth.admin.updateUserById(existingUser.id, {
           email_confirm: true,

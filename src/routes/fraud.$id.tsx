@@ -129,7 +129,11 @@ function FraudDetail() {
                     <span
                       className={cn(
                         "num text-[13px]",
-                        f.weight >= 25 ? "text-crit" : f.weight >= 14 ? "text-warn" : "text-muted-foreground",
+                        f.weight >= 25
+                          ? "text-crit"
+                          : f.weight >= 14
+                            ? "text-warn"
+                            : "text-muted-foreground",
                       )}
                     >
                       +{f.weight} risk
@@ -154,7 +158,10 @@ function FraudDetail() {
             <PanelHeader title="Claim context" />
             <div className="grid sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Order" value={<span className="num">{record.orderId}</span>} />
-              <Field label="Order value" value={<span className="num">{inr(record.orderValue)}</span>} />
+              <Field
+                label="Order value"
+                value={<span className="num">{inr(record.orderValue)}</span>}
+              />
               <Field
                 label="Linked case"
                 value={
@@ -183,7 +190,10 @@ function FraudDetail() {
           </Panel>
 
           <Panel>
-            <PanelHeader title="Review log" subtitle="Every scoring and decision event on this claim." />
+            <PanelHeader
+              title="Review log"
+              subtitle="Every scoring and decision event on this claim."
+            />
             <ol>
               {history.map((h: any, i: number) => (
                 <li
@@ -248,16 +258,24 @@ function FraudDetail() {
           <Panel>
             <PanelHeader title="Customer risk profile" />
             <Field label="Customer" value={`${record.customerName} · ${record.customerId}`} />
-            <Field label="Claims in 90 days" value={<span className="num">{record.priorClaims}</span>} />
+            <Field
+              label="Claims in 90 days"
+              value={<span className="num">{record.priorClaims}</span>}
+            />
             <Field
               label="Upheld claims"
               value={<span className="num text-crit">{record.upheldClaims}</span>}
             />
             <Field
               label="Lifetime refund value"
-              value={<span className="num">{inr(record.refundAmount * (1 + record.priorClaims))}</span>}
+              value={
+                <span className="num">{inr(record.refundAmount * (1 + record.priorClaims))}</span>
+              }
             />
-            <Field label="Account standing" value={record.upheldClaims > 2 ? "Restricted" : "Good"} />
+            <Field
+              label="Account standing"
+              value={record.upheldClaims > 2 ? "Restricted" : "Good"}
+            />
           </Panel>
         </aside>
       </div>

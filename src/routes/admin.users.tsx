@@ -3,7 +3,15 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Panel, PanelHeader, TableShell, Th, Td, StatusBadge, EmptyState } from "@/components/ops/primitives";
+import {
+  Panel,
+  PanelHeader,
+  TableShell,
+  Th,
+  Td,
+  StatusBadge,
+  EmptyState,
+} from "@/components/ops/primitives";
 import { fetchApi } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -18,20 +26,22 @@ export const Route = createFileRoute("/admin/users")({
   head: () => ({
     meta: [
       { title: "User management - DarkOps Admin" },
-      { name: "description", content: "Manage platform users, view roles, and update access permissions." },
+      {
+        name: "description",
+        content: "Manage platform users, view roles, and update access permissions.",
+      },
     ],
   }),
   component: UsersPage,
 });
 
 const ROLES = [
-  "ADMIN",
+  "PLATFORM_ADMIN",
   "EXECUTIVE",
-  "OPERATIONS_MANAGER",
-  "OPERATIONS_AGENT",
+  "OPERATIONS",
   "FRAUD_ANALYST",
   "STORE_MANAGER",
-  "DELIVERY_PARTNER",
+  "CUSTOMER_SUPPORT",
   "CUSTOMER",
 ];
 
@@ -99,10 +109,7 @@ function UsersPage() {
       />
 
       <Panel>
-        <PanelHeader
-          title="All users"
-          subtitle={`${users.length} registered profiles`}
-        />
+        <PanelHeader title="All users" subtitle={`${users.length} registered profiles`} />
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
           <div className="flex h-8 items-center gap-2 rounded-sm border border-border bg-surface-2 px-2">

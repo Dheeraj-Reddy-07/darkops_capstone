@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { fetchApi } from '../lib/api';
-import { queryClient } from '../lib/queryClient';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { fetchApi } from "../lib/api";
+import { queryClient } from "../lib/queryClient";
 
 export interface Notification {
   id: string;
@@ -15,9 +15,9 @@ export interface Notification {
 
 export function useNotifications() {
   return useQuery({
-    queryKey: ['notifications'],
+    queryKey: ["notifications"],
     queryFn: async () => {
-      const response = await fetchApi('/notifications');
+      const response = await fetchApi("/notifications");
       return response.data as Notification[];
     },
   });
@@ -25,9 +25,9 @@ export function useNotifications() {
 
 export function useUnreadCount() {
   return useQuery({
-    queryKey: ['notifications', 'unread-count'],
+    queryKey: ["notifications", "unread-count"],
     queryFn: async () => {
-      const response = await fetchApi('/notifications/unread-count');
+      const response = await fetchApi("/notifications/unread-count");
       return response.count as number;
     },
     refetchInterval: 30000, // Poll every 30 seconds
@@ -38,12 +38,12 @@ export function useMarkAsRead() {
   return useMutation({
     mutationFn: async (id: string) => {
       return await fetchApi(`/notifications/${id}/read`, {
-        method: 'PATCH',
+        method: "PATCH",
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     },
   });
 }
@@ -51,13 +51,13 @@ export function useMarkAsRead() {
 export function useMarkAllAsRead() {
   return useMutation({
     mutationFn: async () => {
-      return await fetchApi('/notifications/read-all', {
-        method: 'PATCH',
+      return await fetchApi("/notifications/read-all", {
+        method: "PATCH",
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
     },
   });
 }

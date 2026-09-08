@@ -4,20 +4,9 @@ import { cn } from "@/lib/utils";
 
 /* ---------------------------------- Panel --------------------------------- */
 
-export function Panel({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+export function Panel({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <section
-      className={cn(
-        "rounded-md border border-border bg-surface shadow-[0_1px_0_0_rgba(255,255,255,0.02)_inset]",
-        className,
-      )}
-    >
+    <section className={cn("rounded-md border border-border bg-surface", className)}>
       {children}
     </section>
   );
@@ -43,9 +32,7 @@ export function PanelHeader({
     >
       <div className="min-w-0">
         <h2 className="text-[13px] font-semibold tracking-tight text-foreground">{title}</h2>
-        {subtitle ? (
-          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
-        ) : null}
+        {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
     </header>
@@ -181,7 +168,13 @@ export function Chip({
 
 export function PriorityBadge({ priority }: { priority: "P1" | "P2" | "P3" | "P4" }) {
   const tone: Tone =
-    priority === "P1" ? "crit" : priority === "P2" ? "warn" : priority === "P3" ? "info" : "neutral";
+    priority === "P1"
+      ? "crit"
+      : priority === "P2"
+        ? "warn"
+        : priority === "P3"
+          ? "info"
+          : "neutral";
   return (
     <Chip tone={tone} className="num w-8 justify-center">
       {priority}
@@ -193,9 +186,15 @@ export function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
   const tone: Tone = s.includes("escalat")
     ? "crit"
-    : s.includes("resolved") || s.includes("approved") || s.includes("healthy") || s.includes("settled")
+    : s.includes("resolved") ||
+        s.includes("approved") ||
+        s.includes("healthy") ||
+        s.includes("settled")
       ? "ok"
-      : s.includes("unassigned") || s.includes("pending") || s.includes("awaiting") || s.includes("risk")
+      : s.includes("unassigned") ||
+          s.includes("pending") ||
+          s.includes("awaiting") ||
+          s.includes("risk")
         ? "warn"
         : s.includes("denied") || s.includes("critical") || s.includes("breach")
           ? "crit"
@@ -203,9 +202,16 @@ export function StatusBadge({ status }: { status: string }) {
   return <Chip tone={tone}>{status}</Chip>;
 }
 
-export function SlaIndicator({ state, label }: { state: "on-track" | "at-risk" | "breached"; label?: string }) {
+export function SlaIndicator({
+  state,
+  label,
+}: {
+  state: "on-track" | "at-risk" | "breached";
+  label?: string;
+}) {
   const tone: Tone = state === "breached" ? "crit" : state === "at-risk" ? "warn" : "ok";
-  const text = label ?? (state === "breached" ? "Breached" : state === "at-risk" ? "At risk" : "On track");
+  const text =
+    label ?? (state === "breached" ? "Breached" : state === "at-risk" ? "At risk" : "On track");
   return (
     <span className="inline-flex items-center gap-1.5">
       <span

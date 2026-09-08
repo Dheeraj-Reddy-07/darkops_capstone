@@ -44,11 +44,31 @@ const REASONS = [
 ];
 
 const FACTOR_LIBRARY: RiskFactor[] = [
-  { label: "Claim velocity", weight: 32, evidence: "9 refund claims in the last 30 days vs cohort median of 2" },
-  { label: "Evidence quality", weight: 24, evidence: "Uploaded photo hash matches an image submitted on an earlier claim" },
-  { label: "Device & address linkage", weight: 18, evidence: "3 accounts share one device fingerprint and delivery address" },
-  { label: "Operational contradiction", weight: 16, evidence: "Pack-station weight and rider POD both consistent with a complete delivery" },
-  { label: "Value concentration", weight: 10, evidence: "Claims concentrated on the highest-value lines of each basket" },
+  {
+    label: "Claim velocity",
+    weight: 32,
+    evidence: "9 refund claims in the last 30 days vs cohort median of 2",
+  },
+  {
+    label: "Evidence quality",
+    weight: 24,
+    evidence: "Uploaded photo hash matches an image submitted on an earlier claim",
+  },
+  {
+    label: "Device & address linkage",
+    weight: 18,
+    evidence: "3 accounts share one device fingerprint and delivery address",
+  },
+  {
+    label: "Operational contradiction",
+    weight: 16,
+    evidence: "Pack-station weight and rider POD both consistent with a complete delivery",
+  },
+  {
+    label: "Value concentration",
+    weight: 10,
+    evidence: "Claims concentrated on the highest-value lines of each basket",
+  },
 ];
 
 function build(): FraudCase[] {
@@ -58,7 +78,13 @@ function build(): FraudCase[] {
   return refundCases.map((c, i) => {
     const confidence = Math.round(56 + rand() * 42);
     const decision: FraudDecision =
-      i % 5 === 1 ? "Escalated" : i % 5 === 2 ? "Denied" : i % 5 === 3 ? "Approved" : "Pending review";
+      i % 5 === 1
+        ? "Escalated"
+        : i % 5 === 2
+          ? "Denied"
+          : i % 5 === 3
+            ? "Approved"
+            : "Pending review";
     const priorClaims = intBetween(rand, 1, 11);
     return {
       id: c.complaintId,
@@ -81,7 +107,11 @@ function build(): FraudCase[] {
         weight: Math.max(4, Math.round(f.weight * (0.6 + rand() * 0.8))),
       })).sort((a, b) => b.weight - a.weight),
       history: [
-        { at: `${istClock(210)} IST`, actor: "Risk engine", action: `Flagged at ${confidence}% confidence` },
+        {
+          at: `${istClock(210)} IST`,
+          actor: "Risk engine",
+          action: `Flagged at ${confidence}% confidence`,
+        },
         { at: `${istClock(150)} IST`, actor: "Ops QC · AG-1188", action: "Evidence pack attached" },
         ...(decision === "Pending review"
           ? []

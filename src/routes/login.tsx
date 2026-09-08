@@ -3,6 +3,7 @@ import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -52,8 +53,13 @@ function LoginPage() {
 
       if (authError) {
         if (authError.message.toLowerCase().includes("invalid")) {
-          setError("The email or password you entered is incorrect. Check your credentials and try again.");
-        } else if (authError.message.toLowerCase().includes("network") || authError.message.toLowerCase().includes("fetch")) {
+          setError(
+            "The email or password you entered is incorrect. Check your credentials and try again.",
+          );
+        } else if (
+          authError.message.toLowerCase().includes("network") ||
+          authError.message.toLowerCase().includes("fetch")
+        ) {
           setError("Unable to reach the authentication server. Check your internet connection.");
         } else {
           setError(authError.message);
@@ -64,29 +70,33 @@ function LoginPage() {
 
       // Clear React Query cache to prevent stale data from previous sessions
       queryClient.clear();
-      
+
       await router.invalidate();
-      
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', currentUser!.id)
+        .from("profiles")
+        .select("role")
+        .eq("id", currentUser!.id)
         .single();
-      
+
       const role = (profile as any)?.role as string | undefined;
-      console.log('[Login] User role:', role, 'for email:', email);
-      
-      let redirectPath = '/executive';
-      if (role === 'CUSTOMER') redirectPath = '/customer';
-      else if (role === 'STORE_MANAGER') redirectPath = '/dark-stores';
-      else if (role === 'CUSTOMER_SUPPORT') redirectPath = '/support';
-      else if (role === 'OPERATIONS') redirectPath = '/operations';
-      else if (role === 'PLATFORM_ADMIN') redirectPath = '/admin';
-      else if (role === 'ADMIN') redirectPath = '/admin'; // Fallback for old role name
-      else if (role === 'OPERATIONS_MANAGER' || role === 'OPERATIONS_AGENT') redirectPath = '/operations'; // Fallback for old role names
-      
-      console.log('[Login] Redirecting to:', redirectPath);
+      console.log("[Login] User role:", role, "for email:", email);
+
+      let redirectPath = "/executive";
+      if (role === "CUSTOMER") redirectPath = "/customer";
+      else if (role === "STORE_MANAGER") redirectPath = "/dark-stores";
+      else if (role === "CUSTOMER_SUPPORT") redirectPath = "/support";
+      else if (role === "OPERATIONS") redirectPath = "/operations";
+      else if (role === "PLATFORM_ADMIN") redirectPath = "/admin";
+      else if (role === "ADMIN")
+        redirectPath = "/admin"; // Fallback for old role name
+      else if (role === "OPERATIONS_MANAGER" || role === "OPERATIONS_AGENT")
+        redirectPath = "/operations"; // Fallback for old role names
+
+      console.log("[Login] Redirecting to:", redirectPath);
       navigate({ to: redirectPath });
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -134,12 +144,12 @@ function LoginPage() {
 
       if (authData.user) {
         // Create profile entry
-        const { error: profileError } = await (supabase.from('profiles') as any).insert([
+        const { error: profileError } = await (supabase.from("profiles") as any).insert([
           {
             id: authData.user.id,
             email: email.trim(),
             full_name: fullName,
-            role: 'CUSTOMER',
+            role: "CUSTOMER",
           },
         ]);
 
@@ -150,7 +160,7 @@ function LoginPage() {
         }
 
         await router.invalidate();
-        navigate({ to: '/customer' });
+        navigate({ to: "/customer" });
       }
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -167,6 +177,10 @@ function LoginPage() {
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Theme toggle — fixed top-right for accessibility */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
       {/* Left panel - branding */}
       <div className="hidden lg:flex lg:flex-col lg:w-[440px] xl:w-[520px] border-r border-border bg-surface p-12">
         <div className="flex items-center gap-2.5">
@@ -183,11 +197,13 @@ function LoginPage() {
             Operational Intelligence Platform
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground leading-snug">
-            Monitor. Resolve.<br />Decide. At scale.
+            Monitor. Resolve.
+            <br />
+            Decide. At scale.
           </h1>
           <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xs">
-            Real-time visibility into dark-store health, case operations,
-            fraud risk, and executive network analytics - in one command center.
+            Real-time visibility into dark-store health, case operations, fraud risk, and executive
+            network analytics - in one command center.
           </p>
 
           <div className="mt-10 space-y-4">
@@ -204,9 +220,7 @@ function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-auto pt-12 text-xs text-muted-foreground">
-          Deloitte Capstone · 2026
-        </div>
+        <div className="mt-auto pt-12 text-xs text-muted-foreground">Deloitte Capstone · 2026</div>
       </div>
 
       {/* Right panel - login form */}
@@ -223,9 +237,13 @@ function LoginPage() {
 
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-foreground">{isLogin ? "Sign in" : "Create account"}</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              {isLogin ? "Sign in" : "Create account"}
+            </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              {isLogin ? "Enter your credentials to access the platform." : "Enter your details to create your account."}
+              {isLogin
+                ? "Enter your credentials to access the platform."
+                : "Enter your details to create your account."}
             </p>
           </div>
 
@@ -247,7 +265,10 @@ function LoginPage() {
                   autoComplete="name"
                   required={!isLogin}
                   value={fullName}
-                  onChange={(e) => { setFullName(e.target.value); setError(null); }}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="John Doe"
                   className="h-9 w-full rounded-sm border border-border bg-surface px-3 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
                   disabled={loading}
@@ -265,7 +286,10 @@ function LoginPage() {
                 autoComplete={isLogin ? "email" : "username"}
                 required
                 value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
                 placeholder="you@darkops.com"
                 className="h-9 w-full rounded-sm border border-border bg-surface px-3 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
                 disabled={loading}
@@ -283,7 +307,10 @@ function LoginPage() {
                   autoComplete={isLogin ? "current-password" : "new-password"}
                   required
                   value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="••••••••"
                   className="h-9 w-full rounded-sm border border-border bg-surface px-3 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
                   disabled={loading}
@@ -312,7 +339,10 @@ function LoginPage() {
                     autoComplete="new-password"
                     required={!isLogin}
                     value={confirmPassword}
-                    onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setError(null);
+                    }}
                     placeholder="••••••••"
                     className="h-9 w-full rounded-sm border border-border bg-surface px-3 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
                     disabled={loading}
@@ -324,7 +354,11 @@ function LoginPage() {
                     tabIndex={-1}
                     aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
-                    {showConfirmPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="size-3.5" />
+                    ) : (
+                      <Eye className="size-3.5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -332,7 +366,9 @@ function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || !email || !password || (!isLogin && (!fullName || !confirmPassword))}
+              disabled={
+                loading || !email || !password || (!isLogin && (!fullName || !confirmPassword))
+              }
               className="flex h-9 w-full items-center justify-center gap-2 rounded-sm bg-primary text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
               {loading ? (
@@ -340,8 +376,10 @@ function LoginPage() {
                   <Loader2 className="size-4 animate-spin" />
                   {isLogin ? "Authenticating…" : "Creating account…"}
                 </>
+              ) : isLogin ? (
+                "Sign in to DarkOps"
               ) : (
-                isLogin ? "Sign in to DarkOps" : "Create account"
+                "Create account"
               )}
             </button>
           </form>
@@ -350,7 +388,10 @@ function LoginPage() {
           <div className="mt-4 text-center">
             <button
               type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(null); }}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError(null);
+              }}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {isLogin ? "Don't have an account? Create one" : "Already have an account? Sign in"}

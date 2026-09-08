@@ -1,38 +1,62 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { fetchApi } from '../lib/api';
-import { queryClient } from '../lib/queryClient';
-import { format } from 'date-fns';
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { fetchApi } from "../lib/api";
+import { queryClient } from "../lib/queryClient";
+import { format } from "date-fns";
 
 export interface CustomerOrder {
   id: string;
   placedAt: string;
   storeName: string;
   storeId: string;
+  storeCity?: string | undefined;
   items: number;
   total: number;
   status: "Delivered" | "Out for delivery" | "Packing" | "Refund in progress" | string;
-  eta?: string;
+  eta?: string | undefined;
   itemsPreview: string;
+  deliveredAt?: string | undefined;
+  deliveryPartner?: string | undefined;
+}
+
+export interface OrderDetail extends CustomerOrder {
+  orderItems: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
 }
 
 export function useCustomerOrders() {
   return useQuery({
-    queryKey: ['customer-orders'],
+    queryKey: ["customer-orders"],
     queryFn: async () => {
-      const response = await fetchApi('/customers/me/orders');
-      
+      const response = await fetchApi("/customers/me/orders");
+
       const orders: CustomerOrder[] = response.data.map((row: any) => ({
         id: row.id,
         placedAt: format(new Date(row.placed_at), "dd MMM, HH:mm 'IST'"),
-        storeName: row.stores?.name || 'Local Store',
+        storeName: row.store_name || "Local Store",
         storeId: row.store_id,
+        storeCity: row.store_city,
         items: row.item_count,
         total: row.total_amount_paise / 100,
-        status: row.status === 'delivered' ? 'Delivered' : 
-                row.status === 'out_for_delivery' ? 'Out for delivery' : 
-                row.status === 'packing' ? 'Packing' : row.status,
+        status:
+          row.status === "delivered"
+            ? "Delivered"
+            : row.status === "out_for_delivery"
+              ? "Out for delivery"
+              : row.status === "packing"
+                ? "Packing"
+                : row.status,
         eta: row.eta_at ? format(new Date(row.eta_at), "HH:mm 'IST'") : undefined,
-        itemsPreview: row.items_preview || 'Order items',
+        itemsPreview:
+          row.order_items?.map((i: any) => i.name).join(", ") ||
+          row.items_preview ||
+          "Order items",
+        deliveredAt: row.delivered_at
+          ? format(new Date(row.delivered_at), "dd MMM, HH:mm 'IST'")
+          : undefined,
+        deliveryPartner: row.delivery_partner,
       }));
       return orders;
     },
@@ -40,12 +64,94 @@ export function useCustomerOrders() {
   });
 }
 
+export function useCustomerOrderById(orderId: string) {
+  return useQuery({
+    queryKey: ["customer-order", orderId],
+    queryFn: async () => {
+      const response = await fetchApi(`/customers/me/orders/${orderId}`);
+
+      const order: OrderDetail = {
+        id: response.data.id,
+        placedAt: format(new Date(response.data.placed_at), "dd MMM, HH:mm 'IST'"),
+        storeName: response.data.store_name || "Local Store",
+        storeId: response.data.store_id,
+        storeCity: response.data.store_city,
+        items: response.data.item_count,
+        total: response.data.total_amount_paise / 100,
+        status:
+          response.data.status === "delivered"
+            ? "Delivered"
+            : response.data.status === "out_for_delivery"
+              ? "Out for delivery"
+              : response.data.status === "packing"
+                ? "Packing"
+                : response.data.status,
+        eta: response.data.eta_at
+          ? format(new Date(response.data.eta_at), "HH:mm 'IST'")
+          : undefined,
+        itemsPreview:
+          response.data.order_items?.map((item: any) => item.name).join(", ") ||
+          response.data.items_preview ||
+          "Order items",
+        deliveredAt: response.data.delivered_at
+          ? format(new Date(response.data.delivered_at), "dd MMM, HH:mm 'IST'")
+          : undefined,
+        deliveryPartner: response.data.delivery_partner,
+        orderItems:
+          response.data.order_items?.map((item: any) => ({
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unit_price_paise / 100,
+          })) || [],
+      };
+      return order;
+    },
+    enabled: !!orderId,
+    retry: false,
+  });
+}
+
+export interface CustomerComplaint {
+  id: string;
+  complaintRef: string;
+  orderId: string;
+  summary: string;
+  detail: string;
+  category: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  resolution?: string | undefined;
+  storeName?: string | undefined;
+  orderValue?: number | undefined;
+}
+
+export interface ComplaintDetail extends CustomerComplaint {
+  orderItemCount?: number | undefined;
+  attachments?:
+    | Array<{
+        id: string;
+        filename: string;
+        fileType: string;
+        uploadedAt: string;
+      }>
+    | undefined;
+  statusHistory?:
+    | Array<{
+        fromStatus: string;
+        toStatus: string;
+        changedAt: string;
+        note?: string;
+      }>
+    | undefined;
+}
+
 export function useCustomerComplaints() {
   return useQuery({
-    queryKey: ['customer-complaints'],
+    queryKey: ["customer-complaints"],
     queryFn: async () => {
-      const response = await fetchApi('/customers/me/complaints');
-      
+      const response = await fetchApi("/customers/me/complaints");
+
       const complaints = response.data.map((row: any) => ({
         id: row.id,
         complaintRef: row.complaint_ref,
@@ -57,6 +163,7 @@ export function useCustomerComplaints() {
         priority: row.priority,
         createdAt: format(new Date(row.created_at), "dd MMM, HH:mm 'IST'"),
         resolution: row.resolution,
+        storeName: row.store_name,
       }));
       return complaints;
     },
@@ -64,16 +171,90 @@ export function useCustomerComplaints() {
   });
 }
 
+export function useCustomerComplaintById(complaintId: string) {
+  return useQuery({
+    queryKey: ["customer-complaint", complaintId],
+    queryFn: async () => {
+      const response = await fetchApi(`/customers/me/complaints/${complaintId}`);
+
+      const complaint: ComplaintDetail = {
+        id: response.data.id,
+        complaintRef: response.data.complaint_ref,
+        orderId: response.data.order_id,
+        summary: response.data.summary,
+        detail: response.data.detail,
+        category: response.data.category,
+        status: response.data.status,
+        priority: response.data.priority,
+        createdAt: format(new Date(response.data.created_at), "dd MMM, HH:mm 'IST'"),
+        resolution: response.data.resolution,
+        storeName: response.data.store_name,
+        orderValue: response.data.order_value_paise
+          ? response.data.order_value_paise / 100
+          : undefined,
+        orderItemCount: response.data.order_value_paise ? undefined : undefined,
+        attachments:
+          response.data.attachments?.map((att: any) => ({
+            id: att.id,
+            filename: att.filename,
+            fileType: att.file_type,
+            uploadedAt: format(new Date(att.uploaded_at), "dd MMM, HH:mm 'IST'"),
+          })) || [],
+        statusHistory:
+          response.data.status_history?.map((h: any) => ({
+            fromStatus: h.from_status,
+            toStatus: h.to_status,
+            changedAt: format(new Date(h.changed_at), "dd MMM, HH:mm 'IST'"),
+            note: h.note,
+          })) || [],
+      };
+      return complaint;
+    },
+    enabled: !!complaintId,
+    retry: false,
+  });
+}
+
 export function useSubmitComplaint() {
   return useMutation({
-    mutationFn: async (data: { order_id: string; category: string; details: string }) => {
-      return await fetchApi('/customers/me/complaints', {
-        method: 'POST',
+    mutationFn: async (data: {
+      order_id: string;
+      category: string;
+      details: string;
+      attachments?: any[];
+    }) => {
+      return await fetchApi("/customers/me/complaints", {
+        method: "POST",
         body: JSON.stringify(data),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer-complaints'] });
+      queryClient.invalidateQueries({ queryKey: ["customer-complaints"] });
+    },
+  });
+}
+
+export function useRequestHumanSupport() {
+  return useMutation({
+    mutationFn: async (data: { complaint_id: string }) => {
+      return await fetchApi("/customers/me/request-support", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-complaints"] });
+    },
+  });
+}
+
+export function useUploadAttachmentUrl() {
+  return useMutation({
+    mutationFn: async (data: { filename: string; content_type: string }) => {
+      return await fetchApi("/customers/me/upload-url", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
     },
   });
 }

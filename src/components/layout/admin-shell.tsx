@@ -4,6 +4,7 @@ import { LogOut, Settings, Shield, Users, FileText, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
 
 const ADMIN_NAV = [
   { label: "Overview", to: "/admin", icon: Shield },
+  { label: "Security Center", to: "/admin/security", icon: Shield },
   { label: "Users", to: "/admin/users", icon: Users },
   { label: "Stores", to: "/dark-stores", icon: Store },
   { label: "Audit Logs", to: "/admin/audit-logs", icon: FileText },
@@ -72,7 +74,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
           <nav className="ml-2 flex items-center gap-0.5">
             {ADMIN_NAV.map((item) => {
-              const active = pathname === item.to || (item.to !== "/admin" && pathname.startsWith(item.to));
+              const active =
+                pathname === item.to || (item.to !== "/admin" && pathname.startsWith(item.to));
               const Icon = item.icon;
               return (
                 <Link
@@ -93,6 +96,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="num flex size-8 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
@@ -103,7 +107,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 <DropdownMenuLabel className="flex flex-col">
                   <span className="text-[13px]">{userProfile?.full_name || "Admin"}</span>
                   <span className="text-xs font-normal text-muted-foreground">
-                    System Administrator
+                    {userProfile?.role?.replace(/_/g, " ") || "System Administrator"}
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

@@ -3,29 +3,33 @@
 ## 1. Existing Codebase (What We Found)
 
 ### Framework Stack
-| Layer | Technology |
-|-------|-----------|
-| Runtime framework | **TanStack Start** (SSR-capable React meta-framework) |
+
+| Layer                | Technology                                            |
+| -------------------- | ----------------------------------------------------- |
+| Runtime framework    | **TanStack Start** (SSR-capable React meta-framework) |
 | Bundler / Dev server | **Vite 8.1** with `@lovable.dev/vite-tanstack-config` |
-| Server runtime | **Nitro** (via `@lovable.dev/vite-tanstack-config`) |
-| Router | **TanStack Router** (file-based, type-safe) |
-| Data fetching | **TanStack Query v5** |
-| UI components | **shadcn/ui** (Radix primitives + CVA) |
-| Styling | **Tailwind CSS v4** |
-| Charts | **Recharts** |
-| Forms | **React Hook Form** + **Zod** |
-| Language | **TypeScript 5.8** |
+| Server runtime       | **Nitro** (via `@lovable.dev/vite-tanstack-config`)   |
+| Router               | **TanStack Router** (file-based, type-safe)           |
+| Data fetching        | **TanStack Query v5**                                 |
+| UI components        | **shadcn/ui** (Radix primitives + CVA)                |
+| Styling              | **Tailwind CSS v4**                                   |
+| Charts               | **Recharts**                                          |
+| Forms                | **React Hook Form** + **Zod**                         |
+| Language             | **TypeScript 5.8**                                    |
 
 ### ⚠ Critical Architectural Observation
-This is **TanStack Start** — an SSR meta-framework, NOT a plain Vite SPA. The server entry is at `src/server.ts` and routes through **Nitro** (Cloudflare target by default). 
+
+This is **TanStack Start** — an SSR meta-framework, NOT a plain Vite SPA. The server entry is at `src/server.ts` and routes through **Nitro** (Cloudflare target by default).
 
 This means:
+
 - We do NOT add a separate Express server in a different process
 - Backend API routes live inside TanStack Start's **server functions** / API routes
 - Nitro handles the server-side rendering and API in one deployment unit
 - The Supabase service role key stays server-side inside TanStack Start server functions
 
 ### Existing Routes
+
 ```
 /                           → redirects to /executive
 /executive                  → Executive dashboard (KPIs, charts, heatmap)
@@ -42,18 +46,20 @@ This means:
 ```
 
 ### Existing Mock Data (all in `src/lib/mock/`)
-| File | Contents |
-|------|----------|
-| `stores.ts` | 200 dark stores across 14 Indian cities, PulseScore formula (100 − deductions), OVERRIDES for named stores |
-| `network.ts` | Executive KPIs, 30d volume series, red alerts, city stats, notifications |
-| `cases.ts` | 64 case records, 6 agents, queue KPIs, priority mix, timeline generator |
-| `fraud.ts` | 14 fraud cases (subset of refund cases), risk factors, FRAUD_KPIS |
-| `insights.ts` | 5 pre-written Q&A answers + fallback for arbitrary questions |
-| `customer.ts` | Single customer (Aditya Menon), 4 orders, active issue, refunds |
-| `random.ts` | Deterministic PRNG (mulberry32 + hashString → rngFor) |
-| `format.ts` | `inr()`, `num()`, `pct()`, `istClock()`, `ageLabel()` utilities |
+
+| File          | Contents                                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `stores.ts`   | 200 dark stores across 14 Indian cities, PulseScore formula (100 − deductions), OVERRIDES for named stores |
+| `network.ts`  | Executive KPIs, 30d volume series, red alerts, city stats, notifications                                   |
+| `cases.ts`    | 64 case records, 6 agents, queue KPIs, priority mix, timeline generator                                    |
+| `fraud.ts`    | 14 fraud cases (subset of refund cases), risk factors, FRAUD_KPIS                                          |
+| `insights.ts` | 5 pre-written Q&A answers + fallback for arbitrary questions                                               |
+| `customer.ts` | Single customer (Aditya Menon), 4 orders, active issue, refunds                                            |
+| `random.ts`   | Deterministic PRNG (mulberry32 + hashString → rngFor)                                                      |
+| `format.ts`   | `inr()`, `num()`, `pct()`, `istClock()`, `ageLabel()` utilities                                            |
 
 ### Existing Key Interfaces (from mock data)
+
 ```typescript
 DarkStore { id, name, city, zone, manager, pulse, prevPulse, sla, refundRate,
             avgResolutionMins, openIssues, status, pickers, riders,
@@ -77,6 +83,7 @@ Agent { id, name, hub, load, capacity }
 ```
 
 ### PulseScore Formula (from existing code)
+
 ```
 breakdown = { equipment: 0-25, sla: 0-25, refunds: 0-20,
               delivery: 0-15, picker: 0-10, inventory: 0-10 }
@@ -85,6 +92,7 @@ pulse = max(12, 100 - deduction)
 ```
 
 ### Existing Business Logic
+
 - **Case statuses**: Unassigned → Assigned → In progress → Awaiting customer → Escalated — L2 → Resolved
 - **SLA states**: on-track (< 150 min), at-risk (150–240 min), breached (> 240 min)
 - **Fraud decisions**: Pending review → Approved / Denied / Escalated
@@ -98,6 +106,7 @@ pulse = max(12, 100 - deduction)
 ## 2. Target Production Architecture
 
 ### Deployment Model
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │          TanStack Start + Nitro (Node.js)            │
@@ -128,7 +137,7 @@ pulse = max(12, 100 - deduction)
 ### Key Architectural Decisions
 
 1. **Backend = TanStack Start API routes (Nitro)**, NOT a separate Express process.
-   - TanStack Start supports API routes at `src/routes/api/...` 
+   - TanStack Start supports API routes at `src/routes/api/...`
    - Nitro handles all server-side code
    - Service role key lives in Nitro environment, never in browser bundles
 
@@ -148,6 +157,7 @@ pulse = max(12, 100 - deduction)
    - Loading/error states use existing `LoadingState`/`ErrorState` primitives
 
 ### Directory Structure (Target)
+
 ```
 d:/Deloitte Capstone/DarkOps/
 ├── src/
@@ -250,6 +260,7 @@ d:/Deloitte Capstone/DarkOps/
 ```
 
 ### Environment Variables
+
 ```
 # Frontend (Vite public — browser-safe)
 VITE_SUPABASE_URL=

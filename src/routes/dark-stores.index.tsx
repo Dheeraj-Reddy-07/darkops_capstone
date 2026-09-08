@@ -65,20 +65,21 @@ function StoreNetwork() {
   // Derive unique cities and zones from store data
   const cities = useMemo(() => {
     if (!data?.stores) return [];
-    return Array.from(new Set(data.stores.map(s => s.city))).sort();
+    return Array.from(new Set(data.stores.map((s) => s.city))).sort();
   }, [data?.stores]);
 
   const zones = useMemo(() => {
     if (!data?.stores) return [];
-    return Array.from(new Set(data.stores.map(s => s.zone))).sort();
+    return Array.from(new Set(data.stores.map((s) => s.zone))).sort();
   }, [data?.stores]);
 
   const rows = useMemo(() => {
     // When filters change, reset the visible rows count
     setVisibleRows(60);
-    
+
     if (!data?.stores) return [];
-    return data.stores.filter((s) => {
+    return data.stores
+      .filter((s) => {
         if (city !== "all" && s.city !== city) return false;
         if (zone !== "all" && s.zone !== zone) return false;
         if (status !== "all" && s.status !== status) return false;
@@ -94,7 +95,8 @@ function StoreNetwork() {
           );
         }
         return true;
-      }).sort((a, b) => a.pulse - b.pulse);
+      })
+      .sort((a, b) => a.pulse - b.pulse);
   }, [data, city, zone, status, band, query]);
 
   const reset = () => {
@@ -126,7 +128,13 @@ function StoreNetwork() {
           tone="crit"
           footnote="PulseScore below 60"
         />
-        <KpiCard label="Network SLA" value={kpis.avgSla} unit="%" tone="warn" footnote="target 95%" />
+        <KpiCard
+          label="Network SLA"
+          value={kpis.avgSla}
+          unit="%"
+          tone="warn"
+          footnote="target 95%"
+        />
         <KpiCard
           label="Network refund rate"
           value={kpis.avgRefundRate}
@@ -139,7 +147,11 @@ function StoreNetwork() {
         <PanelHeader
           title="All dark stores"
           subtitle="Filter by city, zone, status or PulseScore band. Click a store to open its dashboard."
-          right={<Chip tone="neutral">{rows.length} of {stores.length}</Chip>}
+          right={
+            <Chip tone="neutral">
+              {rows.length} of {stores.length}
+            </Chip>
+          }
         />
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
@@ -240,7 +252,7 @@ function StoreNetwork() {
                   key={s.id}
                   className={cn(
                     "row-hover",
-                    s.id ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                    s.id ? "cursor-pointer" : "cursor-not-allowed opacity-60",
                   )}
                   onClick={() => s.id && navigate({ to: "/dark-stores/$id", params: { id: s.id } })}
                 >
@@ -270,7 +282,11 @@ function StoreNetwork() {
                   <Td>
                     <StatusBadge
                       status={
-                        s.status === "critical" ? "Critical" : s.status === "at-risk" ? "At risk" : "Healthy"
+                        s.status === "critical"
+                          ? "Critical"
+                          : s.status === "at-risk"
+                            ? "At risk"
+                            : "Healthy"
                       }
                     />
                   </Td>
@@ -285,7 +301,7 @@ function StoreNetwork() {
               Showing first {visibleRows} of {rows.length} matching stores
             </p>
             <button
-              onClick={() => setVisibleRows(prev => Math.min(rows.length, prev + 60))}
+              onClick={() => setVisibleRows((prev) => Math.min(rows.length, prev + 60))}
               className="rounded-sm border border-border bg-surface-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Show more

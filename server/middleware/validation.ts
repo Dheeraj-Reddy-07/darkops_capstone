@@ -1,6 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import { HTTPError } from './errors';
+import { Request, Response, NextFunction } from "express";
+import { z } from "zod";
+import { HTTPError } from "./errors";
+import { sanitizeText, sanitizeSearchQuery } from "../lib/sanitize";
 
 export const validateBody = (schema: z.Schema) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -9,9 +10,9 @@ export const validateBody = (schema: z.Schema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        next(new HTTPError(400, 'VALIDATION_ERROR', 'Invalid request body', error.errors));
+        next(new HTTPError(400, "VALIDATION_ERROR", "Invalid request body", error.errors));
       } else {
-        next(new HTTPError(400, 'BAD_REQUEST', 'Unable to parse JSON body'));
+        next(new HTTPError(400, "BAD_REQUEST", "Unable to parse JSON body"));
       }
     }
   };
@@ -20,18 +21,55 @@ export const validateBody = (schema: z.Schema) => {
 export const validateQuery = (schema: z.Schema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log('Query dump:', JSON.stringify(req.query), Object.prototype.toString.call(req.query));
       // Fix Object.create(null) issue by spreading into a new object
       const safeQuery = { ...req.query };
       req.query = schema.parse(safeQuery) as any;
       next();
     } catch (error: any) {
-      console.error('Validation error:', error);
       if (error && error.errors) {
-        next(new HTTPError(400, 'VALIDATION_ERROR', 'Invalid query parameters', error.errors));
+        next(new HTTPError(400, "VALIDATION_ERROR", "Invalid query parameters", error.errors));
       } else {
-        next(new HTTPError(400, 'BAD_REQUEST', 'Invalid query parameters'));
+        next(new HTTPError(400, "BAD_REQUEST", "Invalid query parameters"));
       }
+    }
+  };
+};
+
+/**
+ * Sanitize string inputs in request body
+ */
+export const sanitizeBodyFields = (fields: string[] = []) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      for (const field of fields) {
+        if (req.body[field] && typeof req.body[field] === "string") {
+          req.body[field] = sanitizeText(req.body[field]);
+        }
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+/**
+ * Sanitize search/query parameters
+ */
+export const sanitizeSearchParams = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Sanitize common search parameters
+      const searchFields = ["q", "query", "search", "filter", "name", "email"];
+
+      for (const field of searchFields) {
+        if (req.query[field] && typeof req.query[field] === "string") {
+          req.query[field] = sanitizeSearchQuery(req.query[field] as string);
+        }
+      }
+      next();
+    } catch (error) {
+      next(error);
     }
   };
 };

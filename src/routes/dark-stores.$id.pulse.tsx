@@ -91,10 +91,11 @@ function PulseDetail() {
   const { id } = Route.useParams();
   const { data: detailData, isLoading, error } = useStoreDetail(id);
   const { data: execData } = useExecutive();
-  const networkAvgPulse = execData?.network?.avgPulse ?? '-';
+  const networkAvgPulse = execData?.network?.avgPulse ?? "-";
 
   if (isLoading) return <div className="p-8">Loading pulse detail...</div>;
-  if (error || !detailData) return <div className="p-8 text-crit">Failed to load pulse detail.</div>;
+  if (error || !detailData)
+    return <div className="p-8 text-crit">Failed to load pulse detail.</div>;
 
   const { store, trend } = detailData;
   const b = store.breakdown;
@@ -140,7 +141,12 @@ function PulseDetail() {
           tone={store.pulse < 60 ? "crit" : store.pulse < 80 ? "warn" : "ok"}
           footnote={`network avg ${networkAvgPulse}`}
         />
-        <KpiCard label="Total deduction" value={`-${total}`} tone="crit" footnote="from 100 baseline" />
+        <KpiCard
+          label="Total deduction"
+          value={`-${total}`}
+          tone="crit"
+          footnote="from 100 baseline"
+        />
         <KpiCard
           label="Largest driver"
           value={worst.title}
@@ -213,7 +219,11 @@ function PulseDetail() {
                   <span
                     className={cn(
                       "num text-sm font-semibold",
-                      f.value >= 15 ? "text-crit" : f.value >= 8 ? "text-warn" : "text-muted-foreground",
+                      f.value >= 15
+                        ? "text-crit"
+                        : f.value >= 8
+                          ? "text-warn"
+                          : "text-muted-foreground",
                     )}
                   >
                     -{f.value} pts
@@ -223,7 +233,11 @@ function PulseDetail() {
                   <div
                     className={cn(
                       "h-1.5 rounded-sm",
-                      f.value >= 15 ? "bg-crit" : f.value >= 8 ? "bg-warn" : "bg-muted-foreground/60",
+                      f.value >= 15
+                        ? "bg-crit"
+                        : f.value >= 8
+                          ? "bg-warn"
+                          : "bg-muted-foreground/60",
                     )}
                     style={{ width: `${Math.min(100, f.value * 4)}%` }}
                   />

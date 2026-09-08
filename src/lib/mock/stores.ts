@@ -161,18 +161,78 @@ const OVERRIDES: Record<
     sla: 64.0,
     refundRate: 9.5,
   },
-  "Chennai|Old City DS": { id: "DS-1770", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 78.4, refundRate: 6.1 },
-  "Chandigarh|North DS": { id: "DS-1070", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 91.2, refundRate: 4.1 },
-  "Kolkata|Riverside DS": { id: "DS-2092", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 74.8, refundRate: 6.8 },
-  "Hyderabad|South DS": { id: "DS-1126", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 88.5, refundRate: 4.4 },
-  "Mumbai|North DS": { id: "DS-1007", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 92.6, refundRate: 3.8 },
-  "Bengaluru|South DS": { id: "DS-1105", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 94.1, refundRate: 3.4 },
-  "Bengaluru|Airport Road DS": { id: "DS-1630", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 82.3, refundRate: 5.2 },
-  "Mumbai|Riverside DS": { id: "DS-2057", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 76.9, refundRate: 6.4 },
-  "Hyderabad|Outer Ring DS": { id: "DS-1966", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 71.5, refundRate: 7.3 },
-  "Delhi NCR|Outer Ring DS": { id: "DS-1959", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 79.2, refundRate: 5.9 },
-  "Delhi NCR|Industrial Belt DS": { id: "DS-2169", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 69.4, refundRate: 7.7 },
-  "Hyderabad|IT Corridor DS": { id: "DS-1861", breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 }, sla: 86.7, refundRate: 4.7 },
+  "Chennai|Old City DS": {
+    id: "DS-1770",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 78.4,
+    refundRate: 6.1,
+  },
+  "Chandigarh|North DS": {
+    id: "DS-1070",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 91.2,
+    refundRate: 4.1,
+  },
+  "Kolkata|Riverside DS": {
+    id: "DS-2092",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 74.8,
+    refundRate: 6.8,
+  },
+  "Hyderabad|South DS": {
+    id: "DS-1126",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 88.5,
+    refundRate: 4.4,
+  },
+  "Mumbai|North DS": {
+    id: "DS-1007",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 92.6,
+    refundRate: 3.8,
+  },
+  "Bengaluru|South DS": {
+    id: "DS-1105",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 94.1,
+    refundRate: 3.4,
+  },
+  "Bengaluru|Airport Road DS": {
+    id: "DS-1630",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 82.3,
+    refundRate: 5.2,
+  },
+  "Mumbai|Riverside DS": {
+    id: "DS-2057",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 76.9,
+    refundRate: 6.4,
+  },
+  "Hyderabad|Outer Ring DS": {
+    id: "DS-1966",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 71.5,
+    refundRate: 7.3,
+  },
+  "Delhi NCR|Outer Ring DS": {
+    id: "DS-1959",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 79.2,
+    refundRate: 5.9,
+  },
+  "Delhi NCR|Industrial Belt DS": {
+    id: "DS-2169",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 69.4,
+    refundRate: 7.7,
+  },
+  "Hyderabad|IT Corridor DS": {
+    id: "DS-1861",
+    breakdown: { equipment: 0, sla: 0, refunds: 0, delivery: 0, picker: 0, inventory: 0 },
+    sla: 86.7,
+    refundRate: 4.7,
+  },
 };
 
 function statusFor(pulse: number): StoreStatus {
@@ -222,8 +282,10 @@ function build(): DarkStore[] {
       const severity = rand();
       const scale = severity > 0.86 ? 2.4 : severity > 0.6 ? 1.5 : 0.75;
       const equipmentFailures14d = Math.max(0, Math.round(intBetween(rand, 0, 10) * scale));
-      const slaPct = override?.sla ?? round(Math.max(70, 98 - intBetween(rand, 0, 30) - rand() * 4), 1);
-      const refundRatePct = override?.refundRate ?? round(2 + intBetween(rand, 0, 8) * scale + rand() * 0.8, 1);
+      const slaPct =
+        override?.sla ?? round(Math.max(70, 98 - intBetween(rand, 0, 30) - rand() * 4), 1);
+      const refundRatePct =
+        override?.refundRate ?? round(2 + intBetween(rand, 0, 8) * scale + rand() * 0.8, 1);
       const deliveryDelays = Math.max(0, Math.round(intBetween(rand, 0, 50) * scale));
       const pickerDelayMins = round(1.5 + intBetween(rand, 0, 5) * scale, 1);
       const inventoryIssues = Math.max(0, Math.round(intBetween(rand, 0, 15) * scale));
@@ -237,7 +299,8 @@ function build(): DarkStore[] {
       const deliveryPts = Math.min(20, deliveryDelays * 0.5);
       const pickerPts = Math.max(0, (pickerDelayMins - 2.5) * 2);
       const inventoryPts = Math.min(15, inventoryIssues * 1);
-      const totalDeduction = equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
+      const totalDeduction =
+        equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
       const pulse = Math.max(0, Math.min(100, Math.round(100 - totalDeduction)));
 
       // Update breakdown to match calculated points
@@ -291,9 +354,7 @@ export const NETWORK = {
   criticalStores: STORES.filter((s) => s.status === "critical").length,
   avgSla: round(STORES.reduce((a, s) => a + s.sla, 0) / STORES.length, 1),
   avgRefundRate: round(STORES.reduce((a, s) => a + s.refundRate, 0) / STORES.length, 1),
-  avgResolution: Math.round(
-    STORES.reduce((a, s) => a + s.avgResolutionMins, 0) / STORES.length,
-  ),
+  avgResolution: Math.round(STORES.reduce((a, s) => a + s.avgResolutionMins, 0) / STORES.length),
 };
 
 export const WORST_STORES = [...STORES].sort((a, b) => a.pulse - b.pulse).slice(0, 5);
@@ -323,8 +384,6 @@ export function pulseTrend(store: DarkStore, days: number) {
   return Array.from({ length: days }, (_, i) => ({
     t: i,
     label: `D-${days - i}`,
-    score: Math.round(
-      start + ((store.pulse - start) * i) / (days - 1) + (rand() - 0.5) * 4,
-    ),
+    score: Math.round(start + ((store.pulse - start) * i) / (days - 1) + (rand() - 0.5) * 4),
   }));
 }

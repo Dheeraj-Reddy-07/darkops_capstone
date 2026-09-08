@@ -110,17 +110,28 @@ function AdminOverview() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Time</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Action</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Resource</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Role</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Time
+                </th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Action
+                </th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Resource
+                </th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Role
+                </th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
                 <tr key={log.id} className="border-b border-border/50 hover:bg-surface-2">
                   <td className="num px-4 py-2.5 text-xs text-muted-foreground">
-                    {new Date(log.occurred_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour12: false })}
+                    {new Date(log.occurred_at).toLocaleString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                      hour12: false,
+                    })}
                   </td>
                   <td className="px-4 py-2.5 font-medium">{log.action}</td>
                   <td className="num px-4 py-2.5 text-xs text-muted-foreground">

@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import {
   ArrowRight,
   Layers,
@@ -10,6 +9,7 @@ import {
   Store,
   AlertCircle,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,28 +34,6 @@ export const Route = createFileRoute("/")({
   component: LandingPage,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any);
-
-/* ─────────────────────────────── Data ─────────────────────────────── */
-
-interface PublicOverview {
-  store_count: number;
-  active_cases: number;
-  avg_pulse: number;
-  pending_fraud: number;
-}
-
-function usePublicOverview() {
-  return useQuery<PublicOverview>({
-    queryKey: ["public-overview"],
-    queryFn: async () => {
-      const res = await fetch("/api/v1/public/overview");
-      if (!res.ok) throw new Error("Overview unavailable");
-      return res.json();
-    },
-    retry: 2,
-    staleTime: 60_000,
-  });
-}
 
 /* ─────────────────────────── Module definitions ───────────────────── */
 
@@ -148,74 +126,9 @@ const SIGNAL_STEPS = [
   },
 ] as const;
 
-/* ─────────────────────────── Animated counter ─────────────────────── */
-
-function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string }) {
-  const [displayed, setDisplayed] = useState(0);
-  const started = useRef(false);
-
-  useEffect(() => {
-    if (started.current || value === 0) {
-      setDisplayed(value);
-      return;
-    }
-    started.current = true;
-    const duration = 900;
-    const start = performance.now();
-    const from = 0;
-    const to = value;
-
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayed(Math.round(from + (to - from) * eased));
-      if (progress < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [value]);
-
-  return (
-    <span className="num tabular-nums">
-      {displayed}
-      {suffix}
-    </span>
-  );
-}
-
-/* ─────────────────────────── Metric card ──────────────────────────── */
-
-function MetricCard({
-  label,
-  value,
-  suffix = "",
-  sub,
-}: {
-  label: string;
-  value: number | null;
-  suffix?: string;
-  sub?: string;
-}) {
-  return (
-    <div className="lp-metric-card">
-      <p className="lp-label-caps">{label}</p>
-      <p className="lp-metric-value">
-        {value === null ? (
-          <span className="lp-metric-skeleton" />
-        ) : (
-          <AnimatedNumber value={value} suffix={suffix} />
-        )}
-      </p>
-      {sub && <p className="lp-metric-sub">{sub}</p>}
-    </div>
-  );
-}
-
 /* ─────────────────────────── Landing page ─────────────────────────── */
 
 function LandingPage() {
-  const { data: overview, isLoading, isError } = usePublicOverview();
   const modulesRef = useRef<HTMLElement>(null);
 
   const scrollToModules = (e: React.MouseEvent) => {
@@ -247,6 +160,7 @@ function LandingPage() {
             <a href="#modules" onClick={scrollToModules} className="lp-nav-link">
               Platform
             </a>
+            <ThemeToggle className="lp-theme-toggle" />
             <Link to="/login" className="lp-btn-primary" aria-label="Sign in to DarkOps">
               Sign in
               <ArrowRight className="lp-btn-icon" aria-hidden="true" />
@@ -264,15 +178,7 @@ function LandingPage() {
               <span className="lp-live-dot" aria-hidden="true" />
               <span className="lp-eyebrow-label">LIVE NETWORK</span>
               <span className="lp-eyebrow-sep" aria-hidden="true" />
-              <span className="lp-eyebrow-meta">
-                {isLoading ? (
-                  <span className="lp-eyebrow-skeleton" />
-                ) : isError || !overview ? (
-                  "Bengaluru metro"
-                ) : (
-                  `${overview.store_count} dark stores · Bengaluru metro`
-                )}
-              </span>
+              <span className="lp-eyebrow-meta">Bengaluru metro</span>
             </div>
 
             {/* Headline */}
@@ -312,47 +218,133 @@ function LandingPage() {
           </div>
         </section>
 
-        {/* ── Live Network Snapshot ─────────────────────────────────── */}
-        <section className="lp-snapshot-wrap" aria-labelledby="snapshot-heading">
+        {/* ── From Complaint to Resolution ─────────────────────────────── */}
+        <section className="lp-section lp-flow-section" aria-labelledby="flow-heading">
           <div className="lp-container">
-            <div className="lp-snapshot">
-              <div className="lp-snapshot-header">
-                <span className="lp-live-dot lp-live-dot-sm" aria-hidden="true" />
-                <h2 id="snapshot-heading" className="lp-snapshot-title">
-                  Network snapshot
-                </h2>
-                <span className="lp-snapshot-live-label">LIVE</span>
-              </div>
+            <div className="lp-section-header">
+              <h2 id="flow-heading" className="lp-section-h2">
+                From complaint to resolution.
+              </h2>
+              <p className="lp-section-sub">
+                One operational layer that turns customer issues into network intelligence.
+              </p>
+            </div>
 
-              {isError ? (
-                <div className="lp-snapshot-error" role="alert">
-                  <AlertCircle className="lp-error-icon" aria-hidden="true" />
-                  <span>Network data temporarily unavailable.</span>
+            <div className="lp-flow-steps">
+              <div className="lp-flow-step">
+                <div className="lp-flow-step-icon">
+                  <Users className="lp-flow-icon" aria-hidden="true" />
                 </div>
-              ) : (
-                <div className="lp-metrics-grid">
-                  <MetricCard
-                    label="Stores monitored"
-                    value={isLoading ? null : (overview?.store_count ?? 0)}
-                  />
-                  <MetricCard
-                    label="Active cases"
-                    value={isLoading ? null : (overview?.active_cases ?? 0)}
-                    sub="open operational"
-                  />
-                  <MetricCard
-                    label="Network PulseScore"
-                    value={isLoading ? null : (overview?.avg_pulse ?? 0)}
-                    suffix="/100"
-                    sub="network average"
-                  />
-                  <MetricCard
-                    label="Fraud reviews open"
-                    value={isLoading ? null : (overview?.pending_fraud ?? 0)}
-                    sub="pending decision"
-                  />
+                <h3 className="lp-flow-step-label">Customer complaint</h3>
+                <p className="lp-flow-step-desc">
+                  Issues are captured through the customer portal and automatically routed to
+                  support.
+                </p>
+              </div>
+              <div className="lp-flow-arrow" aria-hidden="true">
+                →
+              </div>
+              <div className="lp-flow-step">
+                <div className="lp-flow-step-icon">
+                  <Layers className="lp-flow-icon" aria-hidden="true" />
                 </div>
-              )}
+                <h3 className="lp-flow-step-label">Support case</h3>
+                <p className="lp-flow-step-desc">
+                  Customer support triages, assigns, and escalates cases with full context.
+                </p>
+              </div>
+              <div className="lp-flow-arrow" aria-hidden="true">
+                →
+              </div>
+              <div className="lp-flow-step">
+                <div className="lp-flow-step-icon">
+                  <Store className="lp-flow-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-flow-step-label">Operational investigation</h3>
+                <p className="lp-flow-step-desc">
+                  Operations team investigates store-level issues and takes corrective action.
+                </p>
+              </div>
+              <div className="lp-flow-arrow" aria-hidden="true">
+                →
+              </div>
+              <div className="lp-flow-step">
+                <div className="lp-flow-step-icon">
+                  <AlertCircle className="lp-flow-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-flow-step-label">Store action</h3>
+                <p className="lp-flow-step-desc">
+                  Store managers execute work orders and resolve operational issues.
+                </p>
+              </div>
+              <div className="lp-flow-arrow" aria-hidden="true">
+                →
+              </div>
+              <div className="lp-flow-step">
+                <div className="lp-flow-step-icon">
+                  <ShieldAlert className="lp-flow-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-flow-step-label">Resolution</h3>
+                <p className="lp-flow-step-desc">
+                  Cases are resolved, customers are notified, and the loop closes.
+                </p>
+              </div>
+              <div className="lp-flow-arrow" aria-hidden="true">
+                →
+              </div>
+              <div className="lp-flow-step">
+                <div className="lp-flow-step-icon">
+                  <BarChart3 className="lp-flow-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-flow-step-label">Executive intelligence</h3>
+                <p className="lp-flow-step-desc">
+                  Network performance data informs strategic decisions and process improvements.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Value Pillars ─────────────────────────────────────────────── */}
+        <section className="lp-section lp-pillars-section" aria-labelledby="pillars-heading">
+          <div className="lp-container">
+            <div className="lp-section-header">
+              <h2 id="pillars-heading" className="lp-section-h2">
+                Built for operational excellence.
+              </h2>
+            </div>
+
+            <div className="lp-pillars-grid">
+              <div className="lp-pillar-card">
+                <div className="lp-pillar-icon-wrap">
+                  <Layers className="lp-pillar-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-pillar-label">Customer → Operations</h3>
+                <p className="lp-pillar-desc">
+                  Complaints become actionable operational context with full traceability from issue
+                  to resolution.
+                </p>
+              </div>
+              <div className="lp-pillar-card">
+                <div className="lp-pillar-icon-wrap">
+                  <BarChart3 className="lp-pillar-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-pillar-label">Real-time intelligence</h3>
+                <p className="lp-pillar-desc">
+                  PulseScore, SLA compliance, backlog metrics, and store health in a single
+                  operational platform.
+                </p>
+              </div>
+              <div className="lp-pillar-card">
+                <div className="lp-pillar-icon-wrap">
+                  <ShieldAlert className="lp-pillar-icon" aria-hidden="true" />
+                </div>
+                <h3 className="lp-pillar-label">Secure by design</h3>
+                <p className="lp-pillar-desc">
+                  Role-based access control, row-level security, audit logging, and scoped customer
+                  data isolation.
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -808,104 +800,6 @@ const LANDING_CSS = `
   margin-top: 0.25rem;
 }
 
-/* ── Snapshot section ── */
-.lp-snapshot-wrap {
-  border-top: 1px solid var(--border);
-  padding-block: 1.75rem;
-}
-
-.lp-snapshot {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background-color: var(--surface);
-  padding: 1.25rem 1.5rem;
-}
-
-.lp-snapshot-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.lp-snapshot-title {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--muted-foreground);
-  letter-spacing: 0.01em;
-  margin: 0;
-}
-
-.lp-snapshot-live-label {
-  margin-left: auto;
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  color: var(--ok);
-  border: 1px solid color-mix(in oklch, var(--ok) 30%, transparent);
-  background-color: color-mix(in oklch, var(--ok) 8%, transparent);
-  border-radius: 3px;
-  padding: 0.125rem 0.375rem;
-}
-
-.lp-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem 1.5rem;
-}
-
-@media (min-width: 640px) {
-  .lp-metrics-grid { grid-template-columns: repeat(4, 1fr); }
-}
-
-.lp-metric-card {
-  padding-block: 0.25rem;
-}
-
-.lp-metric-value {
-  font-family: var(--font-data, "JetBrains Mono", ui-monospace, monospace);
-  font-size: 2rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--foreground);
-  line-height: 1.1;
-  margin-top: 0.3rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.lp-metric-skeleton {
-  display: inline-block;
-  width: 3.5rem;
-  height: 2rem;
-  border-radius: 4px;
-  background-color: var(--surface-3);
-  animation: lp-shimmer 1.4s ease-in-out infinite;
-  vertical-align: middle;
-}
-
-.lp-metric-sub {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
-  margin-top: 0.25rem;
-  letter-spacing: 0.01em;
-}
-
-.lp-snapshot-error {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--muted-foreground);
-  padding-block: 0.75rem;
-}
-
-.lp-error-icon {
-  width: 0.875rem;
-  height: 0.875rem;
-  color: var(--warn);
-  flex-shrink: 0;
-}
-
 /* ── Section shared ── */
 .lp-section {
   padding-block: 2.5rem;
@@ -1194,6 +1088,141 @@ const LANDING_CSS = `
   font-size: 0.875rem;
   color: var(--muted-foreground);
   line-height: 1.65;
+  margin: 0;
+}
+
+/* ── Flow section ── */
+.lp-flow-section {
+  background-color: color-mix(in oklch, var(--surface) 30%, transparent);
+}
+
+.lp-flow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .lp-flow-steps {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0;
+  }
+}
+
+.lp-flow-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.lp-flow-step-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.lp-flow-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--primary);
+}
+
+.lp-flow-step-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.lp-flow-step-desc {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.lp-flow-arrow {
+  display: none;
+  font-size: 1.25rem;
+  color: var(--border);
+  align-self: center;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .lp-flow-arrow {
+    display: block;
+    padding: 0 0.5rem;
+  }
+}
+
+/* ── Pillars section ── */
+.lp-pillars-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .lp-pillars-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.lp-pillar-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--surface);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.lp-pillar-card:hover {
+  border-color: color-mix(in oklch, var(--border) 160%, transparent);
+  background-color: var(--surface-2);
+}
+
+.lp-pillar-icon-wrap {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  flex-shrink: 0;
+}
+
+.lp-pillar-icon {
+  width: 1rem;
+  height: 1rem;
+  color: var(--primary);
+}
+
+.lp-pillar-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+
+.lp-pillar-desc {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  line-height: 1.6;
   margin: 0;
 }
 

@@ -17,7 +17,10 @@ export const Route = createFileRoute("/admin/audit-logs")({
   head: () => ({
     meta: [
       { title: "Audit logs - DarkOps Admin" },
-      { name: "description", content: "Complete platform audit trail of all state-changing operations." },
+      {
+        name: "description",
+        content: "Complete platform audit trail of all state-changing operations.",
+      },
     ],
   }),
   component: AuditLogsPage,
@@ -61,7 +64,11 @@ function AuditLogsPage() {
   const [actionFilter, setActionFilter] = useState("all");
   const [limit] = useState(100);
 
-  const { data: logs = [], isLoading, error } = useAuditLogs({
+  const {
+    data: logs = [],
+    isLoading,
+    error,
+  } = useAuditLogs({
     ...(actionFilter !== "all" ? { action: actionFilter } : {}),
     limit,
   });
@@ -109,7 +116,9 @@ function AuditLogsPage() {
             <SelectContent>
               <SelectItem value="all">All actions</SelectItem>
               {ACTION_TYPES.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -148,10 +157,14 @@ function AuditLogsPage() {
                     })}
                   </Td>
                   <Td className="font-medium text-[13px]">{log.action}</Td>
-                  <Td className="label-caps text-[10px] text-muted-foreground">{log.resource_type}</Td>
+                  <Td className="label-caps text-[10px] text-muted-foreground">
+                    {log.resource_type}
+                  </Td>
                   <Td className="num text-xs">{log.resource_id}</Td>
                   <Td>
-                    <span className="label-caps text-[10px]">{log.actor_role?.replace(/_/g, " ")}</span>
+                    <span className="label-caps text-[10px]">
+                      {log.actor_role?.replace(/_/g, " ")}
+                    </span>
                   </Td>
                   <Td className="max-w-[200px] truncate text-xs text-muted-foreground">
                     {log.metadata ? JSON.stringify(log.metadata) : "-"}
