@@ -31,7 +31,9 @@ function ComplaintHistory() {
       return c.status === statusFilter;
     }) || [];
 
-  const getCustomerFriendlyStatus = (status: string) => {
+  const getCustomerFriendlyStatus = (complaint: any) => {
+    // Prefer the backend-computed label (reflects real automation outcome)
+    if (complaint.customerStatusLabel) return complaint.customerStatusLabel;
     const statusMap: Record<string, string> = {
       unassigned: "Received",
       assigned: "Under Review",
@@ -40,7 +42,7 @@ function ComplaintHistory() {
       resolved: "Resolved",
       closed: "Closed",
     };
-    return statusMap[status] || status;
+    return statusMap[complaint.status] || complaint.status;
   };
 
   if (isLoading) {
@@ -136,8 +138,8 @@ function ComplaintHistory() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="num text-[13px]">{complaint.complaintRef}</p>
-                        <StatusBadge status={complaint.status} />
+                       <p className="num text-[13px]">{complaint.complaintRef}</p>
+                        <StatusBadge status={getCustomerFriendlyStatus(complaint)} />
                       </div>
                       <p className="text-sm font-medium">{complaint.summary}</p>
                       <p className="mt-1 text-xs text-muted-foreground">

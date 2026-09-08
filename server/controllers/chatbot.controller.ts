@@ -3,6 +3,7 @@ import { createSupabaseServiceRoleClient } from "../lib/supabase";
 import { HTTPError } from "../middleware/errors";
 import { logSecurityEvent } from "../services/audit.service";
 import { format } from "date-fns";
+import { toComplaintDTO } from "../lib/dto";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -34,46 +35,6 @@ const BLOCKED_KEYWORDS = [
   "bypass security",
   "escalate privileges",
 ];
-
-// Helper to translate internal complaint state into customer-safe status description
-function getCustomerSafeStatus(c: any) {
-  if (c.status === "resolved") {
-    return {
-      label: "Resolved",
-      details: c.resolution ? `Resolution: ${c.resolution}` : "Your complaint has been resolved.",
-      isLiveCallEligible: false,
-    };
-  }
-  if (c.status === "closed") {
-    return {
-      label: "Closed",
-      details: "This complaint record has been closed.",
-      isLiveCallEligible: false,
-    };
-  }
-
-  // Calculate SLA eligibility for open complaints
-  const createdAtMs = c.created_at ? new Date(c.created_at).getTime() : Date.now();
-  const slaMinsMap: Record<string, number> = { P1: 15, P2: 30, P3: 120, P4: 240 };
-  const slaMins = slaMinsMap[c.priority] || 120;
-  const slaDueMs = createdAtMs + slaMins * 60 * 1000;
-  const isBreached = Date.now() > slaDueMs;
-
-  if (isBreached) {
-    return {
-      label: "Response SLA Exceeded (Live support available)",
-      details:
-        "Our standard review window has passed. You are now eligible to connect with a live support agent on your complaint details page.",
-      isLiveCallEligible: true,
-    };
-  }
-
-  return {
-    label: "Being reviewed by support team",
-    details: "Your complaint is currently under review by our operations team within SLA.",
-    isLiveCallEligible: false,
-  };
-}
 
 export const handleCustomerChat = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -149,12 +110,19 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       .eq("customer_id", customer.id)
       .order("placed_at", { ascending: false });
 
-    // 4. Fetch real customer complaints (IDOR protected via customer_id)
-    const { data: rawComplaints = [] } = await adminClient
+    // 4. Fetch real customer complaints with full data so DTO can compute status accurately
+    const { data: rawComplaintsData = [], error: complaintsErr } = await adminClient
       .from("complaints")
-      .select("id, complaint_ref, order_id, summary, detail, category, status, priority, type, created_at, resolution, order_value_paise, stores(name)")
+      .select("*, orders(item_count), stores(name)")
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false });
+
+    if (complaintsErr) {
+      console.error("[CHATBOT] Error fetching complaints:", complaintsErr);
+    }
+
+    // Run each complaint through the DTO so status labels are consistent with what the UI sees
+    const rawComplaints = (rawComplaintsData || []).map((c: any) => toComplaintDTO(c));
 
     let response = "";
     let suggestions = ["Check complaint status", "Which order is my complaint about?", "My account info"];
@@ -194,7 +162,7 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
           (c) => c.status !== "resolved" && c.status !== "closed",
         );
         const target = openComplaints.length > 0 ? openComplaints[0] : rawComplaints[0];
-        const storeName = (target.stores as any)?.name || "Dark Store";
+        const storeName = (target as any).store_name || "Dark Store";
         response = `Your complaint (**${target.complaint_ref}**) is associated with Order **${target.order_id}** from **${storeName}**.\n- **Issue:** ${target.summary}\n- **Detail:** ${target.detail}`;
       }
       suggestions = ["Check complaint status", "My account info"];
@@ -219,15 +187,16 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
         suggestions = ["Check complaint status", "My account info"];
       } else {
         const eligibleComplaint = openComplaints.find(
-          (c) => getCustomerSafeStatus(c).isLiveCallEligible,
+          (c) => c.is_live_call_eligible,
         );
 
         if (eligibleComplaint) {
-          response = `Your complaint (${eligibleComplaint.complaint_ref}) for Order ${eligibleComplaint.order_id} has passed our standard SLA response window. Live support is now unlocked! You can click 'Connect me to a live agent' on your Complaint details page.`;
+          response = `Your complaint (**${eligibleComplaint.complaint_ref}**) for Order **${eligibleComplaint.order_id}** has passed our standard SLA response window. **Live support is now unlocked!** Navigate to your Complaint Details page and click 'Connect me to a live agent'.`;
           suggestions = ["Check complaint status", "My account info"];
         } else {
           const mostRecent = openComplaints[0];
-          response = `Your complaint (${mostRecent.complaint_ref}) for Order ${mostRecent.order_id} is currently being reviewed by our support team within SLA. Live agent connection will automatically become available if your case remains unresolved past SLA.`;
+          const slaDue = mostRecent.sla_due_at ? format(new Date(mostRecent.sla_due_at), "HH:mm 'IST'") : "soon";
+          response = `Your complaint (**${mostRecent.complaint_ref}**) for Order **${mostRecent.order_id}** is **${mostRecent.customer_status_label}**. Live agent connection becomes available if your case remains unresolved after its SLA window (due **${slaDue}**).`;
           suggestions = ["Check complaint status", "My account info"];
         }
       }
@@ -242,12 +211,12 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       lastUserMessage.includes("where") ||
       lastUserMessage.includes("track")
     ) {
-      const activeOrder = rawOrders.find((o) => o.status !== "delivered");
+      const activeOrder = (rawOrders || []).find((o) => o.status !== "delivered");
 
       if (activeOrder) {
         const storeName = (activeOrder.stores as any)?.name || "Local Dark Store";
         response = `Your active order (**${activeOrder.id}**) from **${storeName}** is currently **${activeOrder.status}**.\n\nFull order details are available under the **Orders** tab. I am here to help you check any complaint related to your orders.`;
-      } else if (rawOrders.length > 0) {
+      } else if (rawOrders && rawOrders.length > 0) {
         const mostRecent = rawOrders[0];
         const storeName = (mostRecent.stores as any)?.name || "Local Dark Store";
         response = `Your most recent order (**${mostRecent.id}**) from **${storeName}** is **${mostRecent.status}**.\n\nFull order history is available under the **Orders** tab. I am here to help you check your complaint records.`;
@@ -260,7 +229,7 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       return res.status(200).json({ message: response, suggestions });
     }
 
-    // ── Intent 4: Complaint Status Queries ─────────────────────────────────────
+    // ── Intent 5: Complaint Status Queries ─────────────────────────────────────
     if (
       lastUserMessage.includes("complaint") ||
       lastUserMessage.includes("issue") ||
@@ -279,19 +248,28 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
         const resolvedCount = rawComplaints.length - openComplaints.length;
 
         const targetComplaint = openComplaints.length > 0 ? openComplaints[0] : rawComplaints[0];
-        const safeStatus = getCustomerSafeStatus(targetComplaint);
         const submittedAt = format(new Date(targetComplaint.created_at), "dd MMM, HH:mm 'IST'");
-        const storeName = (targetComplaint.stores as any)?.name || "Dark Store";
+        const storeName = (targetComplaint as any).store_name || "Dark Store";
+
+        // Use the backend-derived status label and detail (from DTO, reflects real state)
+        const statusLabel = (targetComplaint as any).customer_status_label || targetComplaint.status;
+        const statusDetail = (targetComplaint as any).customer_status_detail || "";
 
         const summaryHeader =
           openComplaints.length > 0
             ? `You have **${openComplaints.length}** open complaint(s) out of **${rawComplaints.length}** total record(s).`
-            : `All **${rawComplaints.length}** of your complaint(s) have been resolved.`;
+            : `All **${rawComplaints.length}** of your complaint(s) have been ${resolvedCount === rawComplaints.length ? "resolved" : "processed"}.`;
 
         const sectionHeader =
-          openComplaints.length > 0 ? "Active Open Complaint:" : "Most Recent Complaint:";
+          openComplaints.length > 0 ? "Most Recent Open Complaint:" : "Most Recent Complaint:";
 
-        response = `${summaryHeader}\n\n**${sectionHeader}**\n- **Reference:** ${targetComplaint.complaint_ref}\n- **Order:** ${targetComplaint.order_id} (${storeName})\n- **Category:** ${targetComplaint.summary}\n- **Submitted:** ${submittedAt}\n- **Status:** ${safeStatus.label}\n- **Details:** ${safeStatus.details}`;
+        // Include resolution if resolved
+        let resolutionNote = "";
+        if (targetComplaint.status === "resolved" && targetComplaint.resolution) {
+          resolutionNote = `\n- **Resolution:** ${targetComplaint.resolution}`;
+        }
+
+        response = `${summaryHeader}\n\n**${sectionHeader}**\n- **Reference:** ${targetComplaint.complaint_ref}\n- **Order:** ${targetComplaint.order_id} (${storeName})\n- **Category:** ${targetComplaint.summary}\n- **Submitted:** ${submittedAt}\n- **Status:** ${statusLabel}\n- **Details:** ${statusDetail}${resolutionNote}`;
 
         suggestions = ["Where is my order?", "Check complaint status", "My account info"];
       }
@@ -299,19 +277,19 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       return res.status(200).json({ message: response, suggestions });
     }
 
-    // ── Intent 5: Account Information ──────────────────────────────────────────
+    // ── Intent 6: Account Information ──────────────────────────────────────────
     if (
       lastUserMessage.includes("account") ||
       lastUserMessage.includes("profile") ||
       lastUserMessage.includes("who am i") ||
       lastUserMessage.includes("my info")
     ) {
-      response = `Here is your authenticated profile information:\n\n- **Name:** ${customer.full_name || "Valued Customer"}\n- **Email:** ${customer.email}\n- **Customer ID:** ${customer.id}\n- **Active Orders:** ${rawOrders.filter((o) => o.status !== "delivered").length}\n- **Total Complaints:** ${rawComplaints.length}`;
+      response = `Here is your authenticated profile information:\n\n- **Name:** ${customer.full_name || "Valued Customer"}\n- **Email:** ${customer.email}\n- **Customer ID:** ${customer.id}\n- **Active Orders:** ${(rawOrders || []).filter((o) => o.status !== "delivered").length}\n- **Total Complaints:** ${rawComplaints.length} (${rawComplaints.filter((c) => c.status !== "resolved" && c.status !== "closed").length} open)`;
       suggestions = ["Where is my order?", "Check complaint status"];
       return res.status(200).json({ message: response, suggestions });
     }
 
-    // ── Intent 6: Greetings & General Help Fallback ────────────────────────────
+    // ── Intent 7: Greetings & General Help Fallback ────────────────────────────
     const firstName = customer.full_name ? customer.full_name.split(" ")[0] : "there";
 
     if (
@@ -319,9 +297,9 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       lastUserMessage.includes("hi") ||
       lastUserMessage.includes("hey")
     ) {
-      response = `Hello ${firstName}! I'm your DarkOps Care Assistant. I can look up your real-time order status, complaint records, and account information. What would you like to check today?`;
+      response = `Hello ${firstName}! I'm your DarkOps Care Assistant. I can look up your real-time complaint status, resolution details, and order context. What would you like to check today?`;
     } else {
-      response = `Hello ${firstName}! I am a read-only support assistant. I can fetch your real-time order tracking, complaint history, or account details. Try asking:\n- *"Where is my order?"*\n- *"Check complaint status"*\n- *"My account info"*`;
+      response = `Hello ${firstName}! I am a read-only support assistant. I can fetch your real-time complaint tracking, order history, or account details. Try asking:\n- *"Check my complaint status"*\n- *"Which order is my complaint about?"*\n- *"My account info"*`;
     }
 
     return res.status(200).json({ message: response, suggestions });

@@ -29,7 +29,7 @@ export async function processComplaint(complaintId: string): Promise<AutomationR
         `
         *,
         orders (total_amount_paise, placed_at),
-        customers (prior_claims_90d, refund_history_paise)
+        customers (prior_claims_90d)
       `,
       )
       .eq("id", complaintId)
@@ -71,11 +71,11 @@ export async function processComplaint(complaintId: string): Promise<AutomationR
 
       default:
         // Fallback to manual review
-        return await escalateToSupport(
+        return await escalateToAgentQueue(
           complaintId,
           complaint,
           nlpAnalysis,
-          "Unknown complaint type",
+          "Unknown complaint type – manual review required",
         );
     }
   } catch (error) {
@@ -145,6 +145,24 @@ async function processRefund(
         });
       } catch {}
 
+      // Close the existing support ticket (don't create a new one)
+      if (complaint.ticket_id) {
+        try {
+          await adminClient
+            .from("support_tickets")
+            .update({ status: "closed", priority: "P3" })
+            .eq("id", complaint.ticket_id);
+
+          await adminClient.from("ticket_activity").insert({
+            ticket_id: complaint.ticket_id,
+            event_type: "auto_resolved",
+            payload: { reason: "Refund auto-approved by automation engine", resolution },
+          });
+        } catch (err) {
+          console.error("[Automation] Error closing ticket:", err);
+        }
+      }
+
       // Notify customer via profile lookup
       if (complaint.customer_id) {
         const { data: customerProfile } = await adminClient
@@ -172,7 +190,7 @@ async function processRefund(
       }
 
       await logAudit({
-        actorId: "system",
+        actorId: "00000000-0000-0000-0000-000000000000",
         actorRole: "automation",
         action: "refund.auto_approve",
         resourceType: "complaint",
@@ -193,7 +211,7 @@ async function processRefund(
           ? `Order amount Rs ${orderAmountPaise / 100} exceeds auto-approve threshold of Rs 500`
           : `NLP confidence ${confidence} below threshold of 40`;
 
-      return await escalateToSupport(complaintId, complaint, nlpAnalysis, reason);
+      return await escalateToAgentQueue(complaintId, complaint, nlpAnalysis, reason);
     }
   } catch (error) {
     return await logFailedAutomation(
@@ -223,21 +241,48 @@ async function processReorder(
       : 999;
 
     // Validate reorder
-    const validation = validateReorder(orderAgeHours, customer?.prior_claims_90d || 0);
+    const priorClaims = customer?.prior_claims_90d || 0;
+    const canAutoApprove = orderAgeHours <= 24 && priorClaims <= 5;
 
-    if (validation.can_auto_approve) {
-      // Auto-approve reorder (create new order)
-      // In production, this would call the order service
+    if (canAutoApprove) {
+      // Auto-approve reorder
       await adminClient
         .from("complaints")
         .update({
           status: "resolved",
           automation_result: "Auto-approved reorder",
+          resolution: "Reorder request approved. A replacement order will be dispatched within 30 minutes.",
         })
         .eq("id", complaintId);
 
+      // Status history
+      try {
+        await adminClient.from("complaint_status_history").insert({
+          complaint_id: complaintId,
+          from_status: "unassigned",
+          to_status: "resolved",
+          changed_by: null,
+          note: `Auto-resolved: reorder approved (order age: ${orderAgeHours.toFixed(1)}h, prior_claims: ${priorClaims})`,
+        });
+      } catch {}
+
+      // Close the existing support ticket
+      if (complaint.ticket_id) {
+        try {
+          await adminClient
+            .from("support_tickets")
+            .update({ status: "closed" })
+            .eq("id", complaint.ticket_id);
+          await adminClient.from("ticket_activity").insert({
+            ticket_id: complaint.ticket_id,
+            event_type: "auto_resolved",
+            payload: { reason: "Reorder auto-approved by automation engine" },
+          });
+        } catch {}
+      }
+
       await logAudit({
-        actorId: "system",
+        actorId: "00000000-0000-0000-0000-000000000000",
         actorRole: "automation",
         action: "reorder.auto_approve",
         resourceType: "complaint",
@@ -251,13 +296,11 @@ async function processReorder(
         action_taken: "Reorder auto-approved",
       };
     } else {
-      // Escalate to support
-      return await escalateToSupport(
-        complaintId,
-        complaint,
-        nlpAnalysis,
-        validation.reason || "Reorder validation failed",
-      );
+      const reason = orderAgeHours > 24
+        ? `Reorder window expired (order is ${orderAgeHours.toFixed(0)}h old, limit is 24h)`
+        : `Customer has ${priorClaims} prior claims (threshold: <=5)`;
+
+      return await escalateToAgentQueue(complaintId, complaint, nlpAnalysis, reason);
     }
   } catch (error) {
     return await logFailedAutomation(
@@ -276,56 +319,23 @@ async function processOperational(
   complaint: any,
   nlpAnalysis: any,
 ): Promise<AutomationResult> {
-  const adminClient = createSupabaseServiceRoleClient();
-
-  try {
-    // Route to store manager for investigation
-    await adminClient
-      .from("complaints")
-      .update({
-        status: "assigned",
-        automation_result: "Routed to store manager",
-      })
-      .eq("id", complaintId);
-
-    // Notify store manager
-    if (complaint.store_id) {
-      await adminClient.from("notifications").insert({
-        recipient_id: null, // Will be set to store manager
-        title: `Operational issue at ${complaint.store_id}`,
-        meta: `Complaint ${complaint.complaint_ref} requires investigation`,
-        link_type: "complaint",
-        link_ref: complaintId,
-      });
-    }
-
-    await logAudit({
-      actorId: "system",
-      actorRole: "automation",
-      action: "complaint.route_to_store_manager",
-      resourceType: "complaint",
-      resourceId: complaintId,
-      metadata: { store_id: complaint.store_id },
-    });
-
-    return {
-      success: true,
-      routed_to: "store_manager",
-      action_taken: "Routed to store manager for investigation",
-    };
-  } catch (error) {
-    return await logFailedAutomation(
-      complaintId,
-      "operational_routing",
-      "Store manager routing error",
-      nlpAnalysis.urgency_score,
-      nlpAnalysis.sentiment,
-      error instanceof Error ? error.message : "Unknown error",
-    );
-  }
+  // Operational complaints always go to agent queue for investigation
+  // (we cannot auto-resolve operational issues like late delivery / wrong item)
+  return await escalateToAgentQueue(
+    complaintId,
+    complaint,
+    nlpAnalysis,
+    "Operational complaint requires agent investigation",
+  );
 }
 
-async function escalateToSupport(
+/**
+ * Escalate to the agent queue:
+ * - Updates the complaint status to "assigned"
+ * - Updates (not creates) the existing support ticket with proper priority, queue, and SLA
+ * - Logs automation decision
+ */
+async function escalateToAgentQueue(
   complaintId: string,
   complaint: any,
   nlpAnalysis: any,
@@ -341,97 +351,124 @@ async function escalateToSupport(
     // Determine queue based on complaint type
     let queue = "general";
     if (complaint.type === "refund") queue = "refunds";
-    if (complaint.type === "reorder") queue = "reorders";
-    if (complaint.category === "late_delivery" || complaint.category === "quality_issue")
+    else if (complaint.type === "reorder") queue = "reorders";
+    else if (complaint.category === "late_delivery" || complaint.category === "quality_issue")
       queue = "operational";
-
-    // Generate ticket number
-    const ticketNumber = `TKT-${Date.now()}`;
 
     // Auto-assign to available support agent
     const assignedTo = await autoAssignSupportAgent(queue);
 
-    // Create support ticket
-    const { data: ticket, error: ticketError } = await adminClient
-      .from("support_tickets")
-      .insert({
-        ticket_number: ticketNumber,
-        complaint_id: complaintId,
-        assigned_to: assignedTo,
-        status: "open",
-        priority,
-        queue,
-        sla_deadline: slaDeadline.toISOString(),
-        created_by: "system",
-      })
-      .select()
-      .single();
-
-    if (ticketError) throw ticketError;
-
-    // Update complaint status
+    // Update complaint status + store SLA deadline on the complaint (sla_due_at is the schema column)
     await adminClient
       .from("complaints")
       .update({
         status: "assigned",
-        automation_result: `Escalated to support: ${reason}`,
+        priority,
+        automation_result: `Escalated to agent queue: ${reason}`,
+        sla_due_at: slaDeadline.toISOString(),
       })
       .eq("id", complaintId);
 
-    // Log ticket creation
-    await adminClient.from("support_ticket_history").insert({
-      ticket_id: ticket.id,
-      actor_id: "system",
-      actor_role: "automation",
-      action: "ticket_created",
-      new_status: "open",
-      new_assigned_to: assignedTo,
-      notes: reason,
-    });
+    // Status history entry
+    try {
+      await adminClient.from("complaint_status_history").insert({
+        complaint_id: complaintId,
+        from_status: "unassigned",
+        to_status: "assigned",
+        changed_by: null,
+        note: reason,
+      });
+    } catch {}
 
-    // Log failed automation
-    await logFailedAutomation(
-      complaintId,
-      "escalation_to_support",
-      reason,
-      nlpAnalysis.urgency_score,
-      nlpAnalysis.sentiment,
-    );
+    let ticketId = complaint.ticket_id || null;
+
+    if (ticketId) {
+      // UPDATE existing ticket with correct priority, queue, SLA, and agent assignment
+      try {
+        await adminClient
+          .from("support_tickets")
+          .update({
+            priority,
+            queue,
+            sla_deadline: slaDeadline.toISOString(),
+            assigned_to: assignedTo,
+            status: "open",
+          })
+          .eq("id", ticketId);
+
+        await adminClient.from("ticket_activity").insert({
+          ticket_id: ticketId,
+          event_type: "automation_routed",
+          payload: { reason, priority, queue, assigned_to: assignedTo },
+        });
+      } catch (err) {
+        console.error("[Automation] Error updating existing ticket:", err);
+        ticketId = null; // Fall through to create new one if update failed
+      }
+    }
+
+    if (!ticketId) {
+      // Fallback: create a ticket if one doesn't exist yet
+      const fallbackTicketNumber = `TKT-${Date.now()}-FA`;
+      try {
+        const { data: fallbackTicket } = await adminClient.from("support_tickets").insert({
+          ticket_number: fallbackTicketNumber,
+          complaint_id: complaintId,
+          title: complaint.summary,
+          assigned_to: assignedTo,
+          status: "open",
+          priority,
+          queue,
+          sla_deadline: slaDeadline.toISOString(),
+        }).select("id").single();
+        if (fallbackTicket?.id) {
+          await adminClient.from("ticket_activity").insert({
+            ticket_id: fallbackTicket.id,
+            event_type: "created",
+            payload: { reason, source: "automation_fallback" },
+          });
+          ticketId = fallbackTicket.id;
+        }
+      } catch (err) {
+        console.error("[Automation] Error creating fallback ticket:", err);
+      }
+    }
 
     // Notify assigned agent
     if (assignedTo) {
-      await adminClient.from("notifications").insert({
-        recipient_id: assignedTo,
-        title: `New ticket: ${ticketNumber}`,
-        meta: `Priority ${priority} ticket assigned`,
-        link_type: "support_ticket",
-        link_ref: ticket.id,
-      });
+      try {
+        await adminClient.from("notifications").insert({
+          recipient_id: assignedTo,
+          title: `New case: ${complaint.complaint_ref || complaintId}`,
+          meta: JSON.stringify({ priority, queue, reason }),
+          link_type: "support_ticket",
+          link_ref: ticketId,
+        });
+      } catch {}
     }
 
     await logAudit({
       actorId: "system",
       actorRole: "automation",
-      action: "complaint.escalate_to_support",
+      action: "complaint.escalate_to_agent_queue",
       resourceType: "complaint",
       resourceId: complaintId,
-      metadata: { ticket_id: ticket.id, reason },
+      metadata: { ticket_id: ticketId, reason, priority, queue },
     });
 
     return {
       success: true,
-      routed_to: "customer_support",
-      action_taken: `Escalated to support: ${reason}`,
-      support_ticket_id: ticket.id,
+      routed_to: "agent_queue",
+      action_taken: `Escalated to agent queue (${queue}) – ${reason}`,
+      support_ticket_id: ticketId,
     };
   } catch (error) {
-    console.error("[Automation] Error escalating to support:", error);
+    console.error("[Automation] Error escalating to agent queue:", error);
 
-    // Log failed automation
     await logFailedAutomation(
       complaintId,
-      "support_escalation",
-      "Support escalation error",
+      "agent_queue_escalation",
+      "Agent queue escalation error",
       nlpAnalysis.urgency_score,
       nlpAnalysis.sentiment,
       error instanceof Error ? error.message : "Unknown error",

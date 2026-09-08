@@ -225,7 +225,7 @@ function CustomerHome() {
                       {complaint.createdAt}
                     </p>
                   </div>
-                  <StatusBadge status={complaint.status} />
+                  <StatusBadge status={complaint.customerStatusLabel || complaint.status} />
                 </div>
                 <Button asChild variant="ghost" size="sm" className="mt-3 text-xs">
                   <Link to="/customer/complaints/$id" params={{ id: complaint.id }}>

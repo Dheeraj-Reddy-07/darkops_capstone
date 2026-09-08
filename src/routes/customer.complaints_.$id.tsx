@@ -19,6 +19,8 @@ import { useCustomerComplaintById } from "@/hooks/useCustomer";
 import { inr, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
+import { LiveSupportCallOverlay } from "@/components/customer/LiveSupportCallOverlay";
+
 export const Route = createFileRoute("/customer/complaints_/$id")({
   head: () => ({
     meta: [
@@ -36,31 +38,14 @@ function ComplaintDetail() {
   const { id } = useParams({ from: "/customer/complaints_/$id" });
   const { data: complaint, isLoading, error } = useCustomerComplaintById(id);
 
-  const [callState, setCallState] = useState<"idle" | "dialing" | "connected" | "ended">("idle");
-  const [timer, setTimer] = useState(0);
-  const [timerId, setTimerId] = useState<any>(null);
+  const [showCallOverlay, setShowCallOverlay] = useState(false);
+  const [callStatus, setCallStatus] = useState<string | null>(null);
 
-  const startLiveCall = () => {
-    setCallState("dialing");
-    setTimeout(() => {
-      setCallState("connected");
-      setTimer(0);
-      const interval = setInterval(() => {
-        setTimer((t) => t + 1);
-      }, 1000);
-      setTimerId(interval);
-    }, 2000);
-  };
-
-  const endLiveCall = () => {
-    if (timerId) clearInterval(timerId);
-    setCallState("ended");
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  const handleCallClose = (status: string) => {
+    setShowCallOverlay(false);
+    if (status === "ended") {
+      setCallStatus("completed");
+    }
   };
 
   if (isLoading) {
@@ -88,10 +73,11 @@ function ComplaintDetail() {
     );
   }
 
-  const getCustomerFriendlyStatus = (status: string) => {
+  const getCustomerFriendlyStatus = (status: string, overrideLabel?: string) => {
+    if (overrideLabel) return overrideLabel;
     const statusMap: Record<string, string> = {
-      unassigned: "Received",
-      assigned: "Under Review",
+      unassigned: "Received — being processed",
+      assigned: "Under review by support team",
       in_progress: "In Progress",
       awaiting_customer: "Waiting for Your Response",
       resolved: "Resolved",
@@ -161,13 +147,6 @@ function ComplaintDetail() {
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-[13px]">Priority</p>
-                <p className="num text-xs text-muted-foreground">{complaint.priority}</p>
-              </div>
-            </div>
           </div>
 
           {complaint.resolution && (
@@ -229,12 +208,9 @@ function ComplaintDetail() {
                 </div>
                 <div className="-mt-1">
                   <p className="text-[13px] font-medium">
-                    {getCustomerFriendlyStatus(history.toStatus)}
+                    {getCustomerFriendlyStatus(history.toStatus, undefined)}
                   </p>
                   <p className="num text-xs text-muted-foreground">{history.changedAt}</p>
-                  {history.note && (
-                    <p className="mt-1 text-xs text-muted-foreground italic">{history.note}</p>
-                  )}
                 </div>
               </li>
             ))
@@ -277,17 +253,15 @@ function ComplaintDetail() {
             <div className="flex-1">
               <p className="text-sm font-medium">Current status</p>
               <p className={cn("mt-1 text-sm", getStatusColor(complaint.status))}>
-                {getCustomerFriendlyStatus(complaint.status)}
+                {getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)}
               </p>
+              {/* Show backend-computed detail text if available */}
+              {complaint.customerStatusDetail && (
+                <p className="mt-1 text-xs text-muted-foreground">{complaint.customerStatusDetail}</p>
+              )}
               {complaint.status === "awaiting_customer" && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   We need more information to resolve your complaint. Please check your email or
-                  contact support.
-                </p>
-              )}
-              {complaint.status === "resolved" && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Your complaint has been resolved. If you have any further questions, please
                   contact support.
                 </p>
               )}
@@ -302,56 +276,32 @@ function ComplaintDetail() {
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2 text-amber-500">
               <ShieldAlert className="size-5" />
-              <p className="text-sm font-semibold">Response SLA Exceeded — Live Support Unlocked</p>
+              <p className="text-sm font-semibold">Response SLA Exceeded Live Support Unlocked</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Your case has exceeded our standard response window ({complaint.slaDueAt || "SLA Window"}). You are now authorized for direct live VoIP support with an operations agent.
-            </p>
-            {callState === "idle" && (
-              <Button onClick={startLiveCall} className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white">
-                <PhoneCall className="size-4" /> Connect me to a live agent
-              </Button>
-            )}
-
-            {callState === "dialing" && (
-              <div className="p-4 text-center space-y-2 bg-background rounded-lg border border-border">
-                <PhoneCall className="size-6 text-amber-500 animate-bounce mx-auto" />
-                <p className="text-xs font-semibold">Connecting to senior support agent...</p>
-                <Button variant="outline" size="sm" onClick={endLiveCall} className="text-crit text-xs">
-                  Cancel Call
-                </Button>
-              </div>
-            )}
-
-            {callState === "connected" && (
-              <div className="p-4 space-y-3 bg-background rounded-lg border border-emerald-500/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex size-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
-                    </span>
-                    <span className="text-xs font-bold text-emerald-400">Connected to Senior Agent</span>
-                  </div>
-                  <span className="num text-xs font-mono">{formatTimer(timer)}</span>
-                </div>
-                <p className="text-xs text-muted-foreground italic">
-                  "Hello! I am reviewing your complaint ({complaint.complaintRef}) for order {complaint.orderId}. Processing your priority resolution right now."
+            {callStatus === "completed" ? (
+              <p className="text-sm text-amber-600 font-medium bg-amber-500/10 p-2 rounded-md">
+                You have completed a support call with our agent. Your case has been updated.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Your case has exceeded our standard response window ({complaint.slaDueAt || "SLA Window"}). You are now authorized for a Live support call with an operations agent.
                 </p>
-                <Button variant="destructive" size="sm" onClick={endLiveCall} className="w-full gap-2 text-xs">
-                  <PhoneOff className="size-4" /> End Call
+                <Button onClick={() => setShowCallOverlay(true)} disabled={showCallOverlay} className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white">
+                  <PhoneCall className="size-4" /> Connect with live support
                 </Button>
-              </div>
-            )}
-
-            {callState === "ended" && (
-              <div className="p-3 text-center space-1 bg-background rounded-lg border border-border">
-                <p className="text-xs font-semibold text-foreground">Call Ended ({formatTimer(timer)})</p>
-                <p className="text-[11px] text-muted-foreground">Call summary & audio recording attached to case history.</p>
-              </div>
+              </>
             )}
           </div>
         </Panel>
+      )}
+
+      {showCallOverlay && (
+        <LiveSupportCallOverlay
+          complaintRef={complaint.complaintRef}
+          orderId={complaint.orderId}
+          onClose={handleCallClose}
+        />
       )}
 
       {/* Actions */}

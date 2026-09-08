@@ -57,7 +57,7 @@ function Chatbot() {
     "Check my complaint status",
     "Which order is my complaint about?",
     "Do I have any open complaints?",
-    "My account info",
+    "What happens next with my complaint?",
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

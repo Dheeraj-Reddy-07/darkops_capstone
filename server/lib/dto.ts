@@ -49,10 +49,33 @@ export function toComplaintDTO(complaint: any) {
   // SLA targets: P1 = 15m, P2 = 30m, P3 = 120m (2h), P4 = 240m (4h)
   const slaMinsMap: Record<string, number> = { P1: 15, P2: 30, P3: 120, P4: 240 };
   const slaMins = slaMinsMap[complaint.priority] || 120;
-  const slaDueMs = createdAtMs + slaMins * 60 * 1000;
-  const isBreached =
-    (complaint.status === "unassigned" || complaint.status === "assigned" || complaint.status === "in_progress") &&
-    nowMs > slaDueMs;
+
+  // Prefer sla_due_at set by automation engine; fall back to computed value from priority + created_at
+  const slaDueMs = complaint.sla_due_at
+    ? new Date(complaint.sla_due_at).getTime()
+    : createdAtMs + slaMins * 60 * 1000;
+
+  const isOpen = complaint.status === "unassigned" || complaint.status === "assigned" || complaint.status === "in_progress";
+  const isBreached = isOpen && nowMs > slaDueMs;
+
+  // Customer-facing status label derived from real backend state
+  let customerStatusLabel: string;
+  let customerStatusDetail: string;
+
+  if (complaint.status === "resolved" || complaint.status === "closed") {
+    customerStatusLabel = complaint.status === "resolved" ? "Resolved" : "Closed";
+    customerStatusDetail = complaint.resolution || "Your complaint has been resolved.";
+  } else if (isBreached) {
+    customerStatusLabel = "Response SLA Exceeded - Live support available";
+    customerStatusDetail = "Our standard review window has passed. You are now eligible to connect with a live support agent on your complaint details page.";
+  } else if (complaint.status === "assigned" || complaint.status === "in_progress") {
+    customerStatusLabel = "Under review by support team";
+    customerStatusDetail = "Your complaint is currently assigned to our support team and is being reviewed within SLA.";
+  } else {
+    // unassigned – automation has not yet processed it or it is still being routed
+    customerStatusLabel = "Received — being processed";
+    customerStatusDetail = "Your complaint has been received and is being processed by our automation engine.";
+  }
 
   return {
     id: complaint.id,
@@ -70,10 +93,13 @@ export function toComplaintDTO(complaint: any) {
     created_at: complaint.created_at,
     updated_at: complaint.updated_at,
     resolution: complaint.resolution || null,
+    automation_result: complaint.automation_result || null,
     order_value_paise: complaint.order_value_paise,
     sla_due_at: new Date(slaDueMs).toISOString(),
     sla_breached: isBreached,
     is_live_call_eligible: isBreached,
+    customer_status_label: customerStatusLabel,
+    customer_status_detail: customerStatusDetail,
     // Attachments (metadata only)
     attachments: complaint.complaint_attachments
       ? complaint.complaint_attachments.map((att: any) => ({
@@ -83,14 +109,16 @@ export function toComplaintDTO(complaint: any) {
           uploaded_at: att.uploaded_at,
         }))
       : undefined,
-    // Status history
+    // Status history – sorted ascending so timeline shows oldest-first
     status_history: complaint.complaint_status_history
-      ? complaint.complaint_status_history.map((h: any) => ({
-          from_status: h.from_status,
-          to_status: h.to_status,
-          changed_at: h.changed_at,
-          note: h.note,
-        }))
+      ? [...complaint.complaint_status_history]
+          .sort((a: any, b: any) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime())
+          .map((h: any) => ({
+            from_status: h.from_status,
+            to_status: h.to_status,
+            changed_at: h.changed_at,
+            note: h.note,
+          }))
       : undefined,
   };
 }

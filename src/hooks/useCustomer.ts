@@ -122,11 +122,16 @@ export interface CustomerComplaint {
   priority: string;
   createdAt: string;
   resolution?: string | undefined;
+  automationResult?: string | undefined;
   storeName?: string | undefined;
   orderValue?: number | undefined;
   slaBreached?: boolean | undefined;
   isLiveCallEligible?: boolean | undefined;
   slaDueAt?: string | undefined;
+  /** Backend-computed customer-facing status label (reflects real automation outcome) */
+  customerStatusLabel?: string | undefined;
+  /** Backend-computed customer-facing status detail text */
+  customerStatusDetail?: string | undefined;
 }
 
 export interface ComplaintDetail extends CustomerComplaint {
@@ -166,10 +171,13 @@ export function useCustomerComplaints() {
         priority: row.priority,
         createdAt: format(new Date(row.created_at), "dd MMM, HH:mm 'IST'"),
         resolution: row.resolution,
+        automationResult: row.automation_result,
         storeName: row.store_name,
         slaBreached: row.sla_breached,
         isLiveCallEligible: row.is_live_call_eligible,
         slaDueAt: row.sla_due_at ? format(new Date(row.sla_due_at), "HH:mm 'IST'") : undefined,
+        customerStatusLabel: row.customer_status_label,
+        customerStatusDetail: row.customer_status_detail,
       }));
       return complaints;
     },
@@ -194,10 +202,13 @@ export function useCustomerComplaintById(complaintId: string) {
         priority: response.data.priority,
         createdAt: format(new Date(response.data.created_at), "dd MMM, HH:mm 'IST'"),
         resolution: response.data.resolution,
+        automationResult: response.data.automation_result,
         storeName: response.data.store_name,
         slaBreached: response.data.sla_breached,
         isLiveCallEligible: response.data.is_live_call_eligible,
         slaDueAt: response.data.sla_due_at ? format(new Date(response.data.sla_due_at), "HH:mm 'IST'") : undefined,
+        customerStatusLabel: response.data.customer_status_label,
+        customerStatusDetail: response.data.customer_status_detail,
         orderValue: response.data.order_value_paise
           ? response.data.order_value_paise / 100
           : undefined,

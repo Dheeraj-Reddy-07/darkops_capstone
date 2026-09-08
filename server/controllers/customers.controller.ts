@@ -311,7 +311,38 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
     };
     const dbComplaintType = complaintTypeMap[sanitizedCategory] || "operational_investigation";
 
-    // Insert complaint
+    // Create the initial support ticket BEFORE inserting complaint so we can store ticket_id
+    const ticketNumber = `TKT-${Date.now()}`;
+    const ticketQueue = dbComplaintType === "refund" ? "refunds" : dbComplaintType === "reorder" ? "reorders" : "general";
+    let ticketUUID: string | null = null;
+    try {
+      const { data: insertedTicket } = await adminClient.from("support_tickets").insert({
+        ticket_number: ticketNumber,
+        complaint_id: complaintId,
+        title: `${summary} – ${order_id}`,
+        status: "open",
+        priority: "P3",
+        queue: ticketQueue,
+      }).select("id").single();
+      ticketUUID = insertedTicket?.id || null;
+    } catch (err: any) {
+      console.error("[createComplaint] Ticket insert error:", err);
+    }
+
+    // Log ticket activity
+    if (ticketUUID) {
+      try {
+        await adminClient.from("ticket_activity").insert({
+          ticket_id: ticketUUID,
+          event_type: "created",
+          payload: { complaint_id: complaintId, order_id },
+        });
+      } catch (err: any) {
+        console.error("[createComplaint] Ticket activity error:", err);
+      }
+    }
+
+    // Insert complaint with ticket_id so automation can find and update the existing ticket
     const newComplaint = {
       id: complaintId,
       complaint_ref: complaintRef,
@@ -325,6 +356,7 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
       status: "unassigned",
       priority: "P3",
       order_value_paise: order.total_amount_paise || 0,
+      ticket_id: ticketUUID, // null if ticket creation failed; automation will create one
     };
 
     const { error: insertErr } = await adminClient.from("complaints").insert(newComplaint);
@@ -358,29 +390,6 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
       console.error("[createComplaint] Notification error:", err);
     }
 
-    // Create support ticket (only columns that exist in the schema)
-    const ticketId = `TKT-${Date.now()}`;
-    const ticketQueue = dbComplaintType === "refund" ? "refunds" : dbComplaintType === "reorder" ? "reorders" : "general";
-    try {
-      await adminClient.from("support_tickets").insert({
-        id: ticketId,
-        complaint_id: complaintId,
-        title: `${summary} – ${order_id}`,
-        status: "open",
-        priority: "P3",
-        queue: ticketQueue,
-      });
-    } catch (err: any) {
-      console.error("[createComplaint] Ticket insert error:", err);
-    }
-
-    // Log ticket activity
-    await adminClient.from("ticket_activity").insert({
-      ticket_id: ticketId,
-      event_type: "created",
-      payload: { complaint_id: complaintId, order_id },
-    });
-
     // Process attachments
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const attachmentRows = attachments.map((att: any) => ({
@@ -394,7 +403,8 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
       await adminClient.from("complaint_attachments").insert(attachmentRows);
     }
 
-    processComplaint(complaintId).catch((err) => console.error(err));
+    // Fire automation asynchronously AFTER the response is sent (non-blocking)
+    processComplaint(complaintId).catch((err) => console.error("[createComplaint] Automation error:", err));
 
     await logAudit({
       actorId: auth.user.id,
@@ -409,7 +419,7 @@ export const createComplaint = async (req: Request, res: Response, next: NextFun
     res.status(201).json({
       data: {
         ...newComplaint,
-        ticket_id: ticketId,
+        ticket_id: ticketUUID,
       },
     });
   } catch (error) {
@@ -455,34 +465,52 @@ export const requestHumanSupport = async (req: Request, res: Response, next: Nex
       note: "Customer requested human support via chatbot",
     });
 
-    // Create or update support ticket
-    const { data: existingTicket } = await adminClient
-      .from("support_tickets")
-      .select("id")
-      .eq("complaint_id", complaint_id)
-      .single();
+    // Find existing support ticket for this complaint (by ticket_id or by complaint_id lookup)
+    const existingTicketId = complaint.ticket_id || null;
 
-    if (!existingTicket) {
-      // Create new support ticket
-      const ticketId = `ST-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await adminClient.from("support_tickets").insert({
-        id: ticketId,
-        complaint_id,
-        title: complaint.summary,
-        description: complaint.detail,
-        status: "open",
-        priority: "P2",
-        queue: "customer_support",
-        customer_id: customer.id,
-      });
+    if (existingTicketId) {
+      // Escalate existing ticket - update priority and log activity
+      try {
+        await adminClient
+          .from("support_tickets")
+          .update({ priority: "P2", status: "open" })
+          .eq("id", existingTicketId);
 
-      // Create ticket activity
-      await adminClient.from("ticket_activity").insert({
-        ticket_id: ticketId,
-        event_type: "created",
-        actor_id: auth.user.id,
-        payload: { source: "customer_chatbot" },
-      });
+        await adminClient.from("ticket_activity").insert({
+          ticket_id: existingTicketId,
+          event_type: "customer_escalation",
+          actor_id: auth.user.id,
+          payload: { source: "customer_chatbot", note: "Customer requested human support" },
+        });
+      } catch (err) {
+        console.error("[requestHumanSupport] Error updating ticket:", err);
+      }
+    } else {
+      // No existing ticket - create one
+      const escalationTicketNumber = `TKT-ESC-${Date.now()}`;
+      try {
+        const { data: newTicket } = await adminClient.from("support_tickets").insert({
+          ticket_number: escalationTicketNumber,
+          complaint_id,
+          title: complaint.summary,
+          status: "open",
+          priority: "P2",
+          queue: "customer_support",
+        }).select("id").single();
+
+        if (newTicket?.id) {
+          await adminClient.from("ticket_activity").insert({
+            ticket_id: newTicket.id,
+            event_type: "created",
+            actor_id: auth.user.id,
+            payload: { source: "customer_chatbot" },
+          });
+          // Link back to complaint
+          await adminClient.from("complaints").update({ ticket_id: newTicket.id }).eq("id", complaint_id);
+        }
+      } catch (err) {
+        console.error("[requestHumanSupport] Error creating escalation ticket:", err);
+      }
     }
 
     await logAudit({

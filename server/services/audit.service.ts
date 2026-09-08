@@ -39,7 +39,8 @@ export type AuditAction =
   | "refund.auto_approve"
   | "reorder.auto_approve"
   | "complaint.route_to_store_manager"
-  | "complaint.escalate_to_support";
+  | "complaint.escalate_to_support"
+  | "complaint.escalate_to_agent_queue";
 
 export async function logAudit(params: {
   actorId: string;
@@ -61,8 +62,10 @@ export async function logAudit(params: {
       ? params.resourceId.join(",")
       : params.resourceId;
 
+    const isValidUUID = (id: string | undefined | null) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id || "");
+    
     const { error } = await adminClient.from("audit_logs").insert({
-      actor_id: params.actorId,
+      actor_id: isValidUUID(params.actorId) ? params.actorId : null,
       actor_role: params.actorRole,
       action: params.action,
       resource_type: params.resourceType,
@@ -121,8 +124,10 @@ export async function logSecurityEvent(params: {
         : params.resourceId
       : "N/A";
 
+    const isValidUUID = (id: string | undefined | null) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id || "");
+
     const { error } = await adminClient.from("audit_logs").insert({
-      actor_id: params.actorId || "SYSTEM",
+      actor_id: isValidUUID(params.actorId) ? params.actorId : null,
       actor_role: params.actorRole || "SYSTEM",
       action: params.action,
       resource_type: params.resourceType,

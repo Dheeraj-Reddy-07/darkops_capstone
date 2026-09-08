@@ -3,6 +3,7 @@ import "dotenv/config";
 import { STORES } from "../src/lib/mock/stores";
 import { CASES, AGENTS } from "../src/lib/mock/cases";
 import { FRAUD_CASES } from "../src/lib/mock/fraud";
+import { processComplaint } from "../server/services/automation.service";
 
 async function seed() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -29,7 +30,9 @@ async function seed() {
     { email: "agent.a@darkops.com", name: "Priya Sharma", role: "CUSTOMER_SUPPORT" },
     { email: "agent.b@darkops.com", name: "Rohan Mehta", role: "CUSTOMER_SUPPORT" },
     { email: "agent.c@darkops.com", name: "Sneha Patel", role: "CUSTOMER_SUPPORT" },
-    { email: "customer@darkops.com", name: "Test Customer", role: "CUSTOMER" },
+    { email: "normal@darkops.com", name: "Rajat Sharma", role: "CUSTOMER" },
+    { email: "suspicious@darkops.com", name: "Vikram Malhotra", role: "CUSTOMER" },
+    { email: "sla@darkops.com", name: "Ananya Desai", role: "CUSTOMER" },
     { email: "storemanager@darkops.com", name: "Store Manager", role: "STORE_MANAGER" },
     { email: "operations@darkops.com", name: "Operations Agent", role: "OPERATIONS" },
   ];
@@ -158,25 +161,25 @@ async function seed() {
   // 5. Customers
   const customerIds = new Set();
   const customerRows: any[] = [];
-  const demoCustomerId = "CU-DEMO-001";
+  const normalId = "CU-NORMAL-001";
+  const suspId = "CU-SUSP-001";
+  const slaId = "CU-SLA-001";
 
-  // Create demo customer with proper profile_id mapping
-  const demoCustomerProfileId = createdProfiles["customer@darkops.com"]?.id;
-  console.log(`Demo customer profile ID: ${demoCustomerProfileId}`);
+  const normalProfile = createdProfiles["normal@darkops.com"]?.id;
+  const suspProfile = createdProfiles["suspicious@darkops.com"]?.id;
+  const slaProfile = createdProfiles["sla@darkops.com"]?.id;
 
-  if (demoCustomerProfileId) {
-    customerRows.push({
-      id: demoCustomerId,
-      full_name: "Test Customer",
-      email: "customer@darkops.com",
-      profile_id: demoCustomerProfileId,
-      city: "Bengaluru",
-    });
-    customerIds.add(demoCustomerId);
-    console.log(`Added demo customer with profile_id: ${demoCustomerProfileId}`);
-  } else {
-    console.warn("Demo customer profile not found, skipping customer creation");
-    console.log("Available profiles:", Object.keys(createdProfiles));
+  if (normalProfile) {
+    customerRows.push({ id: normalId, full_name: "Rajat Sharma", email: "normal@darkops.com", profile_id: normalProfile, city: "Bengaluru", prior_claims_90d: 1 });
+    customerIds.add(normalId);
+  }
+  if (suspProfile) {
+    customerRows.push({ id: suspId, full_name: "Vikram Malhotra", email: "suspicious@darkops.com", profile_id: suspProfile, city: "Bengaluru", prior_claims_90d: 5 });
+    customerIds.add(suspId);
+  }
+  if (slaProfile) {
+    customerRows.push({ id: slaId, full_name: "Ananya Desai", email: "sla@darkops.com", profile_id: slaProfile, city: "Bengaluru", prior_claims_90d: 2 });
+    customerIds.add(slaId);
   }
 
   for (const c of CASES) {
@@ -186,10 +189,12 @@ async function seed() {
         id: c.customerId,
         full_name: c.customerName,
         email: `c${c.customerId.toLowerCase()}@example.com`,
+        prior_claims_90d: 0,
       });
     }
   }
-  await supabase.from("customers").upsert(customerRows, { onConflict: "id" });
+  const { error: customerErr } = await supabase.from("customers").upsert(customerRows, { onConflict: "id" });
+  if (customerErr) console.error("Customers upsert error:", customerErr);
 
   // 6. Orders
   const orderRows: any[] = [];
@@ -205,51 +210,68 @@ async function seed() {
     });
   }
 
-  const demoOrderIds = [
-    "ORD-DEMO-001",
-    "ORD-DEMO-002",
-    "ORD-DEMO-003",
-    "ORD-DEMO-004",
-    "ORD-DEMO-005",
-  ];
-  demoOrderIds.forEach((orderId, idx) => {
-    const statuses = ["out_for_delivery", "delivered", "delivered", "packing", "delivered"];
-    const amounts = [2500, 3000, 3500, 1800, 4200];
-    const items = [
-      "Milk, Bread, Eggs",
-      "Rice, Dal, Oil",
-      "Fruits, Snacks",
-      "Vegetables, Curd",
-      "Groceries, Household items",
-    ];
-    const itemCounts = [3, 4, 5, 2, 6];
+  // Normal Persona: 5 orders (clean history, small values)
+  if (normalProfile) {
+    const statuses = ["delivered", "delivered", "delivered", "delivered", "delivered"];
+    const amounts = [150, 450, 800, 320, 210];
+    const itemCounts = [1, 3, 5, 2, 2];
+    const items = ["Bread", "Milk, Eggs, Curd", "Rice, Dal, Oil, Spices, Atta", "Snacks, Juice", "Vegetables"];
+    for (let i = 0; i < 5; i++) {
+      orderRows.push({
+        id: `ORD-NORM-00${i + 1}`,
+        customer_id: normalId,
+        store_id: "DS-1462",
+        placed_at: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+        status: statuses[i],
+        total_amount_paise: amounts[i] * 100,
+        item_count: itemCounts[i],
+        items_preview: items[i],
+        delivered_at: new Date(Date.now() - (i + 1) * 86400000 + 1200000).toISOString(),
+      });
+    }
+  }
 
-    orderRows.push({
-      id: orderId,
-      customer_id: demoCustomerId,
-      store_id: "DS-1462",
-      placed_at: new Date(Date.now() - (idx + 1) * 86400000).toISOString(),
-      status: statuses[idx],
-      total_amount_paise: amounts[idx],
-      item_count: itemCounts[idx],
-      items_preview: items[idx],
-      eta_at:
-        idx === 0 || idx === 3
-          ? new Date(Date.now() + (idx === 0 ? 1800000 : 3600000)).toISOString()
-          : null,
-      delivered_at:
-        statuses[idx] === "delivered"
-          ? new Date(Date.now() - (idx + 1) * 3600000).toISOString()
-          : null,
-    });
-  });
-  await supabase.from("orders").upsert(orderRows, { onConflict: "id" });
+  // Suspicious Persona: 3 orders, all high value
+  if (suspProfile) {
+    for (let i = 0; i < 3; i++) {
+      orderRows.push({
+        id: `ORD-SUSP-00${i + 1}`,
+        customer_id: suspId,
+        store_id: "DS-1462",
+        placed_at: new Date(Date.now() - (i + 2) * 86400000).toISOString(),
+        status: "delivered",
+        total_amount_paise: 4500 * 100,
+        item_count: 8,
+        items_preview: "Premium Items, Electronics, Bulk Groceries",
+        delivered_at: new Date(Date.now() - (i + 2) * 86400000 + 1500000).toISOString(),
+      });
+    }
+  }
+
+  // SLA Persona: 2 orders
+  if (slaProfile) {
+    for (let i = 0; i < 2; i++) {
+      orderRows.push({
+        id: `ORD-SLA-00${i + 1}`,
+        customer_id: slaId,
+        store_id: "DS-1462",
+        placed_at: new Date(Date.now() - (i + 5) * 86400000).toISOString(),
+        status: "delivered",
+        total_amount_paise: 1200 * 100,
+        item_count: 4,
+        items_preview: "Daily Essentials",
+        delivered_at: new Date(Date.now() - (i + 5) * 86400000 + 1800000).toISOString(),
+      });
+    }
+  }
+  const { error: orderErr } = await supabase.from("orders").upsert(orderRows, { onConflict: "id" });
+  if (orderErr) console.error("Orders upsert error:", orderErr);
 
   // NOTE: order_items table does not exist in live DB — items are stored in orders.items_preview
   console.log("Skipping order_items insert (table not in live schema — items_preview used instead)");
 
   // 8. Complaints - with realistic SLA states based on age
-  const complaintRows = CASES.map((c) => {
+  const complaintRows: any[] = CASES.map((c) => {
     let mappedCategory = "other";
     if (c.category === "Late delivery") mappedCategory = "late_delivery";
     if (c.category === "Quality issue") mappedCategory = "quality_issue";
@@ -285,47 +307,75 @@ async function seed() {
     };
   });
 
-  // Add demo complaints for the customer only if customer profile exists
-  if (demoCustomerProfileId) {
+  // Normal Persona: 1 auto-resolve candidate
+  if (normalProfile) {
     complaintRows.push({
-      id: "CMP-DEMO-001",
-      complaint_ref: "REF-DEMO-001",
-      customer_id: demoCustomerId,
-      order_id: "ORD-DEMO-002",
+      id: "CMP-NORM-001",
+      complaint_ref: "REF-NORM-001",
+      customer_id: normalId,
+      order_id: "ORD-NORM-001",
       store_id: "DS-1462",
       summary: "Missing item",
-      detail: "Missing 1L milk from the order",
+      detail: "Missing 1L milk from my order. I need a refund.",
       category: "missing_item",
       type: "refund",
-      priority: "P2",
-      status: "in_progress",
-      sla_state: "on_track",
-      assigned_agent_id: createdProfiles["agent.a@darkops.com"]?.id,
-      order_value_paise: 3000,
-      refund_amount_paise: 60,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-    });
-    complaintRows.push({
-      id: "CMP-DEMO-002",
-      complaint_ref: "REF-DEMO-002",
-      customer_id: demoCustomerId,
-      order_id: "ORD-DEMO-003",
-      store_id: "DS-1462",
-      summary: "Quality issue",
-      detail: "Fruits were not fresh",
-      category: "quality_issue",
-      type: "refund",
       priority: "P3",
-      status: "resolved",
+      status: "unassigned",
       sla_state: "on_track",
-      assigned_agent_id: createdProfiles["agent.b@darkops.com"]?.id,
-      order_value_paise: 3500,
-      refund_amount_paise: 500,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
+      assigned_agent_id: null,
+      order_value_paise: 15000,
+      refund_amount_paise: 0,
+      created_at: new Date().toISOString(),
     });
   }
 
-  await supabase.from("complaints").upsert(complaintRows, { onConflict: "id" });
+  // Suspicious Persona: 2 historical complaints, 1 active highly suspicious complaint
+  if (suspProfile) {
+    complaintRows.push({
+      id: "CMP-SUSP-001",
+      complaint_ref: "REF-SUSP-001",
+      customer_id: suspId,
+      order_id: "ORD-SUSP-001",
+      store_id: "DS-1462",
+      summary: "Missing item",
+      detail: "Half the items are missing again!",
+      category: "missing_item",
+      type: "refund",
+      priority: "P2",
+      status: "unassigned", // will trigger risk review
+      sla_state: "on_track",
+      assigned_agent_id: null,
+      order_value_paise: 450000,
+      refund_amount_paise: 0,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  // SLA Persona: 1 breached complaint
+  if (slaProfile) {
+    complaintRows.push({
+      id: "CMP-SLA-001",
+      complaint_ref: "REF-SLA-001",
+      customer_id: slaId,
+      order_id: "ORD-SLA-001",
+      store_id: "DS-1462",
+      summary: "Quality issue",
+      detail: "The items are damaged and expired",
+      category: "quality_issue",
+      type: "refund",
+      priority: "P3",
+      status: "in_progress",
+      sla_state: "breached",
+      assigned_agent_id: createdProfiles["agent.c@darkops.com"]?.id,
+      order_value_paise: 120000,
+      refund_amount_paise: 120000,
+      created_at: new Date(Date.now() - 3600000 * 3).toISOString(), // 3 hours ago, P3 is 2 hours
+      sla_due_at: new Date(Date.now() - 3600000).toISOString(),
+    });
+  }
+
+  const { error: complaintErr } = await supabase.from("complaints").upsert(complaintRows, { onConflict: "id" });
+  if (complaintErr) console.error("Complaints upsert error:", complaintErr);
 
   // 9. Refund Requests
   const refundRows = complaintRows
@@ -348,6 +398,16 @@ async function seed() {
     reason: f.reason || "Unknown",
     decision: "pending_review",
   }));
+  if (suspProfile) {
+    fraudRows.push({
+      id: "FR-SUSP-001",
+      complaint_id: "CMP-SUSP-001",
+      customer_id: suspId,
+      risk_confidence: 96,
+      reason: "High velocity of missing item claims; Device ID linked to banned account",
+      decision: "pending_review",
+    });
+  }
   await supabase.from("fraud_reviews").upsert(fraudRows, { onConflict: "id" });
 
   // 11. Store Metrics Snapshots - calculate from actual operational metrics first
@@ -524,13 +584,31 @@ async function seed() {
   });
 
   // Customer notifications
-  if (demoCustomerProfileId) {
+  if (normalProfile) {
     notificationRows.push({
-      recipient_id: demoCustomerProfileId,
+      recipient_id: normalProfile,
       title: "Order delivered",
-      meta: JSON.stringify({ order_id: "ORD-DEMO-002" }),
+      meta: JSON.stringify({ order_id: "ORD-NORM-001" }),
       link_type: "order",
-      link_ref: "ORD-DEMO-002",
+      link_ref: "ORD-NORM-001",
+    });
+  }
+  if (suspProfile) {
+    notificationRows.push({
+      recipient_id: suspProfile,
+      title: "Order delivered",
+      meta: JSON.stringify({ order_id: "ORD-SUSP-001" }),
+      link_type: "order",
+      link_ref: "ORD-SUSP-001",
+    });
+  }
+  if (slaProfile) {
+    notificationRows.push({
+      recipient_id: slaProfile,
+      title: "Complaint SLA exceeded",
+      meta: JSON.stringify({ complaint_id: "CMP-SLA-001" }),
+      link_type: "complaint",
+      link_ref: "CMP-SLA-001",
     });
   }
 
@@ -749,6 +827,19 @@ async function seed() {
         sla_deadline: slaIn(210),
         created_at: createdAgo(30),
         updated_at: createdAgo(30),
+      },
+      {
+        ticket_number: "TKT-SLA-001",
+        title: "Quality issue – items damaged and expired",
+        complaint_id: "CMP-SLA-001",
+        assigned_to: agentCId,
+        created_by: agentCId,
+        status: "open",
+        priority: "P3",
+        queue: "general",
+        sla_deadline: slaAgo(60),
+        created_at: createdAgo(180),
+        updated_at: createdAgo(120),
       },
       {
         ticket_number: "TKT-012",
@@ -1362,6 +1453,15 @@ async function seed() {
         console.log(`Seeded ${failedAutomationRows.length} failed automation records`);
       }
     }
+  }
+
+  // Invoke processComplaint on our auto-resolve candidate so it's fully realistic
+  console.log("Running backend automation engine on the auto-resolve candidate (CMP-NORM-001)...");
+  try {
+    const result = await processComplaint("CMP-NORM-001");
+    console.log("Automation engine result for CMP-NORM-001:", result);
+  } catch (err) {
+    console.error("Failed to run automation engine during seed:", err);
   }
 
   console.log("Seed completed successfully!");
