@@ -1378,5 +1378,11 @@
 - Client & Server build checks: PASSED
 - Git sync: Committed & pushed to `origin/main` (`https://github.com/Dheeraj-Reddy-07/darkops_capstone`)
 
+### DarkOps Product Boundary & Intent Refinements
+- **Read-Only Action Protection**: Action/creation requests ("Create complaint", "Report item", "Give refund") strictly block execution and direct the user to the deterministic `Orders` → `Report Issue` form.
+- **Boundary-Aware Order Queries**: Queries like *"Where is my order?"* return concise order status context alongside a clear boundary notice directing full tracking to `Orders`, keeping complaints as the primary focus.
+- **Complaint-Order Association**: Added support for complaint context questions (*"Which order is my complaint about?"*, *"What order was involved in my issue?"*) which fetch the real associated order details from the database.
+- **Clean Markdown Rendering**: Rendered bold text elements (`**text**`) natively via `FormattedChatMessage` component in `src/routes/customer.chat.tsx`.
+
 ---
 
