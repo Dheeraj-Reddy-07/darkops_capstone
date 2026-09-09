@@ -54,10 +54,9 @@ function Chatbot() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([
-    "Check my complaint status",
-    "Which order is my complaint about?",
-    "Do I have any open complaints?",
-    "What happens next with my complaint?",
+    "Why hasn't my issue been resolved?",
+    "What happens next with my issue?",
+    "Can I talk to support?",
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

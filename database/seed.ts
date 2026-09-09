@@ -25,7 +25,6 @@ async function seed() {
     { email: "admin@darkops.com", name: "System Admin", role: "PLATFORM_ADMIN" },
     { email: "exec@darkops.com", name: "Network Exec", role: "EXECUTIVE" },
     { email: "manager@darkops.com", name: "Ops Manager", role: "OPERATIONS" },
-    { email: "fraud@darkops.com", name: "Fraud Analyst", role: "FRAUD_ANALYST" },
     { email: "support@darkops.com", name: "Customer Support", role: "CUSTOMER_SUPPORT" },
     { email: "agent.a@darkops.com", name: "Priya Sharma", role: "CUSTOMER_SUPPORT" },
     { email: "agent.b@darkops.com", name: "Rohan Mehta", role: "CUSTOMER_SUPPORT" },
@@ -419,15 +418,26 @@ async function seed() {
       STORES.map((s) => s.id),
     );
   const metricsRows = STORES.map((s) => {
-    // Use the actual metrics from the store data
+    // Use the actual metrics from the store data with realistic ranges
     const slaPct = s.sla || 95;
     const refundRatePct = s.refundRate || 5;
-    const equipmentFailures14d = s.equipmentFailures14d || 0;
-    const inventoryIssues = s.inventoryIssues || 0;
-    const deliveryDelays = s.deliveryDelays || 0;
-    const pickerDelayMins = s.pickerDelayMins || 2;
+    // Use store metrics or generate realistic values based on store health
+    const equipmentFailures14d = s.equipmentFailures14d !== undefined 
+      ? s.equipmentFailures14d 
+      : Math.floor(Math.random() * 12); // 0-12 failures over 14 days
+    const inventoryIssues = s.inventoryIssues !== undefined 
+      ? s.inventoryIssues 
+      : Math.floor(Math.random() * 20); // 0-20 inventory issues
+    const deliveryDelays = s.deliveryDelays !== undefined 
+      ? s.deliveryDelays 
+      : Math.floor(Math.random() * 50); // 0-50 delivery delays
+    const pickerDelayMins = s.pickerDelayMins !== undefined 
+      ? s.pickerDelayMins 
+      : 1.5 + Math.random() * 4; // 1.5-5.5 minutes average delay
     const avgResolutionMins = s.avgResolutionMins || 60;
-    const openIssues = s.openIssues || 0;
+    const openIssues = s.openIssues !== undefined 
+      ? s.openIssues 
+      : Math.floor(Math.random() * 15); // 0-15 open issues
 
     return {
       store_id: s.id,
@@ -515,24 +525,37 @@ async function seed() {
     await supabase.from("pulse_scores").insert(chunk);
   }
 
-  // 13. Work Orders - correlated with store health (more issues for low pulse stores)
-  const workOrderRows = pulseRows
-    .filter((p) => p.score < 80) // Only create work orders for stores with poor health
-    .map((p, idx) => ({
-      id: `WO-DS-${p.store_id}-${idx + 1}`,
-      store_id: p.store_id,
-      asset_id: `EQ-${p.store_id}-${idx + 1}`,
-      asset_name: [
-        "Walk-in freezer",
-        "Chiller unit",
-        "POS terminal",
-        "Picker device",
-        "Inventory scanner",
-      ][idx % 5],
-      priority: p.score < 60 ? "P1" : "P2",
-      status: "open",
-    }));
-  await supabase.from("work_orders").upsert(workOrderRows);
+  // 13. Work Orders - create for all stores with varying priorities based on health
+  // Get unique store IDs and their latest pulse scores
+  const uniqueStores = new Map<string, { score: number }>();
+  pulseRows.forEach((p) => {
+    if (!uniqueStores.has(p.store_id)) {
+      uniqueStores.set(p.store_id, { score: p.score });
+    }
+  });
+
+  // Create 2-5 work orders per store based on health
+  const workOrderRows: any[] = [];
+  uniqueStores.forEach((health, storeId) => {
+    const numWorkOrders = health.score < 60 ? 5 : health.score < 80 ? 3 : 2;
+    for (let i = 0; i < numWorkOrders; i++) {
+      workOrderRows.push({
+        id: `WO-${storeId}-${Date.now()}-${i}`,
+        store_id: storeId,
+        asset_id: `EQ-${storeId}-${i + 1}`,
+        asset_name: [
+          "Walk-in freezer",
+          "Chiller unit",
+          "POS terminal",
+          "Picker device",
+          "Inventory scanner",
+        ][i % 5],
+        priority: health.score < 60 ? "P1" : health.score < 80 ? "P2" : "P3",
+        status: "open",
+      });
+    }
+  });
+  await supabase.from("work_orders").upsert(workOrderRows, { onConflict: "id" });
 
   // 14. Alerts - correlated with store health (critical alerts for low pulse stores)
   const alertRows = pulseRows

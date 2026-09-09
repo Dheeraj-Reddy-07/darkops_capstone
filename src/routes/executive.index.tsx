@@ -19,7 +19,7 @@ import { HeatmapLegend, StoreHeatmap } from "@/components/ops/heatmap";
 import { useExecutive } from "@/hooks/useExecutive";
 import { useStores } from "@/hooks/useStores";
 import { num, cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "@tanstack/react-router";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -133,14 +133,26 @@ function ExecutiveOverviewContent({
     },
   });
 
+  const savedTimeRange = userProfile?.preferences?.defaultTimeRange;
+  const autoRefresh = !!userProfile?.preferences?.autoRefresh;
+
+  // Apply saved preference for time range if set and not manually modified
+  const [hasUserChangedTimeFilter, setHasUserChangedTimeFilter] = useState(false);
+
+  useEffect(() => {
+    if (savedTimeRange && !hasUserChangedTimeFilter) {
+      setTimeFilter(savedTimeRange);
+    }
+  }, [savedTimeRange, hasUserChangedTimeFilter, setTimeFilter]);
+
   const userRole = userProfile?.role as string;
   const canAccessExecutive = ["PLATFORM_ADMIN", "EXECUTIVE"].includes(userRole);
   const canAccessStores = ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "STORE_MANAGER"].includes(
     userRole,
   );
 
-  // Only fetch executive data if user has permission
-  const { data: execData, isLoading: execLoading } = useExecutive(canAccessExecutive);
+  // Only fetch executive data if user has permission; pass autoRefresh preference
+  const { data: execData, isLoading: execLoading } = useExecutive(canAccessExecutive, autoRefresh);
   const { data: storesData, isLoading: storesLoading } = useStores(canAccessExecutive);
 
   if (!canAccessExecutive) {

@@ -17,4 +17,26 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('react') || id.includes('react-dom')) {
+            return 'react-vendor';
+          }
+          if (id.includes('@tanstack/react-router') || id.includes('@tanstack/react-query')) {
+            return 'router-vendor';
+          }
+          if (id.includes('@radix-ui')) {
+            return 'ui-vendor';
+          }
+          if (id.includes('recharts')) {
+            return 'charts-vendor';
+          }
+          return undefined;
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
 });

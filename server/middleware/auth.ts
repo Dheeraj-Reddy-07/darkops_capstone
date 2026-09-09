@@ -100,7 +100,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     };
 
     // Log successful authentication (without sensitive data)
-    console.log(`[AUTH_SUCCESS] RequestID: ${requestId}, UserID: ${user.id}, Role: ${role}`);
+    console.log(`[AUTH_SUCCESS] RequestID: ${requestId}, UserID: ${user.id}, Role: ${role}, Permissions: ${Array.from(permissions).join(", ")}`);
 
     next();
   } catch (error) {
@@ -132,6 +132,9 @@ export const requirePermission = (permission: AppPermission | AppPermission[]) =
       const permissionsToCheck = Array.isArray(permission) ? permission : [permission];
       const requestId = req.requestId || "unknown";
       const userRole = req.auth.user.role;
+      const userPermissions = Array.from(req.auth!.permissions);
+
+      console.log(`[PERMISSION_CHECK] RequestID: ${requestId}, UserID: ${req.auth.user.id}, Role: ${userRole}, Required: ${permissionsToCheck.join(" or ")}, UserPermissions: ${userPermissions.join(", ")}`);
 
       const hasPermission = permissionsToCheck.some((p) => req.auth!.permissions.has(p));
 

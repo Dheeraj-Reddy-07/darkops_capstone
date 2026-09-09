@@ -23,10 +23,17 @@ export const validateQuery = (schema: z.Schema) => {
     try {
       // Fix Object.create(null) issue by spreading into a new object
       const safeQuery = { ...req.query };
-      req.query = schema.parse(safeQuery) as any;
+      const parsed = schema.parse(safeQuery) as any;
+
+      // In Express 5, req.query has only a getter and cannot be reassigned directly with req.query = ...
+      // Mutate req.query properties in-place instead.
+      for (const key of Object.keys(req.query)) {
+        delete (req.query as any)[key];
+      }
+      Object.assign(req.query, parsed);
       next();
     } catch (error: any) {
-      if (error && error.errors) {
+      if (error instanceof z.ZodError) {
         next(new HTTPError(400, "VALIDATION_ERROR", "Invalid query parameters", error.errors));
       } else {
         next(new HTTPError(400, "BAD_REQUEST", "Invalid query parameters"));

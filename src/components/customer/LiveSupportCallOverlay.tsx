@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Phone, PhoneCall, PhoneOff, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-type CallState = "idle" | "ringing" | "connecting" | "connected" | "ended" | "declined" | "missed";
+type CallState = "calling" | "connecting" | "connected" | "ended";
 
 interface LiveSupportCallOverlayProps {
   complaintRef: string;
@@ -12,7 +11,7 @@ interface LiveSupportCallOverlayProps {
 }
 
 export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveSupportCallOverlayProps) {
-  const [callState, setCallState] = useState<CallState>("ringing");
+  const [callState, setCallState] = useState<CallState>("calling");
   const [timer, setTimer] = useState(0);
   const [agentMessage, setAgentMessage] = useState("");
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -20,7 +19,7 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
   const gainNodeRef = useRef<GainNode | null>(null);
   const ringIntervalRef = useRef<any>(null);
 
-  // Play a simple ringing tone using Web Audio API
+  // Play outgoing ringing tone using Web Audio API
   const playRingtone = useCallback(() => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -36,33 +35,32 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
       const osc = ctx.createOscillator();
       osc.type = "sine";
       osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
-      osc.frequency.setValueAtTime(480, ctx.currentTime + 0.1); // slightly higher
+      osc.frequency.setValueAtTime(480, ctx.currentTime + 0.1);
       osc.connect(gainNode);
       osc.start();
       oscillatorRef.current = osc;
 
-      // Ring pattern: 2 seconds on, 2 seconds off
       let isRinging = true;
       const triggerRing = () => {
         if (isRinging) {
-          gainNode.gain.setTargetAtTime(0.1, ctx.currentTime, 0.05);
+          gainNode.gain.setTargetAtTime(0.08, ctx.currentTime, 0.05);
         } else {
           gainNode.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
         }
         isRinging = !isRinging;
       };
-      
+
       triggerRing();
-      ringIntervalRef.current = setInterval(triggerRing, 2000);
+      ringIntervalRef.current = setInterval(triggerRing, 1800);
     } catch (err) {
-      console.warn("Failed to play ringtone (browser autoplay blocked):", err);
+      console.warn("Failed to play ringtone:", err);
     }
   }, []);
 
   const stopRingtone = useCallback(() => {
     if (ringIntervalRef.current) clearInterval(ringIntervalRef.current);
     if (gainNodeRef.current && audioCtxRef.current) {
-      gainNodeRef.current.gain.setTargetAtTime(0, audioCtxRef.current.currentTime, 0.1);
+      gainNodeRef.current.gain.setTargetAtTime(0, audioCtxRef.current.currentTime, 0.05);
     }
     if (oscillatorRef.current) {
       setTimeout(() => {
@@ -71,74 +69,75 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
           oscillatorRef.current?.disconnect();
           audioCtxRef.current?.close();
         } catch (e) {}
-      }, 200);
+      }, 150);
     }
   }, []);
 
-  // Handle ringing state timeout (missed call)
+  // Handle calling state: CALLING (3.5s)
   useEffect(() => {
-    if (callState === "ringing") {
-      playRingtone();
-      const timeout = setTimeout(() => {
-        if (callState === "ringing") {
-          stopRingtone();
-          setCallState("missed");
-          setTimeout(() => onClose("missed"), 3000);
-        }
-      }, 15000); // 15 seconds to answer
-      return () => {
-        clearTimeout(timeout);
-        stopRingtone();
-      };
-    }
-  }, [callState, playRingtone, stopRingtone, onClose]);
+    if (callState !== "calling") return;
 
-  // Handle call timer and agent script
+    playRingtone();
+    const callingTimer = setTimeout(() => {
+      stopRingtone();
+      setCallState("connecting");
+    }, 3500);
+
+    return () => {
+      clearTimeout(callingTimer);
+      stopRingtone();
+    };
+  }, [callState, playRingtone, stopRingtone]);
+
+  // Handle connecting state: CONNECTING (1.5s)
   useEffect(() => {
-    if (callState === "connected") {
-      const interval = setInterval(() => {
-        setTimer((prev) => prev + 1);
-      }, 1000);
+    if (callState !== "connecting") return;
 
-      // Rotating mock agent script
-      const script = [
-        `"Hello! I am reviewing your complaint (${complaintRef}) for order ${orderId}."`,
-        `"I have the order details and your case history in front of me."`,
-        `"I am checking the next resolution step for you now."`,
-        `"I'll have this sorted out for you right away."`
-      ];
+    const connectingTimer = setTimeout(() => {
+      setCallState("connected");
+    }, 1500);
 
-      setAgentMessage(script[0]);
-      const s1 = setTimeout(() => setAgentMessage(script[1]), 5000);
-      const s2 = setTimeout(() => setAgentMessage(script[2]), 12000);
-      const s3 = setTimeout(() => setAgentMessage(script[3]), 20000);
+    return () => {
+      clearTimeout(connectingTimer);
+    };
+  }, [callState]);
 
-      return () => {
-        clearInterval(interval);
-        clearTimeout(s1);
-        clearTimeout(s2);
-        clearTimeout(s3);
-      };
-    }
+  // Handle call timer and agent script only after CONNECTED
+  useEffect(() => {
+    if (callState !== "connected") return;
+
+    setTimer(0);
+    const interval = setInterval(() => {
+      setTimer((prev) => prev + 1);
+    }, 1000);
+
+    const msg1 = `"Hello! I am reviewing your issue (${complaintRef}) for order ${orderId}."`;
+    const msg2 = `"I have your order details and reported issues right here."`;
+    const msg3 = `"Checking the resolution details and authorizing your support update."`;
+    const msg4 = `"All set! I've updated your issue record with immediate priority."`;
+
+    setAgentMessage(msg1);
+    const s1 = setTimeout(() => setAgentMessage(msg2), 4000);
+    const s2 = setTimeout(() => setAgentMessage(msg3), 9000);
+    const s3 = setTimeout(() => setAgentMessage(msg4), 15000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(s1);
+      clearTimeout(s2);
+      clearTimeout(s3);
+    };
   }, [callState, complaintRef, orderId]);
 
-  const handleAccept = () => {
+  const handleCancelCall = () => {
     stopRingtone();
-    setCallState("connecting");
-    setTimeout(() => {
-      setCallState("connected");
-    }, 1500); // 1.5s simulated connection delay
-  };
-
-  const handleDecline = () => {
-    stopRingtone();
-    setCallState("declined");
-    setTimeout(() => onClose("declined"), 2000);
+    setCallState("ended");
+    setTimeout(() => onClose("ended"), 2000);
   };
 
   const handleEndCall = () => {
     setCallState("ended");
-    setTimeout(() => onClose("ended"), 3000);
+    setTimeout(() => onClose("ended"), 2500);
   };
 
   const formatTimer = (seconds: number) => {
@@ -151,50 +150,35 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
     <div className="fixed left-0 right-0 top-4 z-50 mx-auto w-[90%] max-w-md animate-in slide-in-from-top-4 fade-in duration-300">
       <div className="overflow-hidden rounded-2xl border border-border bg-background/95 shadow-2xl backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="p-4 sm:p-5">
-          {callState === "ringing" && (
-            <div className="flex flex-col items-center text-center space-y-6">
+          {callState === "calling" && (
+            <div className="flex flex-col items-center text-center space-y-5">
               <div className="space-y-1">
-                <div className="flex items-center justify-center gap-2 text-emerald-500 mb-2">
+                <div className="flex items-center justify-center gap-2 text-primary mb-2">
                   <PhoneCall className="size-4 animate-pulse" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">DarkOps Support</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">DarkOps Care</span>
                 </div>
-                <h3 className="text-lg font-semibold tracking-tight">Incoming support call</h3>
-                <p className="text-sm text-muted-foreground">Senior Support Agent</p>
+                <h3 className="text-lg font-semibold tracking-tight">Calling Live Support...</h3>
+                <p className="text-xs text-muted-foreground">Connecting issue {complaintRef}</p>
               </div>
 
-              <div className="flex items-center justify-center gap-8 w-full px-4">
-                <div className="flex flex-col items-center gap-2">
-                  <Button
-                    onClick={handleDecline}
-                    size="icon"
-                    className="size-14 rounded-full bg-destructive hover:bg-destructive/90 text-white shadow-lg shadow-destructive/20 transition-transform active:scale-95"
-                    aria-label="Decline call"
-                  >
-                    <PhoneOff className="size-6" />
-                  </Button>
-                  <span className="text-xs text-muted-foreground font-medium">Decline</span>
-                </div>
-                
-                <div className="flex flex-col items-center gap-2">
-                  <Button
-                    onClick={handleAccept}
-                    size="icon"
-                    className="size-14 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 transition-transform active:scale-95 animate-bounce"
-                    aria-label="Accept call"
-                  >
-                    <Phone className="size-6" />
-                  </Button>
-                  <span className="text-xs text-muted-foreground font-medium">Accept</span>
-                </div>
+              <div className="flex justify-center w-full">
+                <Button
+                  onClick={handleCancelCall}
+                  size="icon"
+                  className="size-12 rounded-full bg-destructive hover:bg-destructive/90 text-white shadow-md transition-transform active:scale-95"
+                  aria-label="Cancel call"
+                >
+                  <PhoneOff className="size-5" />
+                </Button>
               </div>
             </div>
           )}
 
           {callState === "connecting" && (
             <div className="flex flex-col items-center text-center space-y-4 py-4">
-              <div className="relative flex size-12 items-center justify-center rounded-full bg-surface-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-30"></span>
-                <User className="size-6 text-muted-foreground" />
+              <div className="relative flex size-12 items-center justify-center rounded-full bg-primary/10">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-30"></span>
+                <User className="size-6 text-primary" />
               </div>
               <div>
                 <p className="text-sm font-medium">Connecting to Senior Support Agent...</p>
@@ -213,7 +197,7 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold">Senior Support Agent</h3>
-                    <p className="text-xs text-emerald-500 font-medium">Connected • DarkOps Support</p>
+                    <p className="text-xs text-emerald-500 font-medium">Connected • DarkOps Care</p>
                   </div>
                 </div>
                 <div className="num text-sm font-mono tabular-nums text-foreground/80 bg-surface-2 px-2 py-1 rounded-md">
@@ -227,10 +211,10 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
                 </p>
               </div>
 
-              <Button 
-                onClick={handleEndCall} 
-                variant="destructive" 
-                className="w-full h-11 rounded-xl shadow-sm"
+              <Button
+                onClick={handleEndCall}
+                variant="destructive"
+                className="w-full h-10 rounded-xl shadow-sm"
               >
                 <PhoneOff className="mr-2 size-4" /> End Call
               </Button>
@@ -238,31 +222,12 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
           )}
 
           {callState === "ended" && (
-            <div className="flex flex-col items-center text-center space-y-2 py-6">
-              <div className="flex size-12 items-center justify-center rounded-full bg-surface-2 mb-2">
+            <div className="flex flex-col items-center text-center space-y-2 py-5">
+              <div className="flex size-10 items-center justify-center rounded-full bg-surface-2 mb-1">
                 <PhoneOff className="size-5 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium">Call ended</h3>
-              <p className="text-sm text-muted-foreground">Duration {formatTimer(timer)}</p>
-            </div>
-          )}
-
-          {callState === "declined" && (
-            <div className="flex flex-col items-center text-center space-y-2 py-6">
-              <div className="flex size-12 items-center justify-center rounded-full bg-destructive/10 mb-2">
-                <PhoneOff className="size-5 text-destructive" />
-              </div>
-              <h3 className="text-lg font-medium text-destructive">Call declined</h3>
-            </div>
-          )}
-
-          {callState === "missed" && (
-            <div className="flex flex-col items-center text-center space-y-2 py-6">
-              <div className="flex size-12 items-center justify-center rounded-full bg-surface-2 mb-2">
-                <PhoneOff className="size-5 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium">Support call missed</h3>
-              <p className="text-sm text-muted-foreground">We'll try to reach you again later.</p>
+              <h3 className="text-base font-medium">Call ended</h3>
+              {timer > 0 && <p className="text-xs text-muted-foreground">Duration {formatTimer(timer)}</p>}
             </div>
           )}
         </div>

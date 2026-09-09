@@ -63,16 +63,6 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "attachments.upload",
     "attachments.read",
   ],
-  FRAUD_ANALYST: [
-    "fraud.read",
-    "fraud.decide",
-    "cases.read.all",
-    "support.read",
-    "orders.read.all",
-    "customers.read.own",
-    "notifications.read",
-    "attachments.read",
-  ],
   CUSTOMER_SUPPORT: [
     "support.read",
     "support.review",
@@ -83,6 +73,8 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "customers.read.own",
     "notifications.read",
     "attachments.read",
+    "fraud.read",
+    "fraud.decide",
   ],
   STORE_MANAGER: [
     "stores.read.own",
@@ -102,18 +94,26 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
   ],
 };
 
-export function getPermissionsForRole(role: AppRole): Set<AppPermission> {
-  return new Set(ROLE_PERMISSIONS[role] || []);
+const ROLE_ALIASES: Record<string, AppRole> = {
+  FRAUD: "CUSTOMER_SUPPORT",
+  OPERATIONS_AGENT: "OPERATIONS",
+  ADMIN: "PLATFORM_ADMIN",
+};
+
+export function getPermissionsForRole(role: AppRole | string): Set<AppPermission> {
+  const normalizedRole = ROLE_ALIASES[role] || (role as AppRole);
+  return new Set(ROLE_PERMISSIONS[normalizedRole] || []);
 }
 
-export function hasPermission(role: AppRole, permission: AppPermission): boolean {
-  return ROLE_PERMISSIONS[role]?.includes(permission) || false;
+export function hasPermission(role: AppRole | string, permission: AppPermission): boolean {
+  const normalizedRole = ROLE_ALIASES[role] || (role as AppRole);
+  return ROLE_PERMISSIONS[normalizedRole]?.includes(permission) || false;
 }
 
-export function hasAnyPermission(role: AppRole, permissions: AppPermission[]): boolean {
+export function hasAnyPermission(role: AppRole | string, permissions: AppPermission[]): boolean {
   return permissions.some((perm) => hasPermission(role, perm));
 }
 
-export function hasAllPermissions(role: AppRole, permissions: AppPermission[]): boolean {
+export function hasAllPermissions(role: AppRole | string, permissions: AppPermission[]): boolean {
   return permissions.every((perm) => hasPermission(role, perm));
 }

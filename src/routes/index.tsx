@@ -14,7 +14,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "DarkOps — Operational Intelligence for Dark-Store Networks" },
+      { title: "DarkOps - Operational Intelligence for Dark-Store Networks" },
       {
         name: "description",
         content:
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
       },
       {
         property: "og:title",
-        content: "DarkOps — Operational Intelligence for Dark-Store Networks",
+        content: "DarkOps - Operational Intelligence for Dark-Store Networks",
       },
       {
         property: "og:description",
@@ -44,7 +44,7 @@ const MODULES = [
     label: "Executive",
     tagline: "Network-level performance and critical operational signals.",
     detail:
-      "PulseScore trend, SLA compliance, complaint volume, city-level roll-ups, and worst-performing stores — in a single consolidated view.",
+      "PulseScore trend, SLA compliance, complaint volume, city-level roll-ups, and worst-performing stores - in a single consolidated view.",
     accent: "var(--primary)",
     accentBg: "var(--primary)",
   },
@@ -64,7 +64,7 @@ const MODULES = [
     label: "Dark Stores",
     tagline: "Store health, PulseScore, equipment, incidents, and operational readiness.",
     detail:
-      "Per-store PulseScore breakdown, equipment status, active work orders, incident log, and store-level complaint volume — drillable to individual stores.",
+      "Per-store PulseScore breakdown, equipment status, active work orders, incident log, and store-level complaint volume - drillable to individual stores.",
     accent: "var(--warn)",
     accentBg: "var(--warn)",
   },
@@ -112,7 +112,7 @@ const SIGNAL_STEPS = [
   {
     id: "detect",
     label: "Detect",
-    desc: "Surface store deterioration, SLA risk, fraud signals, and operational exceptions as they emerge — not after the fact.",
+    desc: "Surface store deterioration, SLA risk, fraud signals, and operational exceptions as they emerge - not after the fact.",
   },
   {
     id: "decide",
@@ -177,8 +177,6 @@ function LandingPage() {
             <div className="lp-eyebrow" role="status" aria-live="polite">
               <span className="lp-live-dot" aria-hidden="true" />
               <span className="lp-eyebrow-label">LIVE NETWORK</span>
-              <span className="lp-eyebrow-sep" aria-hidden="true" />
-              <span className="lp-eyebrow-meta">Bengaluru metro</span>
             </div>
 
             {/* Headline */}
@@ -362,7 +360,7 @@ function LandingPage() {
                 Four modules. One platform.
               </h2>
               <p className="lp-section-sub">
-                Every operational surface — consolidated under a single data layer.
+                Every operational surface - consolidated under a single data layer.
               </p>
             </div>
 

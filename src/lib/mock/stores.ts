@@ -281,16 +281,17 @@ function build(): DarkStore[] {
       // Generate realistic metrics first
       const severity = rand();
       const scale = severity > 0.86 ? 2.4 : severity > 0.6 ? 1.5 : 0.75;
-      const equipmentFailures14d = Math.max(0, Math.round(intBetween(rand, 0, 10) * scale));
+      // Allow zero values for healthy stores, realistic ranges for others
+      const equipmentFailures14d = Math.round(intBetween(rand, 0, 12) * scale);
       const slaPct =
         override?.sla ?? round(Math.max(70, 98 - intBetween(rand, 0, 30) - rand() * 4), 1);
       const refundRatePct =
         override?.refundRate ?? round(2 + intBetween(rand, 0, 8) * scale + rand() * 0.8, 1);
-      const deliveryDelays = Math.max(0, Math.round(intBetween(rand, 0, 50) * scale));
+      const deliveryDelays = Math.round(intBetween(rand, 0, 50) * scale);
       const pickerDelayMins = round(1.5 + intBetween(rand, 0, 5) * scale, 1);
-      const inventoryIssues = Math.max(0, Math.round(intBetween(rand, 0, 15) * scale));
+      const inventoryIssues = Math.round(intBetween(rand, 0, 18) * scale);
       const avgResolutionMins = Math.round(30 + intBetween(rand, 10, 120) * scale);
-      const openIssues = Math.max(0, Math.round(2 + intBetween(rand, 0, 20) * scale));
+      const openIssues = Math.round(intBetween(rand, 0, 18) * scale);
 
       // Calculate pulse from metrics using the same formula as seed.ts
       const equipmentPts = Math.min(30, equipmentFailures14d * 3);
@@ -368,12 +369,19 @@ export function storeSeries(store: DarkStore) {
   const rand = rngFor(`series-${store.id}`);
   return Array.from({ length: 14 }, (_, i) => {
     const day = 16 + i;
+    // Use actual metrics to generate realistic series data
+    const avgDailyFailures = store.equipmentFailures14d / 14;
+    const avgDailyStockouts = store.inventoryIssues / 14;
+    
+    // Add realistic daily variation - some days have 0, some have more
+    const dailyVariation = () => (rand() > 0.3) ? (0.3 + rand() * 1.4) : 0;
+    
     return {
       day: `${day} Aug`,
-      failures: Math.max(0, Math.round(store.breakdown.equipment * 0.3 * rand() + rand() * 3)),
-      downtime: round(rand() * (1 + store.breakdown.equipment * 0.25), 1),
-      stockouts: Math.round(4 + rand() * store.breakdown.inventory * 3),
-      mismatches: Math.round(2 + rand() * store.breakdown.inventory * 2.2),
+      failures: Math.max(0, Math.round(avgDailyFailures * dailyVariation())),
+      downtime: round(rand() * (avgDailyFailures > 0 ? 1 + avgDailyFailures * 0.5 : 0.5), 1),
+      stockouts: Math.max(0, Math.round(avgDailyStockouts * dailyVariation())),
+      mismatches: Math.max(0, Math.round(avgDailyStockouts * 0.4 * dailyVariation())),
     };
   });
 }

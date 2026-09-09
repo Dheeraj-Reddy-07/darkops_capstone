@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "../lib/api";
 
-export function useExecutive(enabled: boolean = false) {
+export function useExecutive(enabled: boolean = false, autoRefresh: boolean = false) {
   return useQuery({
     queryKey: ["executive-metrics"],
     queryFn: async () => {
@@ -72,6 +72,7 @@ export function useExecutive(enabled: boolean = false) {
       };
     },
     enabled,
+    refetchInterval: autoRefresh ? 30000 : false,
   });
 }
 

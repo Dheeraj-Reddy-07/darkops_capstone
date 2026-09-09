@@ -14,7 +14,7 @@ interface ChatRequest {
   messages: ChatMessage[];
 }
 
-// Chatbot security: Blocklist of dangerous keywords targeting administrative/internal data
+// ── Security blocklist ────────────────────────────────────────────────────────
 const BLOCKED_KEYWORDS = [
   "all customers",
   "all orders",
@@ -36,6 +36,181 @@ const BLOCKED_KEYWORDS = [
   "escalate privileges",
 ];
 
+// ── Intent detection ──────────────────────────────────────────────────────────
+type Intent =
+  | "ACTION_ATTEMPT"
+  | "ISSUE_STATUS"
+  | "ISSUE_EXPLANATION"
+  | "NEXT_STEPS"
+  | "ORDER_CONTEXT"
+  | "SUPPORT_AVAILABILITY"
+  | "GREETING"
+  | "ACCOUNT_INFO"
+  | "OUT_OF_SCOPE";
+
+function detectIntent(msg: string): Intent {
+  // Read-only guard — catch action attempts first
+  if (
+    /\b(create|submit|file|refund|reorder|cancel|open ticket|report issue|raise|lodge)\b/.test(msg) &&
+    !msg.includes("did i")
+  ) {
+    return "ACTION_ATTEMPT";
+  }
+
+  // SUPPORT_AVAILABILITY — wants to talk to a human
+  if (
+    /\b(talk to|speak to|speak with|contact support|live support|human|agent|call someone|someone help|need help from)\b/.test(msg) ||
+    msg.includes("can i call") ||
+    msg.includes("phone")
+  ) {
+    return "SUPPORT_AVAILABILITY";
+  }
+
+  // ISSUE_EXPLANATION — why / reason / delay
+  if (
+    /\b(why|reason|taking so long|not resolved|still pending|still open|taking long|delayed|delay|what went wrong|why hasn|why isn)\b/.test(msg)
+  ) {
+    return "ISSUE_EXPLANATION";
+  }
+
+  // NEXT_STEPS — what happens next
+  if (
+    /\b(next|what happens|what do i|what should i expect|after this|what now|do now|happens now|what's next)\b/.test(msg)
+  ) {
+    return "NEXT_STEPS";
+  }
+
+  // ORDER_CONTEXT — which order
+  if (
+    /\b(which order|what order|order was|order is|did i order|order had|item i ordered|order for)\b/.test(msg) ||
+    msg.includes("associated order") ||
+    msg.includes("complaint order")
+  ) {
+    return "ORDER_CONTEXT";
+  }
+
+  // ISSUE_STATUS — general status check
+  if (
+    /\b(status|happening|open|review|resolved|complaint|issue|problem|case|claim|pending|my issue|my complaint)\b/.test(msg)
+  ) {
+    return "ISSUE_STATUS";
+  }
+
+  // ACCOUNT_INFO
+  if (/\b(account|profile|who am i|my info|my name|my email)\b/.test(msg)) {
+    return "ACCOUNT_INFO";
+  }
+
+  // GREETING
+  if (/^(hi|hello|hey|yo|sup|good morning|good afternoon|good evening)\b/.test(msg)) {
+    return "GREETING";
+  }
+
+  return "OUT_OF_SCOPE";
+}
+
+// ── Customer-visible status explanation ───────────────────────────────────────
+function explainStatus(status: string, category: string, customerStatusLabel: string): string {
+  const cat = formatCategory(category);
+  const s = (status || "").toLowerCase();
+
+  if (s === "unassigned" || s === "received") {
+    return `Your **${cat}** issue has been received and is being processed by our support system. It hasn't been assigned to a team member yet, but it is in the queue.`;
+  }
+  if (s === "assigned" || s === "agent_queue") {
+    return `Your **${cat}** issue is currently under review by our support team. A team member has picked it up and is looking into it. You don't need to take any action right now.`;
+  }
+  if (s === "in_progress") {
+    return `Your **${cat}** issue is actively being worked on by our support team. Resolution is in progress — you will be updated when it's complete.`;
+  }
+  if (s === "auto_resolved") {
+    return `Your **${cat}** issue was resolved automatically by our support system. Check the resolution details on your issue page.`;
+  }
+  if (s === "resolved" || s === "closed") {
+    return `Your **${cat}** issue has been resolved. You can view the resolution details on your **My Issues** page.`;
+  }
+  if (s === "sla_expired") {
+    return `Your **${cat}** issue has been open longer than our usual response window. Live support is now available — you can connect with an agent directly from your issue page.`;
+  }
+  if (s === "awaiting_customer") {
+    return `Our team needs a bit more information from you to resolve your **${cat}** issue. Please check your email or messages for further details.`;
+  }
+
+  return `Your **${cat}** issue is currently **${customerStatusLabel || status}**.`;
+}
+
+function explainWhyNotResolved(status: string, category: string, customerStatusLabel: string): string {
+  const cat = formatCategory(category);
+  const s = (status || "").toLowerCase();
+
+  if (s === "unassigned" || s === "received") {
+    return `Your **${cat}** issue was received but hasn't been reviewed yet. It was submitted to our support queue and will be picked up shortly. You don't need to do anything right now.`;
+  }
+  if (s === "assigned" || s === "agent_queue") {
+    return `Your **${cat}** issue is currently under review by a support team member. It was routed for manual review rather than being resolved automatically — this is normal for this type of issue. No action is needed from you.`;
+  }
+  if (s === "in_progress") {
+    return `Your **${cat}** issue is being actively worked on. The support team is in the process of resolving it. This typically takes a little time — please check back soon.`;
+  }
+  if (s === "sla_expired") {
+    return `Your **${cat}** issue has taken longer than our standard response window. You are now eligible for live support — navigate to the issue on your **My Issues** page and click **Connect with live support**.`;
+  }
+  if (s === "awaiting_customer") {
+    return `Your **${cat}** issue is waiting on some additional information from you. Please check your email or messages and respond so the team can continue.`;
+  }
+  if (s === "resolved" || s === "closed" || s === "auto_resolved") {
+    return `Your **${cat}** issue has actually been resolved! Check your **My Issues** page for the full resolution details.`;
+  }
+
+  return `Your **${cat}** issue is currently **${customerStatusLabel || status}**. Our team is working through it — no action is needed from you unless you hear otherwise.`;
+}
+
+function explainNextSteps(status: string, category: string, isLiveCallEligible: boolean | undefined): string {
+  const cat = formatCategory(category);
+  const s = (status || "").toLowerCase();
+
+  if (s === "unassigned" || s === "received") {
+    return `Your **${cat}** issue is in our queue. The next step is for it to be picked up by a support team member — no action is required from you.`;
+  }
+  if (s === "assigned" || s === "agent_queue") {
+    return `A support team member is reviewing your **${cat}** issue. The next step is their review and decision on how to resolve it. You will be notified when there's an update.`;
+  }
+  if (s === "in_progress") {
+    return `Your **${cat}** issue is being resolved right now. The next step is the team completing the resolution and updating your issue status. Keep an eye on your **My Issues** page.`;
+  }
+  if (isLiveCallEligible || s === "sla_expired") {
+    return `Your **${cat}** issue has taken longer than expected. The next step available to you is **connecting with a live support agent** — go to your issue on the **My Issues** page and click **Connect with live support**.`;
+  }
+  if (s === "awaiting_customer") {
+    return `The next step is for you to provide some additional information requested by the support team. Check your email or messages for details.`;
+  }
+  if (s === "resolved" || s === "closed" || s === "auto_resolved") {
+    return `Your **${cat}** issue has been resolved — there are no further steps needed. If you have a new issue with an order, you can report it from the **Orders** tab.`;
+  }
+
+  return `Our team is reviewing your **${cat}** issue. The next step is their assessment and resolution. You will receive an update when there is progress.`;
+}
+
+function formatCategory(cat: string): string {
+  const map: Record<string, string> = {
+    wrong_item: "wrong item received",
+    missing_item: "missing item",
+    damaged_item: "damaged item",
+    quality_issue: "quality issue",
+    late_delivery: "late delivery",
+    payment_issue: "payment or refund issue",
+    other: "other",
+  };
+  return map[cat] || cat.replace(/_/g, " ");
+}
+
+const DEFAULT_SUGGESTIONS = [
+  "Why hasn't my issue been resolved?",
+  "What happens next with my issue?",
+  "Can I talk to support?",
+];
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 export const handleCustomerChat = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const adminClient = createSupabaseServiceRoleClient();
@@ -50,10 +225,7 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
     const lastUserMessage = messages[messages.length - 1].content.trim().toLowerCase();
 
     // 1. Security Check: Blocklist
-    const hasBlockedKeyword = BLOCKED_KEYWORDS.some((keyword) =>
-      lastUserMessage.includes(keyword.toLowerCase()),
-    );
-
+    const hasBlockedKeyword = BLOCKED_KEYWORDS.some((k) => lastUserMessage.includes(k.toLowerCase()));
     if (hasBlockedKeyword) {
       await logSecurityEvent({
         actorId: auth.user.id,
@@ -63,24 +235,16 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
         resourceId: "N/A",
         requestId,
         ip: req.ip,
-        metadata: {
-          reason: "blocked_keyword_in_chatbot",
-          message: lastUserMessage.substring(0, 100),
-        },
+        metadata: { reason: "blocked_keyword_in_chatbot", message: lastUserMessage.substring(0, 100) },
       });
-
       return res.status(200).json({
         message:
-          "I can only help you with your authorized orders, complaints, and account details. I do not have access to internal systems or other customers' records.",
-        suggestions: [
-          "Where is my order?",
-          "Check my complaint status",
-          "My account information",
-        ],
+          "I can only help you with your own orders, reported issues, and resolution status. I don't have access to internal systems or other customers' records.",
+        suggestions: DEFAULT_SUGGESTIONS,
       });
     }
 
-    // 2. Resolve authenticated customer ID
+    // 2. Resolve authenticated customer — IDOR protection via profile_id
     let customer: { id: string; full_name: string; email: string };
     const { data: customerByProfile } = await adminClient
       .from("customers")
@@ -96,213 +260,144 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
         .select("id, full_name, email")
         .eq("email", auth.user.email)
         .maybeSingle();
-
-      if (!customerByEmail) {
-        throw new HTTPError(404, "NOT_FOUND", "Customer profile not found");
-      }
+      if (!customerByEmail) throw new HTTPError(404, "NOT_FOUND", "Customer profile not found");
       customer = customerByEmail;
     }
 
-    // 3. Fetch real customer orders (IDOR protected via customer_id)
+    // 3. Fetch ONLY this customer's data (both queries are scoped to customer.id)
     const { data: rawOrders = [] } = await adminClient
       .from("orders")
       .select("id, status, placed_at, total_amount_paise, eta_at, delivered_at, item_count, stores(name)")
       .eq("customer_id", customer.id)
       .order("placed_at", { ascending: false });
 
-    // 4. Fetch real customer complaints with full data so DTO can compute status accurately
     const { data: rawComplaintsData = [], error: complaintsErr } = await adminClient
       .from("complaints")
       .select("*, orders(item_count), stores(name)")
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false });
 
-    if (complaintsErr) {
-      console.error("[CHATBOT] Error fetching complaints:", complaintsErr);
-    }
+    if (complaintsErr) console.error("[CHATBOT] Error fetching complaints:", complaintsErr);
 
-    // Run each complaint through the DTO so status labels are consistent with what the UI sees
     const rawComplaints = (rawComplaintsData || []).map((c: any) => toComplaintDTO(c));
 
-    let response = "";
-    let suggestions = ["Check complaint status", "Which order is my complaint about?", "My account info"];
+    // Convenience: most recent open issue, then most recent overall
+    const openIssues = rawComplaints.filter((c) => c.status !== "resolved" && c.status !== "closed");
+    const primaryIssue = openIssues.length > 0 ? openIssues[0] : rawComplaints[0] ?? null;
 
-    // ── Intent 1: Action / Creation Attempts (Read-Only Guard) ────────────────
-    const isActionAttempt =
-      lastUserMessage.includes("create") ||
-      lastUserMessage.includes("file") ||
-      lastUserMessage.includes("submit") ||
-      lastUserMessage.includes("report issue") ||
-      lastUserMessage.includes("refund me") ||
-      lastUserMessage.includes("reorder") ||
-      lastUserMessage.includes("open ticket") ||
-      lastUserMessage.includes("cancel order") ||
-      lastUserMessage.includes("missing item") ||
-      lastUserMessage.includes("wrong item") ||
-      lastUserMessage.includes("damaged item");
-
-    if (isActionAttempt) {
-      response =
-        "I am a read-only support assistant and cannot create complaints or process refunds directly. To report an issue with an order, please go to your **Orders** tab, select the specific order, and click **Report Issue**. Our automated intelligence layer will process your complaint immediately.";
-      suggestions = ["Check complaint status", "My account info"];
-      return res.status(200).json({ message: response, suggestions });
-    }
-
-    // ── Intent 2: Complaint Order Association / Context ───────────────────────
-    if (
-      lastUserMessage.includes("which order") ||
-      lastUserMessage.includes("associated order") ||
-      lastUserMessage.includes("complaint order") ||
-      lastUserMessage.includes("what order")
-    ) {
-      if (!rawComplaints || rawComplaints.length === 0) {
-        response = "You currently do not have any complaint records on file.";
-      } else {
-        const openComplaints = rawComplaints.filter(
-          (c) => c.status !== "resolved" && c.status !== "closed",
-        );
-        const target = openComplaints.length > 0 ? openComplaints[0] : rawComplaints[0];
-        const storeName = (target as any).store_name || "Dark Store";
-        response = `Your complaint (**${target.complaint_ref}**) is associated with Order **${target.order_id}** from **${storeName}**.\n- **Issue:** ${target.summary}\n- **Detail:** ${target.detail}`;
-      }
-      suggestions = ["Check complaint status", "My account info"];
-      return res.status(200).json({ message: response, suggestions });
-    }
-
-    // ── Intent 3: Live Agent Escalation Queries ─────────────────────────────────
-    if (
-      lastUserMessage.includes("human") ||
-      lastUserMessage.includes("agent") ||
-      lastUserMessage.includes("talk to person") ||
-      lastUserMessage.includes("live call") ||
-      lastUserMessage.includes("speak to someone")
-    ) {
-      const openComplaints = (rawComplaints || []).filter(
-        (c) => c.status !== "resolved" && c.status !== "closed",
-      );
-
-      if (openComplaints.length === 0) {
-        response =
-          "You currently do not have any open complaints. To request support, please open your order under the Orders tab and select 'Report Issue'. Live support becomes available if an open case exceeds its SLA.";
-        suggestions = ["Check complaint status", "My account info"];
-      } else {
-        const eligibleComplaint = openComplaints.find(
-          (c) => c.is_live_call_eligible,
-        );
-
-        if (eligibleComplaint) {
-          response = `Your complaint (**${eligibleComplaint.complaint_ref}**) for Order **${eligibleComplaint.order_id}** has passed our standard SLA response window. **Live support is now unlocked!** Navigate to your Complaint Details page and click 'Connect me to a live agent'.`;
-          suggestions = ["Check complaint status", "My account info"];
-        } else {
-          const mostRecent = openComplaints[0];
-          const slaDue = mostRecent.sla_due_at ? format(new Date(mostRecent.sla_due_at), "HH:mm 'IST'") : "soon";
-          response = `Your complaint (**${mostRecent.complaint_ref}**) for Order **${mostRecent.order_id}** is **${mostRecent.customer_status_label}**. Live agent connection becomes available if your case remains unresolved after its SLA window (due **${slaDue}**).`;
-          suggestions = ["Check complaint status", "My account info"];
-        }
-      }
-
-      return res.status(200).json({ message: response, suggestions });
-    }
-
-    // ── Intent 4: Order Boundary & Context Queries ─────────────────────────────
-    if (
-      lastUserMessage.includes("order") ||
-      lastUserMessage.includes("delivery") ||
-      lastUserMessage.includes("where") ||
-      lastUserMessage.includes("track")
-    ) {
-      const activeOrder = (rawOrders || []).find((o) => o.status !== "delivered");
-
-      if (activeOrder) {
-        const storeName = (activeOrder.stores as any)?.name || "Local Dark Store";
-        response = `Your active order (**${activeOrder.id}**) from **${storeName}** is currently **${activeOrder.status}**.\n\nFull order details are available under the **Orders** tab. I am here to help you check any complaint related to your orders.`;
-      } else if (rawOrders && rawOrders.length > 0) {
-        const mostRecent = rawOrders[0];
-        const storeName = (mostRecent.stores as any)?.name || "Local Dark Store";
-        response = `Your most recent order (**${mostRecent.id}**) from **${storeName}** is **${mostRecent.status}**.\n\nFull order history is available under the **Orders** tab. I am here to help you check your complaint records.`;
-      } else {
-        response =
-          "Your complete order history is available under the **Orders** tab. I am here to help you check your complaint records or explain the status of a reported issue.";
-      }
-
-      suggestions = ["Check complaint status", "Which order is my complaint about?", "My account info"];
-      return res.status(200).json({ message: response, suggestions });
-    }
-
-    // ── Intent 5: Complaint Status Queries ─────────────────────────────────────
-    if (
-      lastUserMessage.includes("complaint") ||
-      lastUserMessage.includes("issue") ||
-      lastUserMessage.includes("problem") ||
-      lastUserMessage.includes("status") ||
-      lastUserMessage.includes("claim")
-    ) {
-      if (!rawComplaints || rawComplaints.length === 0) {
-        response =
-          "You currently do not have any complaint records. If you experience an issue with a recent order, you can submit a report from your Orders page.";
-        suggestions = ["Where is my order?", "My account info"];
-      } else {
-        const openComplaints = rawComplaints.filter(
-          (c) => c.status !== "resolved" && c.status !== "closed",
-        );
-        const resolvedCount = rawComplaints.length - openComplaints.length;
-
-        const targetComplaint = openComplaints.length > 0 ? openComplaints[0] : rawComplaints[0];
-        const submittedAt = format(new Date(targetComplaint.created_at), "dd MMM, HH:mm 'IST'");
-        const storeName = (targetComplaint as any).store_name || "Dark Store";
-
-        // Use the backend-derived status label and detail (from DTO, reflects real state)
-        const statusLabel = (targetComplaint as any).customer_status_label || targetComplaint.status;
-        const statusDetail = (targetComplaint as any).customer_status_detail || "";
-
-        const summaryHeader =
-          openComplaints.length > 0
-            ? `You have **${openComplaints.length}** open complaint(s) out of **${rawComplaints.length}** total record(s).`
-            : `All **${rawComplaints.length}** of your complaint(s) have been ${resolvedCount === rawComplaints.length ? "resolved" : "processed"}.`;
-
-        const sectionHeader =
-          openComplaints.length > 0 ? "Most Recent Open Complaint:" : "Most Recent Complaint:";
-
-        // Include resolution if resolved
-        let resolutionNote = "";
-        if (targetComplaint.status === "resolved" && targetComplaint.resolution) {
-          resolutionNote = `\n- **Resolution:** ${targetComplaint.resolution}`;
-        }
-
-        response = `${summaryHeader}\n\n**${sectionHeader}**\n- **Reference:** ${targetComplaint.complaint_ref}\n- **Order:** ${targetComplaint.order_id} (${storeName})\n- **Category:** ${targetComplaint.summary}\n- **Submitted:** ${submittedAt}\n- **Status:** ${statusLabel}\n- **Details:** ${statusDetail}${resolutionNote}`;
-
-        suggestions = ["Where is my order?", "Check complaint status", "My account info"];
-      }
-
-      return res.status(200).json({ message: response, suggestions });
-    }
-
-    // ── Intent 6: Account Information ──────────────────────────────────────────
-    if (
-      lastUserMessage.includes("account") ||
-      lastUserMessage.includes("profile") ||
-      lastUserMessage.includes("who am i") ||
-      lastUserMessage.includes("my info")
-    ) {
-      response = `Here is your authenticated profile information:\n\n- **Name:** ${customer.full_name || "Valued Customer"}\n- **Email:** ${customer.email}\n- **Customer ID:** ${customer.id}\n- **Active Orders:** ${(rawOrders || []).filter((o) => o.status !== "delivered").length}\n- **Total Complaints:** ${rawComplaints.length} (${rawComplaints.filter((c) => c.status !== "resolved" && c.status !== "closed").length} open)`;
-      suggestions = ["Where is my order?", "Check complaint status"];
-      return res.status(200).json({ message: response, suggestions });
-    }
-
-    // ── Intent 7: Greetings & General Help Fallback ────────────────────────────
     const firstName = customer.full_name ? customer.full_name.split(" ")[0] : "there";
+    let response = "";
 
-    if (
-      lastUserMessage.includes("hello") ||
-      lastUserMessage.includes("hi") ||
-      lastUserMessage.includes("hey")
-    ) {
-      response = `Hello ${firstName}! I'm your DarkOps Care Assistant. I can look up your real-time complaint status, resolution details, and order context. What would you like to check today?`;
-    } else {
-      response = `Hello ${firstName}! I am a read-only support assistant. I can fetch your real-time complaint tracking, order history, or account details. Try asking:\n- *"Check my complaint status"*\n- *"Which order is my complaint about?"*\n- *"My account info"*`;
+    // 4. Detect intent
+    const intent = detectIntent(lastUserMessage);
+
+    // ── ACTION_ATTEMPT ────────────────────────────────────────────────────────
+    if (intent === "ACTION_ATTEMPT") {
+      response =
+        "I'm a read-only assistant and can't create, update, or process anything on your behalf.\n\nTo **report a new issue**, go to the **Orders** tab, select the order, and tap **Report an issue**. To check or manage an existing issue, visit **My Issues**.";
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
     }
 
-    return res.status(200).json({ message: response, suggestions });
+    // ── GREETING ─────────────────────────────────────────────────────────────
+    if (intent === "GREETING") {
+      if (primaryIssue) {
+        const label = (primaryIssue as any).customer_status_label || primaryIssue.status;
+        const cat = formatCategory(primaryIssue.category);
+        response = `Hello ${firstName}! I can see you have an open issue — your **${cat}** report is currently **${label}**.\n\nYou can ask me:\n- *"Why hasn't my issue been resolved?"*\n- *"What happens next with my issue?"*\n- *"Can I talk to support?"*`;
+      } else {
+        response = `Hello ${firstName}! I can help you understand your reported issues, resolution status, and support options. What would you like to know?`;
+      }
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── ISSUE_STATUS ─────────────────────────────────────────────────────────
+    if (intent === "ISSUE_STATUS") {
+      if (!primaryIssue) {
+        response = `You don't have any reported issues on file, ${firstName}. If something went wrong with an order, you can report it from the **Orders** tab.`;
+      } else {
+        const label = (primaryIssue as any).customer_status_label || primaryIssue.status;
+        const detail = (primaryIssue as any).customer_status_detail || "";
+        const cat = formatCategory(primaryIssue.category);
+        const storeName = (primaryIssue as any).store_name || "your store";
+        const submittedAt = format(new Date(primaryIssue.created_at), "dd MMM 'at' HH:mm");
+
+        response = explainStatus(primaryIssue.status, primaryIssue.category, label);
+        response += `\n\n**Issue:** ${cat} · Order ${primaryIssue.order_id} (${storeName})\n**Reported:** ${submittedAt}\n**Status:** ${label}`;
+        if (detail) response += `\n${detail}`;
+
+        if (openIssues.length > 1) {
+          response += `\n\nYou have **${openIssues.length}** open issues in total. Visit **My Issues** to see them all.`;
+        }
+      }
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── ISSUE_EXPLANATION ────────────────────────────────────────────────────
+    if (intent === "ISSUE_EXPLANATION") {
+      if (!primaryIssue) {
+        response = `You don't have any open issues, ${firstName}. If something went wrong with an order, go to **Orders** and tap **Report an issue**.`;
+      } else {
+        const label = (primaryIssue as any).customer_status_label || primaryIssue.status;
+        response = explainWhyNotResolved(primaryIssue.status, primaryIssue.category, label);
+        response += `\n\nIf you need more details, you can view the full issue timeline on your **My Issues** page.`;
+      }
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── NEXT_STEPS ────────────────────────────────────────────────────────────
+    if (intent === "NEXT_STEPS") {
+      if (!primaryIssue) {
+        response = `You don't have any open issues right now. If you experience a problem with an order, go to **Orders**, select the order, and tap **Report an issue**.`;
+      } else {
+        response = explainNextSteps(
+          primaryIssue.status,
+          primaryIssue.category,
+          (primaryIssue as any).is_live_call_eligible,
+        );
+      }
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── ORDER_CONTEXT ─────────────────────────────────────────────────────────
+    if (intent === "ORDER_CONTEXT") {
+      if (!primaryIssue) {
+        response = `You don't have any reported issues, ${firstName}. Your full order history is available under the **Orders** tab.`;
+      } else {
+        const cat = formatCategory(primaryIssue.category);
+        const storeName = (primaryIssue as any).store_name || "your store";
+        response = `Your **${cat}** issue is linked to Order **${primaryIssue.order_id}** from **${storeName}**.\n\n**Issue reference:** ${primaryIssue.complaint_ref}\n**Description:** ${primaryIssue.detail}\n\nYou can view the full order in the **Orders** tab.`;
+      }
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── SUPPORT_AVAILABILITY ──────────────────────────────────────────────────
+    if (intent === "SUPPORT_AVAILABILITY") {
+      if (openIssues.length === 0) {
+        response = `You don't have any open issues at the moment, ${firstName}. Live support becomes available for issues that have been open longer than our standard response window. If something went wrong with an order, report it from the **Orders** tab.`;
+      } else {
+        const eligibleIssue = openIssues.find((c) => (c as any).is_live_call_eligible);
+        if (eligibleIssue) {
+          const cat = formatCategory(eligibleIssue.category);
+          response = `Yes — live support is available for your **${cat}** issue (${eligibleIssue.complaint_ref}).\n\nGo to **My Issues**, open that issue, and tap **Connect with live support** to speak with an agent.`;
+        } else {
+          const mostRecent = openIssues[0];
+          const cat = formatCategory(mostRecent.category);
+          response = `Your **${cat}** issue is still within our standard response window, so live support isn't available yet. Our team is working on it.\n\nIf it remains unresolved, live support will unlock automatically and you'll see the option on your issue page.`;
+        }
+      }
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── ACCOUNT_INFO ──────────────────────────────────────────────────────────
+    if (intent === "ACCOUNT_INFO") {
+      const activeOrders = (rawOrders || []).filter((o) => o.status !== "delivered").length;
+      response = `Here's your account summary, ${firstName}:\n\n- **Name:** ${customer.full_name || "Valued Customer"}\n- **Email:** ${customer.email}\n- **Active orders:** ${activeOrders}\n- **Reported issues:** ${rawComplaints.length} (${openIssues.length} open)`;
+      return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
+    }
+
+    // ── OUT_OF_SCOPE fallback ─────────────────────────────────────────────────
+    response = `I can help with your orders, reported issues, resolution status, and support options. Try asking:\n- *"Why hasn't my issue been resolved?"*\n- *"What happens next with my issue?"*\n- *"Can I talk to support?"*`;
+    return res.status(200).json({ message: response, suggestions: DEFAULT_SUGGESTIONS });
   } catch (error) {
     next(error);
   }

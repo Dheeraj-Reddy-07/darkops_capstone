@@ -59,7 +59,6 @@ export const updateUserRole = async (req: Request, res: Response, next: NextFunc
       "PLATFORM_ADMIN",
       "EXECUTIVE",
       "OPERATIONS",
-      "FRAUD_ANALYST",
       "STORE_MANAGER",
       "CUSTOMER_SUPPORT",
       "CUSTOMER",

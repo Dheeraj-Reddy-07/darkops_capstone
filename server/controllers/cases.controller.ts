@@ -184,10 +184,6 @@ export const getCaseById = async (req: Request, res: Response, next: NextFunctio
         (assignedAgentId === userId || !assignedAgentId)
       ) {
         // Allow access
-      }
-      // FRAUD_ANALYST can access cases related to fraud
-      else if (userRole === "FRAUD_ANALYST") {
-        // Allow access (they need to see case details for fraud investigation)
       } else {
         await logSecurityEvent({
           actorId: userId,

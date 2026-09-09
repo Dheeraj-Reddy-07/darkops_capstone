@@ -28,22 +28,16 @@ export const Route = createFileRoute("/customer/support")({
 
 const ISSUE_CATEGORIES = [
   {
-    key: "wrong_item",
-    label: "Wrong item",
-    hint: "You received something you did not order",
-    icon: "📦",
-  },
-  {
     key: "missing_item",
     label: "Missing item",
-    hint: "Part of your order did not arrive",
+    hint: "Part or all of your order did not arrive",
     icon: "🔍",
   },
   {
-    key: "late_delivery",
-    label: "Late delivery",
-    hint: "The order arrived after the promised time",
-    icon: "⏰",
+    key: "wrong_item",
+    label: "Wrong item received",
+    hint: "You received something you did not order",
+    icon: "📦",
   },
   {
     key: "damaged_item",
@@ -54,12 +48,18 @@ const ISSUE_CATEGORIES = [
   {
     key: "quality_issue",
     label: "Quality issue",
-    hint: "Spoiled, expired or thawed product",
+    hint: "Spoiled, expired or poor quality item",
     icon: "🥛",
   },
   {
+    key: "late_delivery",
+    label: "Late delivery",
+    hint: "The order arrived after the promised time",
+    icon: "⏰",
+  },
+  {
     key: "payment_issue",
-    label: "Payment issue",
+    label: "Payment or refund issue",
     hint: "Charge, refund or wallet problem",
     icon: "💳",
   },
@@ -143,7 +143,7 @@ function Support() {
         {
           onSuccess: (data) => {
             const complaint = data?.data;
-            toast.success("Complaint submitted!", {
+            toast.success("Your issue has been received!", {
               description: `Reference: ${complaint?.complaint_ref || complaint?.id}`,
             });
             // Navigate to complaint detail page
@@ -157,9 +157,9 @@ function Support() {
             console.error("[Support] Submit error:", err);
             const message =
               err?.message ||
-              "Failed to submit complaint. Please check your connection and try again.";
+              "Failed to submit issue. Please check your connection and try again.";
             setSubmitError(message);
-            toast.error("Failed to submit complaint", { description: message });
+            toast.error("Failed to submit issue", { description: message });
             setIsUploading(false);
           },
         },
@@ -396,7 +396,7 @@ function Support() {
                   disabled={!details || details.length < 10 || submit.isPending || isUploading}
                   className="flex-1"
                 >
-                  {isUploading ? "Uploading files..." : submit.isPending ? "Submitting..." : "Submit complaint"}
+                  {isUploading ? "Uploading files..." : submit.isPending ? "Submitting..." : "Submit issue"}
                 </Button>
               </div>
             </div>

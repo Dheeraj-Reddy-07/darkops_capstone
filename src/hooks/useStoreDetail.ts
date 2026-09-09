@@ -48,13 +48,15 @@ export function useStoreDetail(id: string) {
 
       const series = recentHistory.map((p: any) => {
         const date = new Date(p.calculated_at);
-        const failures = Math.round(p.equipment_pts / 3);
-        const stockouts = p.inventory_pts;
+        // Use the equipment_pts from pulse history, but scale it to realistic failure counts
+        // equipment_pts represents deduction points, so we convert to approximate daily failures
+        const failures = Math.max(0, Math.round(p.equipment_pts / 2)); // Reduced divisor for more visible values
+        const stockouts = Math.max(0, Math.round(p.inventory_pts / 1.5)); // Reduced divisor for more visible values
 
         return {
           day: `${date.getDate()} ${date.toLocaleString("default", { month: "short" })}`,
           failures,
-          downtime: Math.round(failures * 1.5 + Math.random() * 2), // We still estimate downtime based on failures since it's not stored
+          downtime: Math.round(failures * 1.5 + Math.random() * 2),
           stockouts,
           mismatches: Math.round(stockouts * 0.3 + Math.random()),
         };

@@ -9,10 +9,10 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/customer/complaints/")({
   head: () => ({
     meta: [
-      { title: "Complaint history - DarkOps Care" },
+      { title: "My Issues - DarkOps Care" },
       {
         name: "description",
-        content: "View all your complaints and their status.",
+        content: "Track your reported issues and their resolution status.",
       },
     ],
   }),
@@ -32,23 +32,27 @@ function ComplaintHistory() {
     }) || [];
 
   const getCustomerFriendlyStatus = (complaint: any) => {
-    // Prefer the backend-computed label (reflects real automation outcome)
     if (complaint.customerStatusLabel) return complaint.customerStatusLabel;
+    const rawStatus = (complaint.status || "").toLowerCase();
     const statusMap: Record<string, string> = {
-      unassigned: "Received",
-      assigned: "Under Review",
-      in_progress: "In Progress",
-      awaiting_customer: "Waiting for Response",
+      received: "Complaint received",
+      unassigned: "Complaint received",
+      agent_queue: "Under review",
+      assigned: "Under review",
+      in_progress: "Being resolved",
+      auto_resolved: "Resolved automatically",
       resolved: "Resolved",
-      closed: "Closed",
+      closed: "Resolved",
+      sla_expired: "Support available",
+      awaiting_customer: "Waiting for response",
     };
-    return statusMap[complaint.status] || complaint.status;
+    return statusMap[rawStatus] || "Under review";
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="text-sm text-muted-foreground">Loading complaint history...</div>
+        <div className="text-sm text-muted-foreground">Loading your reported issues...</div>
       </div>
     );
   }
@@ -58,7 +62,7 @@ function ComplaintHistory() {
       <div className="mx-auto w-full max-w-2xl">
         <Panel className="p-8 text-center">
           <AlertCircle className="mx-auto size-8 text-crit" />
-          <h1 className="mt-3 text-lg font-semibold">Unable to load complaints</h1>
+          <h1 className="mt-3 text-lg font-semibold">Unable to load issues</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Please check your connection and try again.
           </p>
@@ -81,9 +85,9 @@ function ComplaintHistory() {
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Complaint history</h1>
+          <h1 className="text-lg font-semibold tracking-tight">My Issues</h1>
           <p className="text-xs text-muted-foreground">
-            {complaints?.length || 0} total complaint{complaints?.length !== 1 ? "s" : ""}
+            {complaints?.length || 0} total reported issue{complaints?.length !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
@@ -98,10 +102,8 @@ function ComplaintHistory() {
           <div className="flex flex-wrap gap-2">
             {[
               { value: "all", label: "All" },
-              { value: "open", label: "Open" },
+              { value: "open", label: "Active" },
               { value: "resolved", label: "Resolved" },
-              { value: "in_progress", label: "In Progress" },
-              { value: "assigned", label: "Under Review" },
             ].map((filter) => (
               <button
                 key={filter.value}
@@ -124,8 +126,8 @@ function ComplaintHistory() {
       {filteredComplaints.length > 0 ? (
         <Panel>
           <PanelHeader
-            title="Complaints"
-            subtitle={`${filteredComplaints.length} complaint${filteredComplaints.length > 1 ? "s" : ""} found`}
+            title="Reported Issues"
+            subtitle={`${filteredComplaints.length} issue${filteredComplaints.length > 1 ? "s" : ""} found`}
           />
           <ul className="divide-y divide-border/60">
             {filteredComplaints.map((complaint: any) => (
@@ -143,7 +145,7 @@ function ComplaintHistory() {
                       </div>
                       <p className="text-sm font-medium">{complaint.summary}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Order {complaint.orderId} · {complaint.storeName || "Unknown store"}
+                        Order {complaint.orderId} · {complaint.storeName || "Store order"}
                       </p>
                       <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="size-3" />
@@ -163,11 +165,11 @@ function ComplaintHistory() {
             <PackageSearch className="mx-auto size-8 text-muted-foreground" />
             <p className="mt-3 text-sm text-muted-foreground">
               {statusFilter === "all"
-                ? "No complaints yet"
-                : `No complaints with status "${statusFilter}"`}
+                ? "No issues reported yet"
+                : `No issues with status "${statusFilter}"`}
             </p>
             <Button asChild variant="outline" size="sm" className="mt-4">
-              <Link to="/customer/support">Report an issue</Link>
+              <Link to="/customer/orders">View orders to report an issue</Link>
             </Button>
           </div>
         </Panel>
@@ -176,11 +178,11 @@ function ComplaintHistory() {
       {/* Summary Stats */}
       {complaints && complaints.length > 0 && (
         <Panel>
-          <PanelHeader title="Summary" subtitle="Your complaint statistics" />
+          <PanelHeader title="Summary" subtitle="Overview of your reported issues" />
           <div className="grid gap-4 p-4 sm:grid-cols-3">
             <div className="text-center">
               <p className="text-2xl font-semibold">{complaints.length}</p>
-              <p className="text-xs text-muted-foreground">Total complaints</p>
+              <p className="text-xs text-muted-foreground">Total reported</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-semibold text-warn">
@@ -189,7 +191,7 @@ function ComplaintHistory() {
                     .length
                 }
               </p>
-              <p className="text-xs text-muted-foreground">Open</p>
+              <p className="text-xs text-muted-foreground">Active</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-semibold text-ok">

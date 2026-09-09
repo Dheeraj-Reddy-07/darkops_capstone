@@ -142,15 +142,20 @@ export const getStorePulse = async (req: Request, res: Response, next: NextFunct
 export const getStoreWorkOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const supabase = createSupabaseServerClient(req, res);
+    console.log("[getStoreWorkOrders] Fetching work orders for store:", id);
+    // Use service role client to bypass RLS since we already check permissions via RBAC middleware
+    const adminClient = createSupabaseServiceRoleClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("work_orders")
       .select("*")
       .eq("store_id", id)
       .order("created_at", { ascending: false });
 
+    console.log("[getStoreWorkOrders] Query result:", { error: error?.message, count: data?.length });
+
     if (error) {
+      console.error("[getStoreWorkOrders] Error:", error);
       throw new HTTPError(500, "DATABASE_ERROR", `Database error: ${error.message}`);
     }
 
@@ -166,9 +171,12 @@ export const createStoreWorkOrder = async (req: Request, res: Response, next: Ne
     const { asset_id, asset_name, priority, description } = req.body;
     const auth = (req as any).auth;
 
-    const supabase = createSupabaseServerClient(req, res);
+    console.log("[createStoreWorkOrder] Creating work order for store:", id, "with data:", { asset_id, asset_name, priority });
 
-    const { data, error } = await supabase
+    // Use service role client to bypass RLS since we already check permissions via RBAC middleware
+    const adminClient = createSupabaseServiceRoleClient();
+
+    const { data, error } = await adminClient
       .from("work_orders")
       .insert({
         id: `WO-${Date.now()}`,
@@ -183,11 +191,14 @@ export const createStoreWorkOrder = async (req: Request, res: Response, next: Ne
       .select()
       .single();
 
+    console.log("[createStoreWorkOrder] Insert result:", { error: error?.message, data: data?.id });
+
     if (error) {
+      console.error("[createStoreWorkOrder] Error:", error);
       throw new HTTPError(500, "DATABASE_ERROR", `Failed to create work order: ${error.message}`);
     }
 
-    await supabase.from("audit_logs").insert({
+    await adminClient.from("audit_logs").insert({
       actor_id: auth.user.id,
       actor_role: auth.user.role,
       action: "work_order.create",

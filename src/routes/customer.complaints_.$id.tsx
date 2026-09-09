@@ -24,10 +24,10 @@ import { LiveSupportCallOverlay } from "@/components/customer/LiveSupportCallOve
 export const Route = createFileRoute("/customer/complaints_/$id")({
   head: () => ({
     meta: [
-      { title: "Complaint details - DarkOps Care" },
+      { title: "Issue details - DarkOps Care" },
       {
         name: "description",
-        content: "View complaint status, timeline, and resolution details.",
+        content: "View issue status, timeline, and resolution details.",
       },
     ],
   }),
@@ -51,7 +51,7 @@ function ComplaintDetail() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="text-sm text-muted-foreground">Loading complaint details...</div>
+        <div className="text-sm text-muted-foreground">Loading issue details...</div>
       </div>
     );
   }
@@ -61,9 +61,9 @@ function ComplaintDetail() {
       <div className="mx-auto w-full max-w-2xl">
         <Panel className="p-8 text-center">
           <AlertCircle className="mx-auto size-8 text-crit" />
-          <h1 className="mt-3 text-lg font-semibold">Complaint not found</h1>
+          <h1 className="mt-3 text-lg font-semibold">Issue not found</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This complaint may not exist or you don't have permission to view it.
+            This issue may not exist or you don't have permission to view it.
           </p>
           <Button asChild size="sm" className="mt-4">
             <Link to="/customer">Back to home</Link>
@@ -75,15 +75,33 @@ function ComplaintDetail() {
 
   const getCustomerFriendlyStatus = (status: string, overrideLabel?: string) => {
     if (overrideLabel) return overrideLabel;
+    const rawStatus = (status || "").toLowerCase();
     const statusMap: Record<string, string> = {
-      unassigned: "Received — being processed",
-      assigned: "Under review by support team",
-      in_progress: "In Progress",
-      awaiting_customer: "Waiting for Your Response",
+      received: "Complaint received",
+      unassigned: "Complaint received",
+      agent_queue: "Under review",
+      assigned: "Under review",
+      in_progress: "Being resolved",
+      auto_resolved: "Resolved automatically",
       resolved: "Resolved",
-      closed: "Closed",
+      closed: "Resolved",
+      sla_expired: "Support available",
+      awaiting_customer: "Waiting for response",
     };
-    return statusMap[status] || status;
+    return statusMap[rawStatus] || "Under review";
+  };
+
+  const formatCategory = (cat: string) => {
+    const categoryMap: Record<string, string> = {
+      wrong_item: "Wrong item received",
+      missing_item: "Missing item",
+      damaged_item: "Damaged item",
+      quality_issue: "Quality issue",
+      late_delivery: "Late delivery",
+      payment_issue: "Payment or refund issue",
+      other: "Other",
+    };
+    return categoryMap[cat] || cat.replace(/_/g, " ");
   };
 
   const getStatusColor = (status: string) => {
@@ -99,11 +117,11 @@ function ComplaintDetail() {
         <Button asChild variant="ghost" size="sm">
           <Link to="/customer/complaints">
             <ArrowLeft className="mr-2 size-4" />
-            Back to complaints
+            Back to My Issues
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Complaint details</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Issue details</h1>
           <p className="text-xs text-muted-foreground">{complaint.complaintRef}</p>
         </div>
       </div>
@@ -112,8 +130,8 @@ function ComplaintDetail() {
       <Panel>
         <PanelHeader
           title={complaint.summary}
-          subtitle={`Order ${complaint.orderId} · ${complaint.storeName || "Unknown store"}`}
-          right={<StatusBadge status={complaint.status} />}
+          subtitle={`Order ${complaint.orderId} · ${complaint.storeName || "Store order"}`}
+          right={<StatusBadge status={getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)} />}
         />
         <div className="p-4 space-y-4">
           <div>
@@ -125,7 +143,7 @@ function ComplaintDetail() {
             <div className="flex items-start gap-3">
               <Clock className="size-4 shrink-0 text-muted-foreground" />
               <div>
-                <p className="text-[13px]">Submitted on</p>
+                <p className="text-[13px]">Reported on</p>
                 <p className="num text-xs text-muted-foreground">{complaint.createdAt}</p>
               </div>
             </div>
@@ -141,9 +159,9 @@ function ComplaintDetail() {
             <div className="flex items-start gap-3">
               <AlertCircle className="size-4 shrink-0 text-muted-foreground" />
               <div>
-                <p className="text-[13px]">Category</p>
-                <p className="num text-xs text-muted-foreground capitalize">
-                  {complaint.category.replace("_", " ")}
+                <p className="text-[13px]">Issue type</p>
+                <p className="num text-xs text-muted-foreground">
+                  {formatCategory(complaint.category)}
                 </p>
               </div>
             </div>
@@ -184,7 +202,7 @@ function ComplaintDetail() {
 
       {/* Status Timeline */}
       <Panel>
-        <PanelHeader title="Status timeline" subtitle="Track your complaint progress" />
+        <PanelHeader title="Status timeline" subtitle="Track your issue resolution" />
         <ol className="p-4">
           {complaint.statusHistory && complaint.statusHistory.length > 0 ? (
             complaint.statusHistory.map((history, index) => (
@@ -223,7 +241,7 @@ function ComplaintDetail() {
               </div>
               <div className="-mt-1">
                 <p className="text-[13px] font-medium">
-                  {getCustomerFriendlyStatus(complaint.status)}
+                  {getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)}
                 </p>
                 <p className="num text-xs text-muted-foreground">{complaint.createdAt}</p>
               </div>
@@ -252,7 +270,7 @@ function ComplaintDetail() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium">Current status</p>
-              <p className={cn("mt-1 text-sm", getStatusColor(complaint.status))}>
+              <p className={cn("mt-1 text-sm font-medium", getStatusColor(complaint.status))}>
                 {getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)}
               </p>
               {/* Show backend-computed detail text if available */}
@@ -261,8 +279,7 @@ function ComplaintDetail() {
               )}
               {complaint.status === "awaiting_customer" && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  We need more information to resolve your complaint. Please check your email or
-                  contact support.
+                  We need a bit more information to resolve your issue. Please check your email or messages.
                 </p>
               )}
             </div>
@@ -272,20 +289,26 @@ function ComplaintDetail() {
 
       {/* Live Agent SLA Escalation Section */}
       {complaint.isLiveCallEligible && (
-        <Panel className="border-amber-500/30 bg-amber-500/5">
+        <Panel className={cn(callStatus === "completed" ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5")}>
           <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-amber-500">
-              <ShieldAlert className="size-5" />
-              <p className="text-sm font-semibold">Response SLA Exceeded Live Support Unlocked</p>
-            </div>
             {callStatus === "completed" ? (
-              <p className="text-sm text-amber-600 font-medium bg-amber-500/10 p-2 rounded-md">
-                You have completed a support call with our agent. Your case has been updated.
-              </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-emerald-500 font-semibold text-sm">
+                  <CheckCircle2 className="size-5 text-emerald-500" />
+                  <span>Support Call Completed</span>
+                </div>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 p-3 rounded-md border border-emerald-500/20">
+                  You have completed a support call with our agent. Your issue has been updated.
+                </p>
+              </div>
             ) : (
               <>
+                <div className="flex items-center gap-2 text-amber-500">
+                  <ShieldAlert className="size-5" />
+                  <p className="text-sm font-semibold">Response window exceeded · Live support available</p>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Your case has exceeded our standard response window ({complaint.slaDueAt || "SLA Window"}). You are now authorized for a Live support call with an operations agent.
+                  Our team is taking longer than usual to resolve your issue. You are now eligible to speak directly with an agent via live voice support.
                 </p>
                 <Button onClick={() => setShowCallOverlay(true)} disabled={showCallOverlay} className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white">
                   <PhoneCall className="size-4" /> Connect with live support
@@ -307,14 +330,13 @@ function ComplaintDetail() {
       {/* Actions */}
       <Panel>
         <div className="p-4">
-          <p className="text-sm font-medium">Need more help?</p>
+          <p className="text-sm font-medium">Need help with another order?</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            If you have additional information or questions about this complaint, our support team
-            is here to help.
+            View your recent orders to report a new issue or track your active deliveries.
           </p>
           <div className="mt-3 flex gap-2">
             <Button asChild size="sm" className="flex-1">
-              <Link to="/customer/support">Report new issue</Link>
+              <Link to="/customer/orders">View orders</Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="flex-1">
               <Link to="/customer">Back to home</Link>

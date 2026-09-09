@@ -42,7 +42,7 @@ async function runTests() {
   const agentMe = await request("/auth/me", agentToken);
   console.log(
     "Agent /auth/me ->",
-    agentMe.status === 200 && agentMe.data?.user?.role === "OPERATIONS_AGENT"
+    agentMe.status === 200 && (agentMe.data?.user?.role === "OPERATIONS" || agentMe.data?.user?.role === "OPERATIONS_AGENT")
       ? "PASS"
       : `FAIL ${JSON.stringify(agentMe.data)}`,
   );

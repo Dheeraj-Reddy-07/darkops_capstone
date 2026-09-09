@@ -41,7 +41,7 @@ router.get(
 router.post(
   "/:id/work-orders",
   rateLimit(20, 60000),
-  requirePermission(["work_orders.manage"]),
+  requirePermission("work_orders.manage"),
   createStoreWorkOrder,
 );
 

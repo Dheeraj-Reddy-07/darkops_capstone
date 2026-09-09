@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ExecutiveSettingsForm } from "@/components/settings/executive-settings-form";
 
 const NAV_BY_ROLE: Record<string, Array<{ label: string; to: string; match?: string; exact?: boolean }>> = {
   PLATFORM_ADMIN: [
@@ -101,11 +102,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           ? "Store Ops"
           : userRole === "EXECUTIVE"
             ? "Executive"
-            : userRole === "FRAUD_ANALYST"
-              ? "Fraud"
-              : userRole === "PLATFORM_ADMIN"
-                ? "Admin"
-                : "Operational Intelligence";
+            : userRole === "PLATFORM_ADMIN"
+              ? "Admin"
+              : "Operational Intelligence";
 
   // Roles that should have search access (can search stores, cases, complaints)
   const canSearch = [
@@ -116,8 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     "CUSTOMER_SUPPORT",
     "FRAUD_ANALYST",
   ].includes(userRole || "");
-
-  const handleLogout = async () => {
+const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
     // Clear React Query cache to prevent stale data after logout
@@ -305,40 +303,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Settings Modal */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Settings className="size-4" />
-              Settings
+              <Settings className="size-4 text-primary" />
+              Executive Settings
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Full Name</label>
-              <input
-                type="text"
-                value={settingsData.full_name}
-                onChange={(e) => setSettingsData({ ...settingsData, full_name: e.target.value })}
-                className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Enter your full name"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Location</label>
-              <input
-                type="text"
-                value={settingsData.hub_city}
-                onChange={(e) => setSettingsData({ ...settingsData, hub_city: e.target.value })}
-                className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Enter your location"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={handleSettingsCancel}>
-              Cancel
-            </Button>
-            <Button onClick={handleSettingsSave}>Save Changes</Button>
+          <div className="py-2">
+            <ExecutiveSettingsForm
+              isModal
+              onSaved={() => setSettingsOpen(false)}
+              onCancel={() => setSettingsOpen(false)}
+            />
           </div>
         </DialogContent>
       </Dialog>

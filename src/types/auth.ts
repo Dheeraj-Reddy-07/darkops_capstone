@@ -2,7 +2,6 @@ export type AppRole =
   | "PLATFORM_ADMIN"
   | "EXECUTIVE"
   | "OPERATIONS"
-  | "FRAUD_ANALYST"
   | "STORE_MANAGER"
   | "CUSTOMER_SUPPORT"
   | "CUSTOMER";

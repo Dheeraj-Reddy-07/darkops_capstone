@@ -74,7 +74,7 @@ export const requireCustomerAccess = (customerIdParam: string = "customerId") =>
 
       // Internal roles can access customer data
       if (
-        ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "CUSTOMER_SUPPORT", "FRAUD_ANALYST"].includes(
+        ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "CUSTOMER_SUPPORT"].includes(
           auth.user.role,
         )
       ) {
@@ -110,11 +110,6 @@ export const requireCaseAccess = (caseIdParam: string = "id") => {
         return next();
       }
 
-      // FRAUD_ANALYST can access cases related to fraud
-      if (auth.user.role === "FRAUD_ANALYST") {
-        return next();
-      }
-
       // CUSTOMER can only access their own cases (handled in controller)
       if (auth.user.role === "CUSTOMER") {
         return next();
@@ -144,7 +139,6 @@ export const requireFraudAccess = () => {
         "PLATFORM_ADMIN",
         "EXECUTIVE",
         "OPERATIONS",
-        "FRAUD_ANALYST",
         "CUSTOMER_SUPPORT",
       ];
 

@@ -242,11 +242,11 @@ function CustomerHome() {
       {/* Quick Actions */}
       <div className="grid gap-3 sm:grid-cols-2">
         <Button asChild variant="outline" className="h-auto flex-col items-start p-4">
-          <Link to="/customer/support" className="flex h-full w-full flex-col items-start gap-2">
+          <Link to="/customer/orders" className="flex h-full w-full flex-col items-start gap-2">
             <AlertCircle className="size-5 text-crit" />
             <div className="text-left">
-              <p className="text-sm font-medium">Report an issue</p>
-              <p className="text-xs text-muted-foreground">Missing, wrong, or damaged items</p>
+              <p className="text-sm font-medium">Need help with an order?</p>
+              <p className="text-xs text-muted-foreground">Select an order to report an issue</p>
             </div>
           </Link>
         </Button>
@@ -308,7 +308,7 @@ function CustomerHome() {
             <PackageSearch className="mx-auto size-8 text-muted-foreground" />
             <p className="mt-3 text-sm text-muted-foreground">No orders yet</p>
             <Button asChild variant="outline" size="sm" className="mt-4">
-              <Link to="/customer/support">Report an issue</Link>
+              <Link to="/customer/orders">View orders</Link>
             </Button>
           </div>
         )}

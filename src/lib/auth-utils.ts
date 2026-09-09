@@ -8,7 +8,6 @@ export const ROLE_LANDING_ROUTES: Record<AppRole, string> = {
   PLATFORM_ADMIN: "/admin",
   EXECUTIVE: "/executive",
   OPERATIONS: "/operations",
-  FRAUD_ANALYST: "/fraud",
   STORE_MANAGER: "/dark-stores",
   CUSTOMER_SUPPORT: "/support",
   CUSTOMER: "/customer",

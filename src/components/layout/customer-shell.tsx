@@ -10,9 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 const NAV = [
   { label: "Home", to: "/customer", exact: true },
   { label: "Orders", to: "/customer/orders" },
-  { label: "Complaints", to: "/customer/complaints" },
+  { label: "My Issues", to: "/customer/complaints" },
   { label: "AI Assistant", to: "/customer/chat" },
-  { label: "Support", to: "/customer/support" },
 ];
 
 export function CustomerShell({ children }: { children: ReactNode }) {
@@ -64,20 +63,26 @@ export function CustomerShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
           <nav className="flex items-center gap-0.5">
-            {NAV.map((n) => (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={cn(
-                  "rounded-sm px-2.5 py-1.5 text-[13px]",
-                  (n.exact ? pathname === n.to : pathname.startsWith(n.to))
-                    ? "bg-surface-3 font-medium text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {n.label}
-              </Link>
-            ))}
+            {NAV.map((n) => {
+              const isActive = n.exact
+                ? pathname === n.to
+                : pathname.startsWith(n.to) ||
+                  (n.to === "/customer/orders" && pathname.startsWith("/customer/support"));
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  className={cn(
+                    "rounded-sm px-2.5 py-1.5 text-[13px]",
+                    isActive
+                      ? "bg-surface-3 font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {n.label}
+                </Link>
+              );
+            })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />

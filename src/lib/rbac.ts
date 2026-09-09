@@ -61,16 +61,6 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "attachments.upload",
     "attachments.read",
   ],
-  FRAUD_ANALYST: [
-    "fraud.read",
-    "fraud.decide",
-    "cases.read.all",
-    "support.read",
-    "orders.read.all",
-    "customers.read.own",
-    "notifications.read",
-    "attachments.read",
-  ],
   CUSTOMER_SUPPORT: [
     "support.read",
     "support.review",
