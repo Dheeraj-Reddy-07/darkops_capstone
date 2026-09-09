@@ -789,7 +789,7 @@ function FailedAutomationPanel({ navigate }: { navigate: any }) {
           <thead>
             <tr>
               <Th>Complaint</Th>
-              <Th>Failure Reason</Th>
+              <Th>Failure Details</Th>
               <Th>Urgency</Th>
               <Th>Sentiment</Th>
               <Th>Created</Th>
@@ -806,8 +806,10 @@ function FailedAutomationPanel({ navigate }: { navigate: any }) {
                   </div>
                 </Td>
                 <Td>
-                  <div className="text-xs">{f.failure_reason}</div>
-                  <div className="text-xs text-muted-foreground">{f.failure_step}</div>
+                  <div className="text-xs font-medium">{f.failure_step}</div>
+                  <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                    {f.failure_reason}
+                  </div>
                 </Td>
                 <Td>
                   <span
@@ -860,6 +862,54 @@ function FailedAutomationPanel({ navigate }: { navigate: any }) {
       />
     </>
   );
+}
+
+// ─── Helper Functions ──────────────────────────────────────────────────────────
+
+function getRuleExplanation(failureStep: string, failureReason: string): string {
+  const stepLower = failureStep?.toLowerCase() || "";
+  const reasonLower = failureReason?.toLowerCase() || "";
+
+  if (stepLower.includes("refund")) {
+    if (reasonLower.includes("prior claim") || reasonLower.includes("history")) {
+      return "Auto-approval Rule Failed: Customer has exceeded the prior claims threshold (≤2 claims in 90 days). This flag indicates potential abuse risk requiring manual review.";
+    }
+    if (reasonLower.includes("amount") || reasonLower.includes("threshold") || reasonLower.includes("rs")) {
+      return "Auto-approval Rule Failed: Order amount exceeds the auto-approve threshold (≤Rs 500). Higher value refunds require manual approval for fraud prevention.";
+    }
+    if (reasonLower.includes("confidence") || reasonLower.includes("nlp")) {
+      return "Auto-approval Rule Failed: NLP confidence score is below the threshold (≥40). The system could not reliably validate the claim, requiring human verification.";
+    }
+    return "Refund validation requires manual review due to one or more rule violations.";
+  }
+
+  if (stepLower.includes("reorder")) {
+    if (reasonLower.includes("expired") || reasonLower.includes("window") || reasonLower.includes("old")) {
+      return "Auto-approval Rule Failed: Reorder time window has expired (≤24 hours from order placement). Reorders outside this window require manual investigation.";
+    }
+    if (reasonLower.includes("prior claim") || reasonLower.includes("customer")) {
+      return "Auto-approval Rule Failed: Customer has exceeded the prior claims threshold (≤5 claims in 90 days). High frequency of reorder requests requires manual review.";
+    }
+    return "Reorder validation requires manual review due to one or more rule violations.";
+  }
+
+  if (stepLower.includes("fraud") || stepLower.includes("detection")) {
+    return "Fraud Detection Rule Failed: The complaint triggered fraud detection patterns. This requires manual security review before any automated processing.";
+  }
+
+  if (stepLower.includes("classification")) {
+    return "Classification Rule Failed: The system could not automatically categorize this complaint type. Manual classification is required to determine the appropriate workflow.";
+  }
+
+  if (stepLower.includes("assignment") || stepLower.includes("agent")) {
+    return "Auto-assignment Rule Failed: The system could not automatically assign this to an agent. Manual assignment is required.";
+  }
+
+  if (stepLower.includes("operational")) {
+    return "Operational Rule: This complaint type requires human investigation (e.g., late delivery, wrong items, quality issues). Automation cannot resolve operational disputes.";
+  }
+
+  return `Manual review required. Failure in ${failureStep || 'unknown'} step: ${failureReason || 'no specific reason provided'}`;
 }
 
 // ─── Review Automation Dialog ──────────────────────────────────────────────────
@@ -938,13 +988,9 @@ function ReviewAutomationDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-xs text-muted-foreground font-medium mb-1">
-                    Failure Reason
+                    Failure Step
                   </div>
-                  <div className="text-sm font-medium">{item.failure_reason}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground font-medium mb-1">Failure Step</div>
-                  <div className="text-sm">{item.failure_step}</div>
+                  <div className="text-sm font-medium">{item.failure_step}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground font-medium mb-1">
@@ -955,6 +1001,24 @@ function ReviewAutomationDialog({
                 <div>
                   <div className="text-xs text-muted-foreground font-medium mb-1">Sentiment</div>
                   <div className="text-sm">{item.sentiment}</div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-muted-foreground font-medium mb-1">
+                  Detailed Failure Reason
+                </div>
+                <div className="text-sm bg-surface-2 p-3 rounded-md border border-border">
+                  {item.failure_reason}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-muted-foreground font-medium mb-1">
+                  Rule Validation Details
+                </div>
+                <div className="text-sm bg-surface-2 p-3 rounded-md border border-border">
+                  {getRuleExplanation(item.failure_step, item.failure_reason)}
                 </div>
               </div>
 

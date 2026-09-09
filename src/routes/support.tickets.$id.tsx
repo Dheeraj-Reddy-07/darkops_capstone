@@ -15,6 +15,7 @@ import {
   X,
   ChevronDown,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import {
   Panel,
@@ -118,6 +119,7 @@ const EVENT_LABELS: Record<string, string> = {
   note_added: "Note added",
   resolved: "Resolved",
   attachment_added: "Attachment added",
+  attachment_deleted: "Attachment deleted",
 };
 
 function EventIcon({ type }: { type: string }) {
@@ -150,6 +152,12 @@ function EventIcon({ type }: { type: string }) {
     return (
       <span className={cn(base, "border-border bg-surface-3")}>
         <Paperclip className="size-3.5 text-muted-foreground" />
+      </span>
+    );
+  if (type === "attachment_deleted")
+    return (
+      <span className={cn(base, "border-destructive/30 bg-destructive/10")}>
+        <Trash2 className="size-3.5 text-destructive" />
       </span>
     );
   return (
@@ -219,6 +227,13 @@ function EventDescription({ event }: { event: any }) {
     return (
       <span>
         <strong>{actorName}</strong> attached <strong>{payload?.filename}</strong>
+      </span>
+    );
+  }
+  if (event_type === "attachment_deleted") {
+    return (
+      <span>
+        <strong>{actorName}</strong> deleted <strong>{payload?.filename}</strong>
       </span>
     );
   }
@@ -349,6 +364,18 @@ function TicketDetail() {
     onError: (err: any) => toast.error(`Failed: ${err.message}`),
   });
 
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: string) =>
+      fetchApi(`/support/tickets/${id}/attachments/${attachmentId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("Attachment deleted");
+      invalidateAll();
+    },
+    onError: (err: any) => toast.error(`Failed to delete: ${err.message}`),
+  });
+
   const [uploading, setUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,10 +423,23 @@ function TicketDetail() {
       const { signed_url } = await fetchApi(
         `/support/tickets/${id}/attachments/${attachmentId}/download`,
       );
+      
+      // Fetch the file as a blob to ensure it downloads instead of opening
+      const response = await fetch(signed_url);
+      if (!response.ok) throw new Error("Failed to fetch file");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
       const a = document.createElement("a");
-      a.href = signed_url;
+      a.href = url;
       a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (err: any) {
       toast.error(`Download failed: ${err.message}`);
     }
@@ -702,12 +742,25 @@ function TicketDetail() {
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDownload(att.id, att.filename)}
-                        className="text-xs text-primary hover:underline flex-shrink-0"
-                      >
-                        Download
-                      </button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleDownload(att.id, att.filename)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Download
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete ${att.filename}?`)) {
+                              deleteAttachmentMutation.mutate(att.id);
+                            }
+                          }}
+                          className="text-xs text-destructive hover:underline"
+                          disabled={deleteAttachmentMutation.isPending}
+                        >
+                          {deleteAttachmentMutation.isPending ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

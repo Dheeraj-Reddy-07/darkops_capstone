@@ -87,7 +87,7 @@ export const getMyTickets = async (req: Request, res: Response, next: NextFuncti
       .select(
         `
         id, ticket_number, title, status, priority, queue, sla_deadline, created_at, updated_at, resolution_notes,
-        complaints (complaint_ref, summary, category, order_id, customer_id, store_id),
+        complaints!complaint_id (complaint_ref, summary, category, order_id, customer_id, store_id),
         assigned_to_profile:profiles!support_tickets_assigned_to_fkey (id, full_name, email)
       `,
       )
@@ -147,7 +147,7 @@ export const getTeamTickets = async (req: Request, res: Response, next: NextFunc
       .select(
         `
         id, ticket_number, title, status, priority, queue, sla_deadline, created_at, updated_at,
-        complaints (complaint_ref, summary, category),
+        complaints!complaint_id (complaint_ref, summary, category),
         assigned_to_profile:profiles!support_tickets_assigned_to_fkey (id, full_name, email)
       `,
       )
@@ -202,7 +202,7 @@ export const getUnassignedTickets = async (req: Request, res: Response, next: Ne
       .select(
         `
         id, ticket_number, title, status, priority, queue, sla_deadline, created_at, updated_at,
-        complaints (complaint_ref, summary, category)
+        complaints!complaint_id (complaint_ref, summary, category)
       `,
       )
       .is("assigned_to", null)
@@ -237,7 +237,7 @@ export const getMyResolvedTickets = async (req: Request, res: Response, next: Ne
       .select(
         `
         id, ticket_number, title, status, priority, queue, sla_deadline, created_at, updated_at, resolution_notes, resolution_time_minutes,
-        complaints (complaint_ref, summary, category),
+        complaints!complaint_id (complaint_ref, summary, category),
         assigned_to_profile:profiles!support_tickets_assigned_to_fkey (id, full_name, email),
         resolved_by_profile:profiles!support_tickets_resolved_by_fkey (id, full_name, email)
       `,
@@ -274,7 +274,7 @@ export const getSupportTicketById = async (req: Request, res: Response, next: Ne
       .select(
         `
         *,
-        complaints (
+        complaints!complaint_id (
           id, complaint_ref, summary, detail, category, type, priority, status, sla_state,
           order_id, customer_id, store_id, order_value_paise, refund_amount_paise
         ),
@@ -859,6 +859,77 @@ export const getAttachmentDownloadUrl = async (req: Request, res: Response, next
     if (signedErr) throw new HTTPError(500, "STORAGE_ERROR", signedErr.message);
 
     res.json({ signed_url: signedData.signedUrl, filename: attachment.filename });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /support/tickets/:id/attachments/:attachmentId
+ * Deletes an attachment from both storage and database.
+ */
+export const deleteAttachment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const auth = (req as any).auth;
+    requireSupportRole(auth);
+    const adminClient = createSupabaseServiceRoleClient();
+    const { id, attachmentId } = req.params;
+
+    // Verify ticket access
+    const { data: ticket } = await adminClient
+      .from("support_tickets")
+      .select("assigned_to")
+      .eq("id", id)
+      .single();
+
+    const isAssignee = ticket?.assigned_to === auth.user.id;
+    if (!isAssignee && auth.user.role !== "PLATFORM_ADMIN") {
+      throw new HTTPError(403, "FORBIDDEN", "Only ticket assignee can delete attachments");
+    }
+
+    // Get attachment details
+    const { data: attachment } = await adminClient
+      .from("ticket_attachments")
+      .select("storage_path, filename")
+      .eq("id", attachmentId)
+      .eq("ticket_id", id)
+      .single();
+
+    if (!attachment) throw new HTTPError(404, "NOT_FOUND", "Attachment not found");
+
+    // Delete from storage
+    const { error: storageError } = await adminClient.storage
+      .from("ticket-attachments")
+      .remove([attachment.storage_path]);
+
+    if (storageError) {
+      throw new HTTPError(500, "STORAGE_ERROR", storageError.message);
+    }
+
+    // Delete from database
+    const { error: dbError } = await adminClient
+      .from("ticket_attachments")
+      .delete()
+      .eq("id", attachmentId)
+      .eq("ticket_id", id);
+
+    if (dbError) throw new HTTPError(500, "DATABASE_ERROR", dbError.message);
+
+    // Write activity event
+    await adminClient.from("ticket_activity").insert({
+      ticket_id: id,
+      actor_id: auth.user.id,
+      event_type: "attachment_deleted",
+      payload: { filename: attachment.filename },
+    });
+
+    // Update ticket updated_at
+    await adminClient
+      .from("support_tickets")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

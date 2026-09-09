@@ -14,6 +14,7 @@ import {
   getAttachmentUploadUrl,
   createAttachmentRecord,
   getAttachmentDownloadUrl,
+  deleteAttachment,
   // Legacy / kept endpoints
   getSupportTicketById,
   getFailedAutomationQueue,
@@ -107,6 +108,12 @@ router.get(
   rateLimit(30, 60000),
   requirePermission("support.read"),
   getAttachmentDownloadUrl,
+);
+router.delete(
+  "/tickets/:id/attachments/:attachmentId",
+  rateLimit(20, 60000),
+  requirePermission("support.review"),
+  deleteAttachment,
 );
 
 // ── Ticket creation ──────────────────────────────────────────────────────────
