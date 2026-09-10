@@ -40,7 +40,7 @@ app.use(
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
   process.env.VITE_FRONTEND_URL ||
-  "http://localhost:5173"
+  "http://localhost:5173,http://localhost:5174"
 ).split(",");
 
 app.use(
@@ -108,6 +108,7 @@ app.use("/api/v1/cases", casesRoutes);
 app.use("/api/v1/stores", storesRoutes);
 app.use("/api/v1/fraud", fraudRoutes);
 app.use("/api/v1/executive", executiveRoutes);
+app.use("/api/v1/executive-assistant", executiveRoutes);
 app.use("/api/v1/customers", customersRoutes);
 app.use("/api/v1/search", searchRoutes);
 app.use("/api/v1/admin", adminRoutes);

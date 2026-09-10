@@ -140,7 +140,7 @@ export class DeterministicInsightsProvider {
 
   /**
    * Handles a free-form question from the executive chatbot.
-   * Builds DB context, then uses an LLM or deterministic fallback.
+   * Uses deterministic keyword-matched answers grounded on real DB metrics.
    */
   public async chat(question: string): Promise<InsightAnswer> {
     const ctx = await this.buildContext();
@@ -154,17 +154,7 @@ export class DeterministicInsightsProvider {
       topCategories,
     } = ctx;
 
-    // Try LLM if configured
-    const googleApiKey = process.env.GOOGLE_AI_API_KEY;
-    if (googleApiKey) {
-      try {
-        return await this.callGemini(question, ctx, googleApiKey);
-      } catch (err) {
-        console.error("[InsightsService] LLM call failed, falling back to deterministic:", err);
-      }
-    }
-
-    // Deterministic fallback — keyword-matched answers grounded on real DB metrics
+    // Deterministic engine — keyword-matched answers grounded on real DB metrics
     return this.deterministicAnswer(question, {
       avgPulse,
       criticalStores,
@@ -174,69 +164,6 @@ export class DeterministicInsightsProvider {
       worstStores,
       topCategories,
     });
-  }
-
-  private async callGemini(
-    question: string,
-    ctx: NetworkContext,
-    apiKey: string,
-  ): Promise<InsightAnswer> {
-    const contextSummary = `
-Network overview (live):
-- Average PulseScore: ${ctx.avgPulse}/100
-- Critical stores (PulseScore < 60): ${ctx.criticalStores}
-- Active open complaints: ${ctx.activeCases}
-- SLA breaches: ${ctx.slaBreached}
-- P1 (critical) cases: ${ctx.p1Cases}
-- Worst 5 stores: ${ctx.worstStores.map((s) => `${s.id} ${s.name} (Pulse ${s.pulse}, SLA ${s.sla}%, Refunds ${s.refundRate}%)`).join("; ")}
-- Top complaint categories: ${ctx.topCategories.map((c) => `${c.category}: ${c.count}`).join(", ")}
-`.trim();
-
-    const prompt = `You are a DarkOps executive intelligence assistant. You have access to the following live operational data from the database:
-
-${contextSummary}
-
-Answer this question concisely and factually based ONLY on the data above. Do not speculate. Return a JSON object with these fields:
-- answer: string (2-3 sentence factual answer)
-- metrics: array of { label, value, tone } where tone is 'ok'|'warn'|'crit'|'neutral'
-- stores: array of { id, note } for referenced stores
-- causes: array of string (contributing causes)
-- action: string (recommended action for ops leadership)
-- sources: string (brief description of data sources used)
-
-Question: ${question}`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 800 },
-        }),
-      },
-    );
-
-    if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-
-    const data = (await response.json()) as any;
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    // Extract JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON in LLM response");
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      question,
-      answer: parsed.answer || "No answer available.",
-      metrics: parsed.metrics || [],
-      stores: parsed.stores || [],
-      causes: parsed.causes || [],
-      action: parsed.action || "Consult the operations team.",
-      sources: parsed.sources || "Live operational data",
-    };
   }
 
   private deterministicAnswer(question: string, ctx: NetworkContext): InsightAnswer {

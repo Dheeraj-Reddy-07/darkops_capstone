@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
+import { ExecutiveAssistant } from "@/components/executive/ExecutiveAssistant";
 
 export const Route = createFileRoute("/executive/")({
   head: () => ({
@@ -264,7 +265,7 @@ function ExecutiveOverviewContent({
         />
       </div>
 
-      <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_400px]">
+      <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_500px]">
         <Panel>
           <PanelHeader
             title="Complaint volume vs resolved - 30 days"
@@ -308,51 +309,7 @@ function ExecutiveOverviewContent({
           </div>
         </Panel>
 
-        <Panel>
-          <PanelHeader title="Red alerts" subtitle="Needs a leadership decision." />
-          <div className="max-h-64 overflow-y-auto">
-            <ul>
-              {(RED_ALERTS || []).map((a: any) => (
-                <li key={a.id}>
-                  {canAccessStores && a.storeId ? (
-                    <Link
-                      to="/dark-stores/$id"
-                      params={{ id: a.storeId }}
-                      className="row-hover flex items-start gap-3 border-b border-border/70 px-4 py-3 last:border-0"
-                    >
-                      <span
-                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${a.severity === "crit" ? "bg-crit" : "bg-warn"}`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <p className="truncate text-[13px] font-medium">{a.title}</p>
-                          <span className="num text-[11px] text-muted-foreground">{a.id}</span>
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{a.detail}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{a.ago}</p>
-                      </div>
-                      <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                    </Link>
-                  ) : (
-                    <div className="flex items-start gap-3 border-b border-border/70 px-4 py-3 last:border-0 opacity-60">
-                      <span
-                        className={`mt-1.5 size-1.5 shrink-0 rounded-full ${a.severity === "crit" ? "bg-crit" : "bg-warn"}`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <p className="truncate text-[13px] font-medium">{a.title}</p>
-                          <span className="num text-[11px] text-muted-foreground">{a.id}</span>
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{a.detail}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{a.ago}</p>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Panel>
+        <ExecutiveAssistant />
       </div>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_400px]">

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { createSupabaseServiceRoleClient } from "../lib/supabase";
 import { DeterministicInsightsProvider } from "../services/insights.service";
+import { ExecutiveAssistantService } from "../services/executive-assistant.service";
 
 export const getMetrics = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -190,6 +191,29 @@ export const chatInsights = async (req: Request, res: Response, next: NextFuncti
     const provider = new DeterministicInsightsProvider();
     const answer = await provider.chat(question.trim());
     res.status(200).json({ answer });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assistantQuery = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { question, context } = req.body;
+    
+    if (!question || typeof question !== "string" || question.trim().length === 0) {
+      res.status(400).json({
+        error: {
+          code: "INVALID_QUESTION",
+          message: "question is required and must be a non-empty string",
+        },
+      });
+      return;
+    }
+
+    const assistant = new ExecutiveAssistantService();
+    const response = await assistant.query(question.trim(), context);
+    
+    res.status(200).json(response);
   } catch (error) {
     next(error);
   }
