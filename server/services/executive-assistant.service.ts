@@ -930,14 +930,14 @@ export class ExecutiveAssistantService {
     const worstStores = await this.tools.getStoreRankings("pulse_asc", 3);
 
     const worstList = worstStores
-      .map((s, i) => `${i + 1}. **${s.name}** (\`${s.id}\`, ${s.city}) — Pulse **${s.pulse}/100**, ${s.openComplaints} open complaints`)
+      .map((s, i) => `${i + 1}. **${s.name}** (\`${s.id}\`, ${s.city}) - Pulse **${s.pulse}/100**, ${s.openComplaints} open complaints`)
       .join("\n");
 
     const worstStore = worstStores[0];
     const synthesis = `**Executive Synthesis:** 73.5% of dark stores (${kpis.criticalStores} of ${kpis.storeCount}) are running below the critical 60-point threshold. Score deductions are primarily triggered by unresolved SLA breaches and unaddressed chiller equipment breakdowns.`;
     const recommendation = `**Recommended Action:** Dispatch emergency maintenance technicians to inspect refrigeration units at ${worstStore ? `\`${worstStore.id}\` (${worstStore.name})` : "low-scoring stores"} to mitigate inventory spoilage.`;
 
-    const answer = `### PulseScore Fleet Health & Distribution\n\n• **Fleet Average:** ${kpis.avgPulse}/100 across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities.\n• **Health Breakdown:** ${kpis.criticalStores} stores in critical status (<60), ${kpis.atRiskStores} at risk (60–79), and ${kpis.healthyStores} healthy (80+).\n• **Lowest Scoring Dark Stores:**\n${worstList || "• None recorded"}\n• **Score Penalty Drivers:** Deductions are predominantly caused by ${kpis.activeCriticalAlerts} active equipment faults and ${kpis.slaBreached} SLA breaches in open support tickets.\n\n${synthesis}\n\n${recommendation}`;
+    const answer = `### PulseScore Fleet Health & Distribution\n\n• **Fleet Average:** ${kpis.avgPulse}/100 across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities.\n• **Health Breakdown:** ${kpis.criticalStores} stores in critical status (<60), ${kpis.atRiskStores} at risk (60-79), and ${kpis.healthyStores} healthy (80+).\n• **Lowest Scoring Dark Stores:**\n${worstList || "• None recorded"}\n• **Score Penalty Drivers:** Deductions are predominantly caused by ${kpis.activeCriticalAlerts} active equipment faults and ${kpis.slaBreached} SLA breaches in open support tickets.\n\n${synthesis}\n\n${recommendation}`;
 
     return {
       intent: "PULSE_OVERVIEW",
@@ -1007,7 +1007,7 @@ export class ExecutiveAssistantService {
 
     if (raw.includes("how bad")) {
       const riskLevel = sla.breachRate > 40 ? "HIGH RISK" : "MODERATE RISK";
-      headline = `Operational Severity Assessment (${riskLevel} — ${sla.breachRate}% SLA breach rate)`;
+      headline = `Operational Severity Assessment (${riskLevel} - ${sla.breachRate}% SLA breach rate)`;
     } else if (raw.includes("fixing") || raw.includes("fix") || raw.includes("action")) {
       headline = "Prioritized Operational Fixes Needed Across Dark Stores";
     } else if (raw.includes("going wrong") || raw.includes("wrong")) {
@@ -1164,7 +1164,7 @@ export class ExecutiveAssistantService {
       .slice(0, 4)
       .map(
         (c, i) =>
-          `${i + 1}. **${CATEGORY_LABEL_MAP[c.category] || c.category}** — ${c.count} cases (**${c.percentage}%** of total volume)`,
+          `${i + 1}. **${CATEGORY_LABEL_MAP[c.category] || c.category}** - ${c.count} cases (**${c.percentage}%** of total volume)`,
       )
       .join("\n");
 
@@ -1223,7 +1223,7 @@ export class ExecutiveAssistantService {
     const storeLines = stores
       .map(
         (s, i) =>
-          `${i + 1}. **${s.name}** (\`${s.id}\`, ${s.city}) — ${s.openComplaints} open complaints, Pulse **${s.pulse}/100**, ${s.slaBreaches} SLA breaches`,
+          `${i + 1}. **${s.name}** (\`${s.id}\`, ${s.city}) - ${s.openComplaints} open complaints, Pulse **${s.pulse}/100**, ${s.slaBreaches} SLA breaches`,
       )
       .join("\n");
 
@@ -1359,7 +1359,7 @@ export class ExecutiveAssistantService {
     const pulseDiff = curDetail.currentPulse - (priorDetail?.currentPulse || curDetail.currentPulse);
     const pulseSign = pulseDiff >= 0 ? `+${pulseDiff}` : `${pulseDiff}`;
 
-    const answer = `Comparative performance for ${curDetail.id} (${curDetail.name}) — ${currentRange.label} vs ${priorRange.label}: Complaint volume changed by ${pctSign} (${curCount} cases vs ${priorCount} cases, delta of ${sign}). Store PulseScore changed by ${pulseSign} points (currently ${curDetail.currentPulse}/100 vs ${priorDetail?.currentPulse || curDetail.currentPulse}/100). SLA breaches changed from ${priorDetail?.slaBreaches || 0} to ${curDetail.slaBreaches}.`;
+    const answer = `Comparative performance for ${curDetail.id} (${curDetail.name}) - ${currentRange.label} vs ${priorRange.label}: Complaint volume changed by ${pctSign} (${curCount} cases vs ${priorCount} cases, delta of ${sign}). Store PulseScore changed by ${pulseSign} points (currently ${curDetail.currentPulse}/100 vs ${priorDetail?.currentPulse || curDetail.currentPulse}/100). SLA breaches changed from ${priorDetail?.slaBreaches || 0} to ${curDetail.slaBreaches}.`;
 
     return {
       intent: "STORE_COMPARISON",
@@ -1480,7 +1480,7 @@ export class ExecutiveAssistantService {
         { label: "Pickers / Riders", value: `${detail.pickers} / ${detail.riders}`, tone: "neutral" },
       ],
       evidence: [
-        { label: "Store", value: `${detail.id} — ${detail.name}` },
+        { label: "Store", value: `${detail.id} - ${detail.name}` },
         { label: "Manager", value: detail.managerName },
         { label: "Zone", value: detail.zone },
         { label: "Time period", value: parsed.timeRange.label },
@@ -1514,7 +1514,7 @@ export class ExecutiveAssistantService {
       .slice(0, 4)
       .map(
         (c, i) =>
-          `${i + 1}. **${c.city}** — ${c.complaintsCount} complaints across ${c.storeCount} dark stores (Avg Pulse: **${c.avgPulse}/100**, ${c.slaBreaches} SLA breaches)`,
+          `${i + 1}. **${c.city}** - ${c.complaintsCount} complaints across ${c.storeCount} dark stores (Avg Pulse: **${c.avgPulse}/100**, ${c.slaBreaches} SLA breaches)`,
       )
       .join("\n");
 
@@ -1860,7 +1860,7 @@ export class ExecutiveAssistantService {
         "Auto-resolution uses deterministic NLP classification to identify simple refund-eligible cases (like missing items) and automatically routes them for processing without manual agent intervention.";
     } else if (q.includes("pulsescore")) {
       answer =
-        "PulseScore is a composite operational health index (12–100) computed from penalty deductions: equipment failures (up to 25 pts), SLA breaches (up to 25 pts), refund rates (up to 20 pts), delivery delays (up to 15 pts), picker delays (up to 10 pts), and inventory discrepancies (up to 5 pts).";
+        "PulseScore is a composite operational health index (12-100) computed from penalty deductions: equipment failures (up to 25 pts), SLA breaches (up to 25 pts), refund rates (up to 20 pts), delivery delays (up to 15 pts), picker delays (up to 10 pts), and inventory discrepancies (up to 5 pts).";
     } else if (q.includes("llm") || q.includes("nlp")) {
       answer =
         "DarkOps uses a deterministic NLP classification engine backed by weighted scoring, exact entity extraction, and database analytics. It does NOT use external LLMs or unexplainable generative AI models.";

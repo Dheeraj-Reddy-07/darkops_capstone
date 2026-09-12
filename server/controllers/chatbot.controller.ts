@@ -121,7 +121,7 @@ function explainStatus(status: string, category: string, customerStatusLabel: st
     return `Your **${cat}** issue is currently under review by our support team. A team member has picked it up and is looking into it. You don't need to take any action right now.`;
   }
   if (s === "in_progress") {
-    return `Your **${cat}** issue is actively being worked on by our support team. Resolution is in progress — you will be updated when it's complete.`;
+    return `Your **${cat}** issue is actively being worked on by our support team. Resolution is in progress - you will be updated when it's complete.`;
   }
   if (s === "auto_resolved") {
     return `Your **${cat}** issue was resolved automatically by our support system. Check the resolution details on your issue page.`;
@@ -130,7 +130,7 @@ function explainStatus(status: string, category: string, customerStatusLabel: st
     return `Your **${cat}** issue has been resolved. You can view the resolution details on your **My Issues** page.`;
   }
   if (s === "sla_expired") {
-    return `Your **${cat}** issue has been open longer than our usual response window. Live support is now available — you can connect with an agent directly from your issue page.`;
+    return `Your **${cat}** issue has been open longer than our usual response window. Live support is now available - you can connect with an agent directly from your issue page.`;
   }
   if (s === "awaiting_customer") {
     return `Our team needs a bit more information from you to resolve your **${cat}** issue. Please check your email or messages for further details.`;
@@ -147,13 +147,13 @@ function explainWhyNotResolved(status: string, category: string, customerStatusL
     return `Your **${cat}** issue was received but hasn't been reviewed yet. It was submitted to our support queue and will be picked up shortly. You don't need to do anything right now.`;
   }
   if (s === "assigned" || s === "agent_queue") {
-    return `Your **${cat}** issue is currently under review by a support team member. It was routed for manual review rather than being resolved automatically — this is normal for this type of issue. No action is needed from you.`;
+    return `Your **${cat}** issue is currently under review by a support team member. It was routed for manual review rather than being resolved automatically - this is normal for this type of issue. No action is needed from you.`;
   }
   if (s === "in_progress") {
-    return `Your **${cat}** issue is being actively worked on. The support team is in the process of resolving it. This typically takes a little time — please check back soon.`;
+    return `Your **${cat}** issue is being actively worked on. The support team is in the process of resolving it. This typically takes a little time - please check back soon.`;
   }
   if (s === "sla_expired") {
-    return `Your **${cat}** issue has taken longer than our standard response window. You are now eligible for live support — navigate to the issue on your **My Issues** page and click **Connect with live support**.`;
+    return `Your **${cat}** issue has taken longer than our standard response window. You are now eligible for live support - navigate to the issue on your **My Issues** page and click **Connect with live support**.`;
   }
   if (s === "awaiting_customer") {
     return `Your **${cat}** issue is waiting on some additional information from you. Please check your email or messages and respond so the team can continue.`;
@@ -162,7 +162,7 @@ function explainWhyNotResolved(status: string, category: string, customerStatusL
     return `Your **${cat}** issue has actually been resolved! Check your **My Issues** page for the full resolution details.`;
   }
 
-  return `Your **${cat}** issue is currently **${customerStatusLabel || status}**. Our team is working through it — no action is needed from you unless you hear otherwise.`;
+  return `Your **${cat}** issue is currently **${customerStatusLabel || status}**. Our team is working through it - no action is needed from you unless you hear otherwise.`;
 }
 
 function explainNextSteps(status: string, category: string, isLiveCallEligible: boolean | undefined): string {
@@ -170,7 +170,7 @@ function explainNextSteps(status: string, category: string, isLiveCallEligible: 
   const s = (status || "").toLowerCase();
 
   if (s === "unassigned" || s === "received") {
-    return `Your **${cat}** issue is in our queue. The next step is for it to be picked up by a support team member — no action is required from you.`;
+    return `Your **${cat}** issue is in our queue. The next step is for it to be picked up by a support team member - no action is required from you.`;
   }
   if (s === "assigned" || s === "agent_queue") {
     return `A support team member is reviewing your **${cat}** issue. The next step is their review and decision on how to resolve it. You will be notified when there's an update.`;
@@ -179,13 +179,13 @@ function explainNextSteps(status: string, category: string, isLiveCallEligible: 
     return `Your **${cat}** issue is being resolved right now. The next step is the team completing the resolution and updating your issue status. Keep an eye on your **My Issues** page.`;
   }
   if (isLiveCallEligible || s === "sla_expired") {
-    return `Your **${cat}** issue has taken longer than expected. The next step available to you is **connecting with a live support agent** — go to your issue on the **My Issues** page and click **Connect with live support**.`;
+    return `Your **${cat}** issue has taken longer than expected. The next step available to you is **connecting with a live support agent** - go to your issue on the **My Issues** page and click **Connect with live support**.`;
   }
   if (s === "awaiting_customer") {
     return `The next step is for you to provide some additional information requested by the support team. Check your email or messages for details.`;
   }
   if (s === "resolved" || s === "closed" || s === "auto_resolved") {
-    return `Your **${cat}** issue has been resolved — there are no further steps needed. If you have a new issue with an order, you can report it from the **Orders** tab.`;
+    return `Your **${cat}** issue has been resolved - there are no further steps needed. If you have a new issue with an order, you can report it from the **Orders** tab.`;
   }
 
   return `Our team is reviewing your **${cat}** issue. The next step is their assessment and resolution. You will receive an update when there is progress.`;
@@ -303,7 +303,7 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
       if (primaryIssue) {
         const label = (primaryIssue as any).customer_status_label || primaryIssue.status;
         const cat = formatCategory(primaryIssue.category);
-        response = `Hello ${firstName}! I can see you have an open issue — your **${cat}** report is currently **${label}**.\n\nYou can ask me:\n- *"Why hasn't my issue been resolved?"*\n- *"What happens next with my issue?"*\n- *"Can I talk to support?"*`;
+        response = `Hello ${firstName}! I can see you have an open issue - your **${cat}** report is currently **${label}**.\n\nYou can ask me:\n- *"Why hasn't my issue been resolved?"*\n- *"What happens next with my issue?"*\n- *"Can I talk to support?"*`;
       } else {
         response = `Hello ${firstName}! I can help you understand your reported issues, resolution status, and support options. What would you like to know?`;
       }
@@ -378,7 +378,7 @@ export const handleCustomerChat = async (req: Request, res: Response, next: Next
         const eligibleIssue = openIssues.find((c) => (c as any).is_live_call_eligible);
         if (eligibleIssue) {
           const cat = formatCategory(eligibleIssue.category);
-          response = `Yes — live support is available for your **${cat}** issue (${eligibleIssue.complaint_ref}).\n\nGo to **My Issues**, open that issue, and tap **Connect with live support** to speak with an agent.`;
+          response = `Yes - live support is available for your **${cat}** issue (${eligibleIssue.complaint_ref}).\n\nGo to **My Issues**, open that issue, and tap **Connect with live support** to speak with an agent.`;
         } else {
           const mostRecent = openIssues[0];
           const cat = formatCategory(mostRecent.category);

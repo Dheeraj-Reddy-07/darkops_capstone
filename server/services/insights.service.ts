@@ -210,7 +210,7 @@ export class DeterministicInsightsProvider {
           `${criticalStores} stores have PulseScore below 60`,
         ],
         action: "Prioritize P1 case resolution and add agents to stores with >20% SLA breach rate.",
-        sources: "Live complaints table, pulse_scores — current snapshot",
+        sources: "Live complaints table, pulse_scores - current snapshot",
       };
     }
 
@@ -239,7 +239,7 @@ export class DeterministicInsightsProvider {
           `Top complaint category: ${topCategories[0]?.category || "missing items"}`,
         ],
         action: `Assign an operations lead to each of the ${criticalStores} critical stores and require daily PulseScore reviews.`,
-        sources: "pulse_scores, store_metrics_snapshots — live data",
+        sources: "pulse_scores, store_metrics_snapshots - live data",
       };
     }
 
@@ -310,7 +310,7 @@ export class DeterministicInsightsProvider {
       ],
       action:
         "Focus on the 5 worst-scoring stores and ensure P1 cases are assigned within 15 minutes.",
-      sources: "pulse_scores, complaints, store_metrics_snapshots — live snapshot",
+      sources: "pulse_scores, complaints, store_metrics_snapshots - live snapshot",
     };
   }
 }
