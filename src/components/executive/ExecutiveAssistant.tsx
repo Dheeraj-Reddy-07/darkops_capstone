@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Panel, PanelHeader } from "@/components/ops/primitives";
-import { Loader2, Send, Sparkles, ChevronRight, AlertCircle } from "lucide-react";
+import { Loader2, Send, Sparkles, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
 
@@ -15,6 +15,7 @@ interface AssistantResponse {
   evidence: Array<{ label: string; value: string }>;
   suggestedQuestions: string[];
   drillDown?: { label: string; route: string; params?: Record<string, string> };
+  context?: any;
 }
 
 interface Message {
@@ -22,6 +23,14 @@ interface Message {
   content: string;
   response?: AssistantResponse;
   context?: any;
+  isError?: boolean;
+  failedQuestion?: string;
+}
+
+interface ExecutiveAssistantProps {
+  dashboardContext?: {
+    timeFilter?: string;
+  };
 }
 
 const toneColors: Record<string, string> = {
@@ -40,17 +49,34 @@ const suggestedQuestions = [
   "Are there any fraud risks?",
 ];
 
-export function ExecutiveAssistant() {
+export function ExecutiveAssistant({ dashboardContext }: ExecutiveAssistantProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
   const mutation = useMutation({
-    mutationFn: async ({ question, context }: { question: string; context?: any }) => {
+    mutationFn: async ({
+      question,
+      context,
+      dashboardContext: localDashboardContext,
+    }: {
+      question: string;
+      context?: any;
+      dashboardContext?: { timeFilter?: string };
+    }) => {
       const response = await fetchApi("/executive/assistant/query", {
         method: "POST",
-        body: JSON.stringify({ question, context }),
+        body: JSON.stringify({
+          question,
+          context,
+          dashboardContext: localDashboardContext || dashboardContext,
+        }),
       });
       return response as AssistantResponse;
     },
@@ -66,13 +92,15 @@ export function ExecutiveAssistant() {
       ]);
       setIsLoading(false);
     },
-    onError: () => {
+    onError: (_err, variables) => {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content: "I couldn't retrieve the operational data right now. Please try again.",
           response: undefined,
+          isError: true,
+          failedQuestion: variables.question,
         },
       ]);
       setIsLoading(false);
@@ -94,7 +122,7 @@ export function ExecutiveAssistant() {
     setIsLoading(true);
 
     const context = getLatestContext();
-    mutation.mutate({ question: userMessage, context });
+    mutation.mutate({ question: userMessage, context, dashboardContext });
   };
 
   const handleSuggestedQuestion = (question: string) => {
@@ -104,7 +132,7 @@ export function ExecutiveAssistant() {
     setIsLoading(true);
 
     const context = getLatestContext();
-    mutation.mutate({ question: userMessage, context });
+    mutation.mutate({ question: userMessage, context, dashboardContext });
   };
 
   return (
@@ -201,7 +229,7 @@ export function ExecutiveAssistant() {
                               {message.response.suggestedQuestions.slice(0, 3).map((question, idx) => (
                                 <button
                                   key={idx}
-                                  onClick={() => setInput(question)}
+                                  onClick={() => handleSuggestedQuestion(question)}
                                   className="flex items-center gap-1.5 rounded-sm border border-border bg-surface-2 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
                                 >
                                   {question}
@@ -236,6 +264,20 @@ export function ExecutiveAssistant() {
                           )}
                         </>
                       )}
+
+                      {message.isError && message.failedQuestion && (
+                        <div className="pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSuggestedQuestion(message.failedQuestion!)}
+                            className="h-7 gap-1.5 text-xs"
+                          >
+                            <RefreshCw className="size-3" />
+                            Retry query
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -247,6 +289,7 @@ export function ExecutiveAssistant() {
                   <p className="text-sm text-muted-foreground">Analyzing network data...</p>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>

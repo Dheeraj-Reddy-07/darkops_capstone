@@ -362,7 +362,7 @@ function ExecutiveOverviewContent({
           </div>
         </Panel>
 
-        <ExecutiveAssistant />
+        <ExecutiveAssistant dashboardContext={{ timeFilter }} />
       </div>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_400px]">

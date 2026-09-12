@@ -1,4 +1,16 @@
-import { createSupabaseServiceRoleClient } from "../lib/supabase";
+import {
+  CopilotTools,
+  TimeRange,
+  NetworkKPIs,
+  ComplaintAnalytics,
+  StoreRankingItem,
+  StoreDetailData,
+  CityAnalyticsItem,
+  SLAAnalytics,
+  AutomationMetrics,
+  RiskAnalytics,
+  AnomalyItem,
+} from "./copilot-tools";
 
 export interface AssistantResponse {
   intent: string;
@@ -18,12 +30,6 @@ export interface AssistantResponse {
   };
 }
 
-interface TimeRange {
-  start: Date;
-  end: Date;
-  label: string;
-}
-
 interface ParsedQuery {
   intent: string;
   timeRange: TimeRange;
@@ -31,16 +37,6 @@ interface ParsedQuery {
   parameters: Record<string, any>;
   entities: string[];
   confidence: number;
-}
-
-interface IntentDefinition {
-  intent: string;
-  phrases: string[];
-  keywords: string[];
-  negativeKeywords?: string[];
-  requiredSignals?: string[];
-  optionalSignals?: string[];
-  weight: number;
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -54,300 +50,17 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
 };
 
 export class ExecutiveAssistantService {
-  private supabase = createSupabaseServiceRoleClient();
-
-  private intentDefinitions: IntentDefinition[] = [
-    {
-      intent: "NETWORK_SUMMARY",
-      phrases: [
-        "what's happening",
-        "what is happening",
-        "how are we doing",
-        "operational summary",
-        "what's going on",
-        "what is going on",
-        "network health",
-        "health check",
-        "situation today",
-        "should i know",
-        "biggest issues",
-        "what are the biggest operational issues",
-        "what are the biggest operational issues right now",
-        "biggest operational issues",
-        "network status",
-        "overall status",
-        "quick health check",
-        "network operations",
-        "overview of network",
-        "what's going on right now",
-        "network overview",
-      ],
-      keywords: ["happening", "doing", "summary", "health", "status", "situation", "overview", "network"],
-      weight: 1.1,
-    },
-    {
-      intent: "COMPLAINT_TRENDS",
-      phrases: [
-        "are complaints increasing",
-        "are issues going up",
-        "what's changed",
-        "why are complaints rising",
-        "why are issues rising",
-        "complaint trends",
-        "issue trends",
-        "complaint volume",
-        "issue volume",
-        "spike",
-        "increasing",
-        "decreasing",
-        "trend",
-        "compare",
-        "versus",
-        "vs",
-        "better than yesterday",
-        "worse than last week",
-        "how does this compare",
-        "compare complaints this week with last week",
-      ],
-      keywords: ["trend", "trends", "increasing", "decreasing", "rising", "spike", "spiking", "compare", "versus", "vs", "changed", "change", "difference", "growth"],
-      weight: 1.0,
-    },
-    {
-      intent: "COMPLAINT_CATEGORIES",
-      phrases: [
-        "what are customers complaining about",
-        "what's driving complaints",
-        "which issue types",
-        "main complaint",
-        "top categories",
-        "complaint categories",
-        "issue categories",
-        "driving complaints",
-        "what types of issues",
-        "biggest complaint drivers",
-        "breakdown of complaints",
-        "which issue types are highest",
-      ],
-      keywords: ["category", "categories", "type", "types", "complain", "complaining", "complaints", "driving", "driver", "drivers", "main", "reason", "reasons"],
-      weight: 1.0,
-    },
-    {
-      intent: "STORE_PERFORMANCE",
-      phrases: [
-        "which stores have the most complaints",
-        "which stores need attention",
-        "which stores are driving that",
-        "which stores are driving",
-        "which stores are driving issues",
-        "problem stores",
-        "struggling stores",
-        "worst stores",
-        "dark stores",
-        "locations need attention",
-        "store performance",
-        "bad stores",
-        "elevated complaints",
-        "high complaint stores",
-        "which dark stores are struggling",
-        "which locations are performing badly",
-        "where are complaints concentrated",
-        "unusually high issue volume",
-        "show stores with elevated complaints",
-        "show problem stores",
-        "show me problem stores",
-        "top stores",
-      ],
-      keywords: ["store", "stores", "location", "locations", "darkstore", "darkstores", "outlet", "outlets", "hub", "hubs", "struggling", "problem", "worst", "attention", "badly", "driving"],
-      weight: 1.0,
-    },
-    {
-      intent: "CITY_PERFORMANCE",
-      phrases: [
-        "which cities have the most issues",
-        "where are problems concentrated",
-        "which cities need attention",
-        "city performance",
-        "regional performance",
-        "cities struggling",
-        "problem cities",
-        "which regions are struggling",
-        "show me city performance",
-        "city breakdown",
-        "which cities",
-        "regional issues",
-      ],
-      keywords: ["city", "cities", "region", "regional", "regionally", "area", "areas", "zone", "zones"],
-      weight: 1.0,
-    },
-    {
-      intent: "SLA_PERFORMANCE",
-      phrases: [
-        "how many cases are overdue",
-        "where are sla breaches",
-        "how is support doing",
-        "missed sla",
-        "sla breaches",
-        "sla performance",
-        "overdue cases",
-        "support performance",
-        "how many issues missed sla",
-        "which locations have the most sla problems",
-        "where are sla breaches happening",
-        "sla issues",
-      ],
-      keywords: ["sla", "breach", "breached", "breaches", "overdue", "late", "support", "deadline", "missed"],
-      weight: 1.0,
-    },
-    {
-      intent: "AUTOMATION_PERFORMANCE",
-      phrases: [
-        "how is automation performing",
-        "how much are we resolving automatically",
-        "auto-resolved",
-        "automation effectiveness",
-        "manual work",
-        "auto resolution",
-        "automation rate",
-        "how effective is automation",
-        "how many issues are auto-resolved",
-        "how much manual work is left",
-        "bot resolution",
-        "auto resolution percentage",
-      ],
-      keywords: ["automation", "auto", "resolved", "auto-resolved", "auto-resolution", "manual", "effective", "effectiveness", "rate"],
-      weight: 1.0,
-    },
-    {
-      intent: "RISK_SUMMARY",
-      phrases: [
-        "any fraud risks",
-        "suspicious patterns",
-        "need review",
-        "risk areas",
-        "fraud cases",
-        "suspicious",
-        "fraud risk",
-        "what's happening with fraud",
-        "fraud overview",
-        "suspicious activity",
-        "cases pending review",
-        "where are the risk areas",
-        "are there suspicious patterns",
-      ],
-      keywords: ["fraud", "risk", "suspicious", "review", "pattern", "patterns", "flagged", "anomalies"],
-      weight: 1.0,
-    },
-    {
-      intent: "STORE_DETAIL",
-      phrases: [
-        "tell me more about",
-        "why is",
-        "details about",
-        "more information",
-        "breakdown for",
-        "how is",
-        "store detail",
-        "what is happening at",
-        "why is the top store struggling",
-        "why is the first one high",
-        "what are customers complaining about there",
-        "compare it with last week",
-        "compare that with last week",
-        "what should i investigate first",
-      ],
-      keywords: ["detail", "breakdown", "store", "why", "more", "first", "second", "top", "there", "investigate"],
-      weight: 0.9,
-    },
-    {
-      intent: "GENERAL_DARKOPS_KNOWLEDGE",
-      phrases: [
-        "what is darkops",
-        "what does darkops do",
-        "why does darkops exist",
-        "how does auto-resolution work",
-        "what happens when automation fails",
-        "role of executive dashboard",
-        "operations dashboard",
-        "fraud dashboard",
-        "connect with commerce",
-        "execute refunds",
-        "nlp an llm",
-        "is the nlp an llm",
-        "does darkops use an llm",
-        "is this an ai",
-        "is this an llm",
-      ],
-      keywords: ["darkops", "automation", "dashboard", "refund", "refunds", "nlp", "llm"],
-      weight: 0.8,
-    },
-    {
-      intent: "HELP",
-      phrases: [
-        "what can you do",
-        "what can i ask",
-        "help",
-        "how can you help",
-        "capabilities",
-        "what questions",
-        "how can you help me",
-      ],
-      keywords: ["help", "capabilities", "questions", "can you"],
-      weight: 0.9,
-    },
-  ];
-
-  private darkOpsKnowledge: Array<{ keywords: string[]; answer: string }> = [
-    {
-      keywords: ["what is darkops", "explain darkops", "about darkops"],
-      answer: "DarkOps is an operational intelligence and exception management platform for quick-commerce dark store operations. It monitors network health, manages complaints, automates resolution, and provides real-time analytics for decision-making.",
-    },
-    {
-      keywords: ["what does darkops do", "function of darkops"],
-      answer: "DarkOps provides real-time monitoring of dark store operations, automated complaint classification and routing, SLA tracking, fraud detection, and executive dashboards for network-wide operational intelligence.",
-    },
-    {
-      keywords: ["why does darkops exist", "purpose of darkops"],
-      answer: "DarkOps exists to provide operational visibility and exception management for quick-commerce networks, enabling rapid response to issues, automation of routine cases, and data-driven decision making for operations leadership.",
-    },
-    {
-      keywords: ["how does auto-resolution work", "auto resolution work"],
-      answer: "Auto-resolution uses deterministic NLP classification to identify simple refund-eligible cases (like missing items) and automatically routes them for processing without manual agent intervention.",
-    },
-    {
-      keywords: ["what happens when automation fails", "automation fails"],
-      answer: "When automation cannot confidently classify or resolve a case, it routes to the manual support queue for agent review and decision.",
-    },
-    {
-      keywords: ["role of executive dashboard", "executive dashboard"],
-      answer: "The Executive dashboard provides network-wide operational intelligence including PulseScore, SLA compliance, complaint trends, store performance, and risk signals for leadership decision-making.",
-    },
-    {
-      keywords: ["operations dashboard"],
-      answer: "The Operations dashboard provides detailed operational views for day-to-day management including active cases, queue management, and store-specific performance metrics.",
-    },
-    {
-      keywords: ["fraud dashboard"],
-      answer: "The Fraud dashboard provides risk monitoring and review workflows for suspicious complaint patterns, fraud detection, and investigation management.",
-    },
-    {
-      keywords: ["connect with commerce", "commerce platform"],
-      answer: "DarkOps receives complaint data from the commerce platform via API integrations and can send resolution decisions back for automated processing.",
-    },
-    {
-      keywords: ["execute refunds", "does darkops execute refunds", "issue refunds"],
-      answer: "DarkOps can recommend and trigger refund decisions through integration with the commerce platform's payment systems for approved cases.",
-    },
-    {
-      keywords: ["nlp an llm", "is the nlp an llm", "use an llm", "using an llm", "is this an llm"],
-      answer: "DarkOps uses a deterministic NLP classification engine backed by weighted scoring, exact entity extraction, and database analytics. It does NOT use external LLMs or unexplainable generative AI models.",
-    },
-  ];
+  private tools = new CopilotTools();
 
   /**
-   * Main entry point - parse question and return analytical response
+   * Main query execution entry point
    */
-  async query(question: string, context?: any): Promise<AssistantResponse> {
-    const parsed = this.parseQuestion(question, context);
+  async query(
+    question: string,
+    context?: any,
+    dashboardContext?: { timeFilter?: string },
+  ): Promise<AssistantResponse> {
+    const parsed = this.parseQuestion(question, context, dashboardContext);
 
     switch (parsed.intent) {
       case "NETWORK_SUMMARY":
@@ -358,16 +71,28 @@ export class ExecutiveAssistantService {
         return this.getComplaintCategories(parsed);
       case "STORE_PERFORMANCE":
         return this.getStorePerformance(parsed);
+      case "STORE_DETAIL":
+        return this.getStoreDetail(parsed);
+      case "STORE_ROOT_CAUSE":
+        return this.getStoreRootCause(parsed);
+      case "STORE_COMPARISON":
+        return this.getStoreComparison(parsed);
+      case "STORE_RECOMMENDATION":
+        return this.getStoreRecommendation(parsed);
       case "CITY_PERFORMANCE":
         return this.getCityPerformance(parsed);
+      case "CITY_COMPARISON":
+        return this.getCityComparison(parsed);
       case "SLA_PERFORMANCE":
         return this.getSlaPerformance(parsed);
       case "AUTOMATION_PERFORMANCE":
         return this.getAutomationPerformance(parsed);
       case "RISK_SUMMARY":
         return this.getRiskSummary(parsed);
-      case "STORE_DETAIL":
-        return this.getStoreDetail(parsed);
+      case "ANOMALIES_ALERTS":
+        return this.getAnomaliesAndAlerts(parsed);
+      case "PERIOD_COMPARISON":
+        return this.getPeriodComparison(parsed);
       case "GENERAL_DARKOPS_KNOWLEDGE":
         return this.getDarkOpsKnowledge(question);
       case "HELP":
@@ -378,122 +103,343 @@ export class ExecutiveAssistantService {
   }
 
   /**
-   * Intent detection and parameter extraction
+   * Semantic intent and entity parser
    */
-  private parseQuestion(question: string, context?: any): ParsedQuery {
+  private parseQuestion(
+    question: string,
+    context?: any,
+    dashboardContext?: { timeFilter?: string },
+  ): ParsedQuery {
     const q = question.toLowerCase().trim();
     const tokens = this.tokenize(q);
 
-    // Explicit check for out-of-scope queries (weather, sports, general writing)
-    if (this.isOutOfScope(q, tokens)) {
+    // 1. Explicit out of scope check
+    if (this.isOutOfScope(q)) {
       return {
         intent: "UNSUPPORTED",
-        timeRange: this.getDefaultTimeRange(),
+        timeRange: this.getTimeRange(q, dashboardContext),
         parameters: {},
         entities: [],
         confidence: 0,
       };
     }
 
-    // Check for conversational follow-ups using session context
-    if (context && (context.lastStore || context.lastCity || (context.lastResults && context.lastResults.length > 0) || context.lastIntent)) {
-      const followUp = this.detectFollowUpIntent(q, tokens, context);
-      if (followUp) {
-        return followUp;
+    // 2. Knowledge queries
+    if (
+      q.includes("what is darkops") ||
+      q.includes("how does auto-resolution work") ||
+      q.includes("nlp an llm") ||
+      q.includes("is this an llm") ||
+      q.includes("use an llm") ||
+      q.includes("pulsescore work") ||
+      q.includes("what is pulsescore")
+    ) {
+      return {
+        intent: "GENERAL_DARKOPS_KNOWLEDGE",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.98,
+      };
+    }
+
+    // 3. Help query
+    if (
+      q === "help" ||
+      q === "what can you do" ||
+      q === "what can you do?" ||
+      q.includes("what questions can i ask") ||
+      q.includes("what are your capabilities")
+    ) {
+      return {
+        intent: "HELP",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.95,
+      };
+    }
+
+    // 4. Follow-up detection using conversation context
+    if (context) {
+      const followUp = this.detectFollowUp(q, tokens, context, dashboardContext);
+      if (followUp) return followUp;
+    }
+
+    // 5. City-to-city comparison (e.g. "compare mumbai vs delhi")
+    const cityMatch = this.detectCityComparison(q);
+    if (cityMatch) {
+      return {
+        intent: "CITY_COMPARISON",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { city1: cityMatch.city1, city2: cityMatch.city2 },
+        entities: [cityMatch.city1, cityMatch.city2],
+        confidence: 0.95,
+      };
+    }
+
+    // 6. Direct entity matches (e.g. DS-1462)
+    const storeId = this.extractStoreId(q);
+    if (storeId) {
+      if (q.includes("why") || q.includes("struggling") || q.includes("problem") || q.includes("drop")) {
+        return {
+          intent: "STORE_ROOT_CAUSE",
+          timeRange: this.getTimeRange(q, dashboardContext),
+          parameters: { storeId },
+          entities: [storeId],
+          confidence: 0.95,
+        };
       }
-    }
-
-    // Score each intent
-    const scoredIntents = this.intentDefinitions.map((def) => ({
-      intent: def.intent,
-      score: this.calculateIntentScore(q, tokens, def),
-    }));
-
-    scoredIntents.sort((a, b) => b.score - a.score);
-
-    const topIntent = scoredIntents[0];
-    const confidence = topIntent.score;
-
-    if (confidence < 0.25) {
       return {
-        intent: "UNSUPPORTED",
-        timeRange: this.getDefaultTimeRange(),
-        parameters: {},
-        entities: [],
-        confidence: 0,
+        intent: "STORE_DETAIL",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { storeId },
+        entities: [storeId],
+        confidence: 0.95,
       };
     }
 
-    const timeRange = this.extractTimeRange(q);
-    const comparisonTimeRange = this.extractComparisonTimeRange(q, timeRange);
-    const entities = this.extractEntities(q, tokens);
-    const parameters = this.extractParameters(q, tokens, entities, context);
+    // 7. General Period Comparison (e.g. "compare complaints this week with last week")
+    if (
+      q.includes("compare") &&
+      (q.includes("last week") || q.includes("last month") || q.includes("yesterday") || q.includes("previous period"))
+    ) {
+      const timeRange = this.getTimeRange(q, dashboardContext);
+      const comparisonRange = this.getComparisonRange(q, timeRange);
+      return {
+        intent: "PERIOD_COMPARISON",
+        timeRange,
+        comparisonTimeRange: comparisonRange,
+        parameters: { metric: q.includes("sla") ? "sla_breaches" : "complaints" },
+        entities: [],
+        confidence: 0.92,
+      };
+    }
+
+    // 8. Anomalies & Alerts
+    if (
+      q.includes("unusual") ||
+      q.includes("alert") ||
+      q.includes("freezer") ||
+      q.includes("equipment") ||
+      q.includes("needs attention") ||
+      q.includes("concerned about") ||
+      q.includes("any problems")
+    ) {
+      return {
+        intent: "ANOMALIES_ALERTS",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.9,
+      };
+    }
+
+    // 9. Automation & Resolution
+    if (
+      q.includes("automation") ||
+      q.includes("auto-resolved") ||
+      q.includes("auto resolved") ||
+      q.includes("auto-approved") ||
+      q.includes("auto approved") ||
+      q.includes("manual intervention")
+    ) {
+      return {
+        intent: "AUTOMATION_PERFORMANCE",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.92,
+      };
+    }
+
+    // 10. Fraud & Risk
+    if (
+      q.includes("fraud") ||
+      q.includes("suspicious") ||
+      q.includes("risk review") ||
+      q.includes("fraud risk") ||
+      q.includes("risk pattern")
+    ) {
+      return {
+        intent: "RISK_SUMMARY",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.92,
+      };
+    }
+
+    // 11. SLA Performance
+    if (
+      q.includes("sla") ||
+      q.includes("breach") ||
+      q.includes("overdue") ||
+      q.includes("target 95") ||
+      q.includes("p1 case") ||
+      q.includes("compliance")
+    ) {
+      const city = this.extractCity(q);
+      return {
+        intent: "SLA_PERFORMANCE",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { city },
+        entities: city ? [city] : [],
+        confidence: 0.9,
+      };
+    }
+
+    // 12. Complaint Categories
+    if (
+      q.includes("category") ||
+      q.includes("categories") ||
+      q.includes("missing item") ||
+      q.includes("late delivery") ||
+      q.includes("damaged item") ||
+      q.includes("quality issue") ||
+      q.includes("complaining about") ||
+      q.includes("type of complaint")
+    ) {
+      const city = this.extractCity(q);
+      return {
+        intent: "COMPLAINT_CATEGORIES",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { city },
+        entities: city ? [city] : [],
+        confidence: 0.9,
+      };
+    }
+
+    // 13. City Performance
+    if (
+      q.includes("city") ||
+      q.includes("cities") ||
+      q.includes("regional") ||
+      q.includes("regions") ||
+      q.includes("where are complaints concentrated")
+    ) {
+      return {
+        intent: "CITY_PERFORMANCE",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.9,
+      };
+    }
+
+    // 14. Store Performance / Problem Stores
+    if (
+      q.includes("which store") ||
+      q.includes("which stores") ||
+      q.includes("what dark store") ||
+      q.includes("what dark stores") ||
+      q.includes("problem store") ||
+      q.includes("struggling") ||
+      q.includes("lowest pulse") ||
+      q.includes("worst store") ||
+      q.includes("stores have the most")
+    ) {
+      const city = this.extractCity(q);
+      return {
+        intent: "STORE_PERFORMANCE",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { city },
+        entities: city ? [city] : [],
+        confidence: 0.9,
+      };
+    }
+
+    // 15. Complaint Trends
+    if (
+      q.includes("trend") ||
+      q.includes("increasing") ||
+      q.includes("rising") ||
+      q.includes("going up") ||
+      q.includes("what's changed") ||
+      q.includes("what has changed") ||
+      q.includes("spike") ||
+      q.includes("backlog")
+    ) {
+      const city = this.extractCity(q);
+      return {
+        intent: "COMPLAINT_TRENDS",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { city },
+        entities: city ? [city] : [],
+        confidence: 0.9,
+      };
+    }
+
+    // 16. Network Summary / Availability
+    if (
+      q.includes("happening") ||
+      q.includes("operational summary") ||
+      q.includes("network health") ||
+      q.includes("how are we doing") ||
+      q.includes("availability") ||
+      q.includes("uptime") ||
+      q.includes("overall status") ||
+      q.includes("network status") ||
+      q.includes("overview") ||
+      q.includes("biggest operational") ||
+      q.includes("operational issue") ||
+      q.includes("operational issues") ||
+      q.includes("biggest issue") ||
+      q.includes("biggest problem") ||
+      q.includes("major issue")
+    ) {
+      return {
+        intent: "NETWORK_SUMMARY",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.9,
+      };
+    }
+
+    // Fallback: If any recognized city is in query
+    const cityInQuery = this.extractCity(q);
+    if (cityInQuery) {
+      return {
+        intent: "STORE_PERFORMANCE",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { city: cityInQuery },
+        entities: [cityInQuery],
+        confidence: 0.8,
+      };
+    }
 
     return {
-      intent: topIntent.intent,
-      timeRange,
-      comparisonTimeRange,
-      parameters,
-      entities,
-      confidence,
+      intent: "UNSUPPORTED",
+      timeRange: this.getTimeRange(q, dashboardContext),
+      parameters: {},
+      entities: [],
+      confidence: 0,
     };
   }
 
-  private isOutOfScope(question: string, tokens: string[]): boolean {
-    const outOfScopeTerms = ["weather", "cricket", "recipe", "write an email", "tell a joke", "who won", "football", "movie", "song"];
-    return outOfScopeTerms.some((term) => question.includes(term));
-  }
-
   /**
-   * Calculate intent score based on phrases, keywords, and signals
+   * Conversational context resolver for multi-turn dialogues
    */
-  private calculateIntentScore(question: string, tokens: string[], def: IntentDefinition): number {
-    let score = 0;
-
-    for (const phrase of def.phrases) {
-      if (question.includes(phrase)) {
-        score += 0.85;
-      }
-    }
-
-    for (const keyword of def.keywords) {
-      if (tokens.includes(keyword)) {
-        score += 0.3;
-      }
-    }
-
-    if (def.requiredSignals) {
-      const hasRequired = def.requiredSignals.every(
-        (signal) => tokens.includes(signal) || question.includes(signal)
-      );
-      if (!hasRequired) {
-        score *= 0.1;
-      }
-    }
-
-    score *= def.weight;
-    return Math.min(score, 1.0);
-  }
-
-  /**
-   * Detect conversational follow-up intent from context
-   */
-  private detectFollowUpIntent(question: string, tokens: string[], context: any): ParsedQuery | null {
-    const q = question.toLowerCase();
-
-    // References like "first one", "first store", "top store", "1st store", "worst store"
+  private detectFollowUp(
+    q: string,
+    tokens: string[],
+    context: any,
+    dashboardContext?: { timeFilter?: string },
+  ): ParsedQuery | null {
     const isFirstRef =
       q.includes("first one") ||
-      q.includes("first store") ||
-      q.includes("top store") ||
-      q.includes("1st store") ||
-      q.includes("1st one") ||
-      q.includes("worst store") ||
-      q.includes("top location");
-
-    const isSecondRef = q.includes("second one") || q.includes("2nd one") || q.includes("2nd store");
-    const isThereRef = tokens.includes("there") || q.includes("at that store") || q.includes("for that store");
-    const isItRef = tokens.includes("it") || tokens.includes("that") || q.includes("this store");
+      q.includes("the first") ||
+      q.includes("top one") ||
+      q.includes("top store");
+    const isSecondRef = q.includes("second one") || q.includes("the second");
+    const isItRef =
+      q.includes("why is it") ||
+      q.includes("why it is") ||
+      q.includes("compare it") ||
+      q.includes("what about it") ||
+      q.includes("investigate it");
+    const isThereRef = q.includes("there") || q.includes("at that store");
 
     const targetStoreId = isSecondRef
       ? context.lastResults?.[1] || context.lastStore
@@ -501,29 +447,66 @@ export class ExecutiveAssistantService {
         ? context.lastResults?.[0] || context.lastStore
         : context.lastStore || context.lastResults?.[0];
 
-    // Follow-up: "Which stores are driving that?" after Network Summary or Complaint Categories
-    if ((q.includes("which stores are driving") || q.includes("which stores")) && (context.lastIntent === "NETWORK_SUMMARY" || context.lastIntent === "COMPLAINT_CATEGORIES")) {
+    // Follow-up: "Which stores are driving that?"
+    if (
+      q.includes("which stores are driving") ||
+      q.includes("which stores are responsible") ||
+      (q.includes("which stores") &&
+        (context.lastIntent === "NETWORK_SUMMARY" || context.lastIntent === "COMPLAINT_CATEGORIES"))
+    ) {
       return {
         intent: "STORE_PERFORMANCE",
-        timeRange: this.extractTimeRange(q),
+        timeRange: this.getTimeRange(q, dashboardContext),
         parameters: { city: context.lastCity },
         entities: context.lastCity ? [context.lastCity] : [],
         confidence: 0.95,
       };
     }
 
-    // Follow-up: "Why is the top store struggling?" or "Why is the first one high?"
-    if (isFirstRef || isSecondRef || (isItRef && q.includes("why"))) {
+    // Follow-up: "Why is the first one high?" / "Why is it high?" -> Root cause analysis!
+    if ((isFirstRef || isSecondRef || isItRef || isThereRef) && (q.includes("why") || q.includes("high") || q.includes("struggling"))) {
       if (targetStoreId) {
         return {
-          intent: "STORE_DETAIL",
-          timeRange: this.extractTimeRange(q),
-          comparisonTimeRange: this.extractComparisonTimeRange(q, this.extractTimeRange(q)),
-          parameters: { storeId: targetStoreId, followUpType: "why" },
+          intent: "STORE_ROOT_CAUSE",
+          timeRange: this.getTimeRange(q, dashboardContext),
+          parameters: { storeId: targetStoreId },
           entities: [targetStoreId],
           confidence: 0.95,
         };
       }
+    }
+
+    // Follow-up: "Compare it with last week" -> Store comparison!
+    if ((isItRef || isThereRef || q.includes("compare")) && (q.includes("last week") || q.includes("yesterday") || q.includes("vs") || q.includes("last month"))) {
+      if (targetStoreId) {
+        const timeRange = this.getTimeRange(q, dashboardContext);
+        const compRange = this.getComparisonRange(q, timeRange);
+        return {
+          intent: "STORE_COMPARISON",
+          timeRange,
+          comparisonTimeRange: compRange,
+          parameters: { storeId: targetStoreId },
+          entities: [targetStoreId],
+          confidence: 0.95,
+        };
+      }
+    }
+
+    // Follow-up: "What should I investigate first?" -> Actionable recommendations!
+    if (
+      q.includes("investigate first") ||
+      q.includes("what should i investigate") ||
+      q.includes("action item") ||
+      q.includes("recommendation") ||
+      q.includes("what to do")
+    ) {
+      return {
+        intent: "STORE_RECOMMENDATION",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: { storeId: targetStoreId, city: context.lastCity },
+        entities: targetStoreId ? [targetStoreId] : [],
+        confidence: 0.95,
+      };
     }
 
     // Follow-up: "What are customers complaining about there?"
@@ -531,1143 +514,1021 @@ export class ExecutiveAssistantService {
       if (targetStoreId) {
         return {
           intent: "COMPLAINT_CATEGORIES",
-          timeRange: this.extractTimeRange(q),
+          timeRange: this.getTimeRange(q, dashboardContext),
           parameters: { storeId: targetStoreId },
           entities: [targetStoreId],
-          confidence: 0.9,
+          confidence: 0.92,
         };
       }
-    }
-
-    // Follow-up: "Compare it with last week" or "Compare that with last week"
-    if ((isItRef || isThereRef || q.includes("compare")) && (q.includes("last week") || q.includes("yesterday") || q.includes("vs"))) {
-      const timeRange = this.getDefaultTimeRange();
-      const compRange = this.extractTimeRange(q.includes("last week") ? "last week" : q);
-      return {
-        intent: "STORE_DETAIL",
-        timeRange,
-        comparisonTimeRange: compRange,
-        parameters: { storeId: targetStoreId, compare: true },
-        entities: targetStoreId ? [targetStoreId] : [],
-        confidence: 0.92,
-      };
-    }
-
-    // Follow-up: "What should I investigate first?"
-    if (q.includes("investigate first") || q.includes("what should i investigate") || q.includes("action item")) {
-      return {
-        intent: "STORE_DETAIL",
-        timeRange: this.getDefaultTimeRange(),
-        parameters: { storeId: targetStoreId, recommendation: true },
-        entities: targetStoreId ? [targetStoreId] : [],
-        confidence: 0.9,
-      };
     }
 
     return null;
   }
 
-  private tokenize(question: string): string[] {
-    return question
+  /**
+   * 1. Intent Handler: Network Summary
+   */
+  private async getNetworkSummary(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const kpis = await this.tools.getNetworkKPIs(parsed.timeRange);
+
+    const topStoreText = kpis.topProblemStore
+      ? `${kpis.topProblemStore.name} (${kpis.topProblemStore.city}) recorded the highest complaint volume (${kpis.topProblemStore.complaints} cases).`
+      : "";
+
+    const topCatText = kpis.topCategory
+      ? `${CATEGORY_LABEL_MAP[kpis.topCategory.category] || kpis.topCategory.category} represents the top complaint category (${kpis.topCategory.count} cases).`
+      : "";
+
+    const answer = `Network overview for ${parsed.timeRange.label}: We are tracking ${kpis.totalComplaints} total issues across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities. Currently, ${kpis.activeCases} cases are in the active support queue and ${kpis.slaBreached} cases have breached SLA. Average network PulseScore is ${kpis.avgPulse}/100, with ${kpis.criticalStores} stores in critical health (<60). ${topCatText} ${topStoreText} ${kpis.pendingFraud} cases are currently flagged for fraud review.`;
+
+    const topStoreId = kpis.topProblemStore?.id || "DS-1462";
+    const topCity = kpis.topProblemStore?.city || "Kolkata";
+
+    return {
+      intent: "NETWORK_SUMMARY",
+      answer,
+      summary: `Network summary: ${kpis.totalComplaints} complaints, ${kpis.activeCases} active, ${kpis.slaBreached} breached, ${kpis.criticalStores} critical stores.`,
+      metrics: [
+        { label: "Active cases", value: `${kpis.activeCases}`, tone: kpis.activeCases > 50 ? "warn" : "ok" },
+        { label: "SLA breached", value: `${kpis.slaBreached}`, tone: kpis.slaBreached > 0 ? "crit" : "ok" },
+        { label: "Network Pulse", value: `${kpis.avgPulse}/100`, tone: kpis.avgPulse < 60 ? "crit" : kpis.avgPulse < 80 ? "warn" : "ok" },
+        { label: "Critical stores", value: `${kpis.criticalStores}`, tone: kpis.criticalStores > 0 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Time period", value: parsed.timeRange.label },
+        { label: "Total issues", value: `${kpis.totalComplaints}` },
+        { label: "Active support cases", value: `${kpis.activeCases}` },
+        { label: "SLA breaches", value: `${kpis.slaBreached}` },
+        { label: "Top category", value: kpis.topCategory ? CATEGORY_LABEL_MAP[kpis.topCategory.category] || kpis.topCategory.category : "N/A" },
+      ],
+      suggestedQuestions: [
+        "Which stores have the most complaints?",
+        "What are the top complaint categories?",
+        "Are complaints increasing?",
+        "How effective is automation?",
+      ],
+      drillDown: {
+        label: "Open Operations Board",
+        route: "/operations",
+      },
+      context: {
+        lastIntent: "NETWORK_SUMMARY",
+        lastStore: topStoreId,
+        lastCity: topCity,
+        lastTimePeriod: parsed.timeRange.label,
+        lastResults: [topStoreId],
+      },
+    };
+  }
+
+  /**
+   * 2. Intent Handler: Complaint Trends
+   */
+  private async getComplaintTrends(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const currentRange = parsed.timeRange;
+    const priorRange = parsed.comparisonTimeRange || this.getPriorPeriod(currentRange);
+
+    const [curAnalytics, priorAnalytics] = await Promise.all([
+      this.tools.getComplaintAnalytics(currentRange, parsed.parameters),
+      this.tools.getComplaintAnalytics(priorRange, parsed.parameters),
+    ]);
+
+    const deltaPct = this.tools.calcPctChange(curAnalytics.total, priorAnalytics.total);
+    const direction = deltaPct > 0 ? "increased" : deltaPct < 0 ? "decreased" : "remained steady";
+    const deltaSign = deltaPct > 0 ? `+${deltaPct}%` : `${deltaPct}%`;
+
+    const answer = `Complaint trend analysis (${currentRange.label} vs ${priorRange.label}): Total complaints have ${direction} by ${Math.abs(deltaPct)}% (${curAnalytics.total} cases vs ${priorAnalytics.total} in previous period). Active unresolved cases currently stand at ${curAnalytics.total - curAnalytics.resolvedCount}. SLA breach rate is ${curAnalytics.slaBreachRate}% (${curAnalytics.slaBreachedCount} breached cases).`;
+
+    return {
+      intent: "COMPLAINT_TRENDS",
+      answer,
+      summary: `Complaints ${direction} by ${Math.abs(deltaPct)}% (${curAnalytics.total} vs ${priorAnalytics.total}).`,
+      metrics: [
+        { label: "Current volume", value: `${curAnalytics.total}`, tone: "neutral" },
+        { label: "Prior volume", value: `${priorAnalytics.total}`, tone: "neutral" },
+        { label: "Period delta", value: deltaSign, tone: deltaPct > 0 ? "crit" : "ok" },
+        { label: "SLA breach rate", value: `${curAnalytics.slaBreachRate}%`, tone: curAnalytics.slaBreachRate > 20 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Current period", value: `${curAnalytics.total} cases (${currentRange.label})` },
+        { label: "Previous period", value: `${priorAnalytics.total} cases (${priorRange.label})` },
+        { label: "Delta percentage", value: deltaSign },
+      ],
+      suggestedQuestions: [
+        "What are the top complaint categories?",
+        "Which stores are driving that?",
+        "Where are SLA breaches happening?",
+      ],
+      drillDown: {
+        label: "View 30-Day Volume Chart",
+        route: "/executive",
+      },
+      context: {
+        lastIntent: "COMPLAINT_TRENDS",
+        lastTimePeriod: currentRange.label,
+      },
+    };
+  }
+
+  /**
+   * 3. Intent Handler: Complaint Categories
+   */
+  private async getComplaintCategories(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const analytics = await this.tools.getComplaintAnalytics(parsed.timeRange, parsed.parameters);
+
+    const topCategoriesText = analytics.byCategory
+      .slice(0, 4)
+      .map((c) => `${CATEGORY_LABEL_MAP[c.category] || c.category}: ${c.count} cases (${c.percentage}%)`)
+      .join("; ");
+
+    const topCat = analytics.byCategory[0];
+    const topCatLabel = topCat ? CATEGORY_LABEL_MAP[topCat.category] || topCat.category : "None";
+
+    const filterText = parsed.parameters.storeId
+      ? ` for store ${parsed.parameters.storeId}`
+      : parsed.parameters.city
+        ? ` in ${parsed.parameters.city}`
+        : "";
+
+    const answer = `Complaint breakdown${filterText} for ${parsed.timeRange.label}: ${topCategoriesText}. ${topCatLabel} represents the primary operational driver with ${topCat?.count || 0} occurrences (${topCat?.percentage || 0}% of all logged issues).`;
+
+    return {
+      intent: "COMPLAINT_CATEGORIES",
+      answer,
+      summary: `Top category: ${topCatLabel} (${topCat?.count || 0} cases, ${topCat?.percentage || 0}%).`,
+      metrics: analytics.byCategory.slice(0, 4).map((c) => ({
+        label: CATEGORY_LABEL_MAP[c.category] || c.category,
+        value: `${c.count} (${c.percentage}%)`,
+        tone: c.percentage > 30 ? "warn" : "neutral",
+      })),
+      evidence: [
+        { label: "Time period", value: parsed.timeRange.label },
+        { label: "Total analyzed", value: `${analytics.total} cases` },
+        { label: "Top category", value: `${topCatLabel} (${topCat?.count || 0})` },
+      ],
+      suggestedQuestions: [
+        "Which stores are driving that?",
+        "How effective is automation?",
+        "What is the network PulseScore?",
+      ],
+      drillDown: {
+        label: "View Operations Queue",
+        route: "/operations",
+      },
+      context: {
+        lastIntent: "COMPLAINT_CATEGORIES",
+        lastCategory: topCat?.category,
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 4. Intent Handler: Store Performance / Problem Stores
+   */
+  private async getStorePerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const stores = await this.tools.getStoreRankings("complaints", 5, parsed.parameters);
+
+    const cityText = parsed.parameters.city ? ` in ${parsed.parameters.city}` : "";
+    const listText = stores
+      .map(
+        (s) =>
+          `${s.id} (${s.name}) — ${s.openComplaints} complaints, Pulse ${s.pulse}/100, ${s.slaBreaches} SLA breaches`,
+      )
+      .join("; ");
+
+    const worstStore = stores[0];
+    const answer = `Top problem stores by complaint volume${cityText} for ${parsed.timeRange.label}: ${listText}. ${worstStore ? `${worstStore.name} (${worstStore.id}) has the highest issue volume (${worstStore.openComplaints} complaints)` : "No stores found"}.`;
+
+    return {
+      intent: "STORE_PERFORMANCE",
+      answer,
+      summary: `Top problem store: ${worstStore?.name || "None"} (${worstStore?.openComplaints || 0} complaints, Pulse ${worstStore?.pulse || 70}).`,
+      metrics: stores.slice(0, 4).map((s) => ({
+        label: s.name.replace(/ DS$/, ""),
+        value: `${s.openComplaints} complaints (Pulse ${s.pulse})`,
+        tone: s.pulse < 60 ? "crit" : s.pulse < 80 ? "warn" : "ok",
+      })),
+      evidence: [
+        { label: "Time period", value: parsed.timeRange.label },
+        { label: "Locations analyzed", value: `${stores.length}` },
+        { label: "Top problem store", value: `${worstStore?.id} (${worstStore?.name})` },
+      ],
+      suggestedQuestions: [
+        `Why is ${worstStore?.id || "the first one"} struggling?`,
+        `What are customers complaining about there?`,
+        `Compare ${worstStore?.id || "it"} with last week`,
+      ],
+      drillDown: worstStore
+        ? {
+            label: `Open ${worstStore.name} Dashboard`,
+            route: `/dark-stores/${worstStore.id}`,
+          }
+        : undefined,
+      context: {
+        lastIntent: "STORE_PERFORMANCE",
+        lastStore: worstStore?.id,
+        lastCity: worstStore?.city,
+        lastResults: stores.map((s) => s.id),
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 5. Intent Handler: Store Root Cause (Why is it high?)
+   */
+  private async getStoreRootCause(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const storeId = parsed.parameters.storeId || "DS-1462";
+    const priorRange = this.getPriorPeriod(parsed.timeRange);
+    const detail = await this.tools.getStoreDetail(storeId, parsed.timeRange, priorRange);
+
+    if (!detail) {
+      return this.getStoreNotFoundResponse(storeId);
+    }
+
+    const catText = detail.topCategories
+      .map((c) => `${CATEGORY_LABEL_MAP[c.category] || c.category} (${c.count} cases)`)
+      .join(", ");
+
+    const workOrderText = detail.workOrders.length
+      ? `Active equipment work orders: ${detail.workOrders.map((w) => `${w.asset} (${w.priority})`).join(", ")}.`
+      : "No active equipment breakdowns recorded.";
+
+    const alertText = detail.activeAlerts.length
+      ? `Active critical alerts: ${detail.activeAlerts.map((a) => a.title).join("; ")}.`
+      : "";
+
+    const deltaSign = (detail.complaintsDeltaPct || 0) >= 0 ? `+${detail.complaintsDeltaPct}%` : `${detail.complaintsDeltaPct}%`;
+
+    const answer = `Root cause analysis for ${detail.id} (${detail.name}, ${detail.city}): Complaints have reached ${detail.complaintsCount} cases for ${parsed.timeRange.label} (${deltaSign} vs prior period). The primary driver is ${catText || "unspecified complaints"}. SLA breaches stand at ${detail.slaBreaches}. ${workOrderText} ${alertText} PulseScore is currently ${detail.currentPulse}/100 (${detail.pulseTrend >= 0 ? `+${detail.pulseTrend}` : detail.pulseTrend} points this week).`;
+
+    return {
+      intent: "STORE_ROOT_CAUSE",
+      answer,
+      summary: `Root cause for ${detail.id}: driven by ${detail.topCategories[0] ? CATEGORY_LABEL_MAP[detail.topCategories[0].category] : "complaints"}, ${detail.slaBreaches} SLA breaches, and ${detail.workOrders.length} work orders.`,
+      metrics: [
+        { label: "PulseScore", value: `${detail.currentPulse}/100`, tone: detail.currentPulse < 60 ? "crit" : "warn" },
+        { label: "Total complaints", value: `${detail.complaintsCount}`, tone: "crit" },
+        { label: "SLA breaches", value: `${detail.slaBreaches}`, tone: detail.slaBreaches > 0 ? "crit" : "ok" },
+        { label: "Open work orders", value: `${detail.workOrders.length}`, tone: detail.workOrders.length > 0 ? "warn" : "ok" },
+      ],
+      evidence: [
+        { label: "Store", value: `${detail.id} (${detail.name})` },
+        { label: "Dominant issue", value: detail.topCategories[0] ? CATEGORY_LABEL_MAP[detail.topCategories[0].category] : "N/A" },
+        { label: "SLA breaches", value: `${detail.slaBreaches}` },
+        { label: "Equipment faults", value: `${detail.workOrders.length}` },
+      ],
+      suggestedQuestions: [
+        `Compare ${detail.id} with last week`,
+        `What should I investigate first?`,
+        `What are customers complaining about there?`,
+      ],
+      drillDown: {
+        label: `View ${detail.id} Store Detail`,
+        route: `/dark-stores/${detail.id}`,
+      },
+      context: {
+        lastIntent: "STORE_ROOT_CAUSE",
+        lastStore: detail.id,
+        lastCity: detail.city,
+        lastResults: [detail.id],
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 6. Intent Handler: Store Period Comparison (Compare it with last week)
+   */
+  private async getStoreComparison(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const storeId = parsed.parameters.storeId || "DS-1462";
+    const currentRange = parsed.timeRange;
+    const priorRange = parsed.comparisonTimeRange || this.getPriorPeriod(currentRange);
+
+    const [curDetail, priorDetail] = await Promise.all([
+      this.tools.getStoreDetail(storeId, currentRange),
+      this.tools.getStoreDetail(storeId, priorRange),
+    ]);
+
+    if (!curDetail) return this.getStoreNotFoundResponse(storeId);
+
+    const curCount = curDetail.complaintsCount;
+    const priorCount = priorDetail?.complaintsCount || 0;
+    const diff = curCount - priorCount;
+    const pctChange = this.tools.calcPctChange(curCount, priorCount);
+    const sign = diff >= 0 ? `+${diff}` : `${diff}`;
+    const pctSign = pctChange >= 0 ? `+${pctChange}%` : `${pctChange}%`;
+
+    const pulseDiff = curDetail.currentPulse - (priorDetail?.currentPulse || curDetail.currentPulse);
+    const pulseSign = pulseDiff >= 0 ? `+${pulseDiff}` : `${pulseDiff}`;
+
+    const answer = `Comparative performance for ${curDetail.id} (${curDetail.name}) — ${currentRange.label} vs ${priorRange.label}: Complaint volume changed by ${pctSign} (${curCount} cases vs ${priorCount} cases, delta of ${sign}). Store PulseScore changed by ${pulseSign} points (currently ${curDetail.currentPulse}/100 vs ${priorDetail?.currentPulse || curDetail.currentPulse}/100). SLA breaches changed from ${priorDetail?.slaBreaches || 0} to ${curDetail.slaBreaches}.`;
+
+    return {
+      intent: "STORE_COMPARISON",
+      answer,
+      summary: `Comparison for ${curDetail.id}: complaints ${pctSign} (${curCount} vs ${priorCount}), PulseScore ${pulseSign} pts.`,
+      metrics: [
+        { label: "Current complaints", value: `${curCount}`, tone: "neutral" },
+        { label: "Prior complaints", value: `${priorCount}`, tone: "neutral" },
+        { label: "Volume delta", value: pctSign, tone: pctChange > 0 ? "crit" : "ok" },
+        { label: "PulseScore delta", value: `${pulseSign} pts`, tone: pulseDiff < 0 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Current window", value: `${curCount} complaints (${currentRange.label})` },
+        { label: "Prior window", value: `${priorCount} complaints (${priorRange.label})` },
+        { label: "SLA breaches", value: `${curDetail.slaBreaches} current vs ${priorDetail?.slaBreaches || 0} prior` },
+      ],
+      suggestedQuestions: [
+        `What should I investigate first?`,
+        `Why is ${curDetail.id} struggling?`,
+        `Which other stores need attention?`,
+      ],
+      drillDown: {
+        label: `View ${curDetail.id} Pulse History`,
+        route: `/dark-stores/${curDetail.id}/pulse`,
+      },
+      context: {
+        lastIntent: "STORE_COMPARISON",
+        lastStore: curDetail.id,
+        lastCity: curDetail.city,
+        lastResults: [curDetail.id],
+        lastTimePeriod: currentRange.label,
+      },
+    };
+  }
+
+  /**
+   * 7. Intent Handler: Store Actionable Recommendations (What should I investigate first?)
+   */
+  private async getStoreRecommendation(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const storeId = parsed.parameters.storeId || "DS-1462";
+    const detail = await this.tools.getStoreDetail(storeId, parsed.timeRange);
+
+    if (!detail) return this.getStoreNotFoundResponse(storeId);
+
+    const steps: string[] = [];
+    if (detail.slaBreaches > 0) {
+      steps.push(`1. Triage the ${detail.slaBreaches} SLA-breached tickets in Operations Queue immediately`);
+    }
+    if (detail.workOrders.length > 0) {
+      steps.push(`2. Dispatch maintenance technician for active work order (${detail.workOrders[0].asset})`);
+    }
+    if (detail.topCategories.length > 0) {
+      steps.push(`3. Audit fulfillment picking bins to mitigate ${CATEGORY_LABEL_MAP[detail.topCategories[0].category] || detail.topCategories[0].category}`);
+    }
+    steps.push(`4. Review shift allocation (${detail.pickers} pickers, ${detail.riders} riders assigned)`);
+
+    const answer = `Prioritized action plan for ${detail.id} (${detail.name}, ${detail.city}):\n${steps.join("\n")}\n\nExecuting these steps will stabilize the store's PulseScore from its current critical level (${detail.currentPulse}/100) and clear the ${detail.slaBreaches} overdue SLA cases.`;
+
+    return {
+      intent: "STORE_RECOMMENDATION",
+      answer,
+      summary: `Recommended actions for ${detail.id}: clear ${detail.slaBreaches} SLA breaches, fix ${detail.workOrders.length} equipment assets, audit ${detail.topCategories[0] ? CATEGORY_LABEL_MAP[detail.topCategories[0].category] : "picking"}.`,
+      metrics: [
+        { label: "Immediate SLA actions", value: `${detail.slaBreaches} tickets`, tone: "crit" },
+        { label: "Equipment repairs", value: `${detail.workOrders.length} orders`, tone: "warn" },
+        { label: "Current PulseScore", value: `${detail.currentPulse}/100`, tone: "crit" },
+      ],
+      evidence: [
+        { label: "Store", value: `${detail.id} (${detail.name})` },
+        { label: "Breached SLA cases", value: `${detail.slaBreaches}` },
+        { label: "Work orders pending", value: `${detail.workOrders.length}` },
+      ],
+      suggestedQuestions: [
+        `Why is ${detail.id} struggling?`,
+        `Compare ${detail.id} with last week`,
+        `Which other stores need attention?`,
+      ],
+      drillDown: {
+        label: `Go to Operations Queue for ${detail.id}`,
+        route: "/operations",
+      },
+      context: {
+        lastIntent: "STORE_RECOMMENDATION",
+        lastStore: detail.id,
+        lastCity: detail.city,
+        lastResults: [detail.id],
+      },
+    };
+  }
+
+  /**
+   * 8. Intent Handler: Store Detail
+   */
+  private async getStoreDetail(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const storeId = parsed.parameters.storeId || "DS-1462";
+    const detail = await this.tools.getStoreDetail(storeId, parsed.timeRange);
+
+    if (!detail) return this.getStoreNotFoundResponse(storeId);
+
+    const catText = detail.topCategories
+      .map((c) => `${CATEGORY_LABEL_MAP[c.category] || c.category} (${c.count})`)
+      .join(", ");
+
+    const answer = `${detail.id} (${detail.name}, ${detail.city}): PulseScore is currently ${detail.currentPulse}/100 (${detail.pulseTrend >= 0 ? `+${detail.pulseTrend}` : detail.pulseTrend} pts). The store has ${detail.complaintsCount} complaints for ${parsed.timeRange.label} with ${detail.slaBreaches} SLA breaches. Dominant categories: ${catText || "N/A"}. On shift: ${detail.pickers} pickers, ${detail.riders} riders. Active work orders: ${detail.workOrders.length}.`;
+
+    return {
+      intent: "STORE_DETAIL",
+      answer,
+      summary: `${detail.id} overview: Pulse ${detail.currentPulse}/100, ${detail.complaintsCount} complaints, ${detail.slaBreaches} SLA breaches.`,
+      metrics: [
+        { label: "PulseScore", value: `${detail.currentPulse}/100`, tone: detail.currentPulse < 60 ? "crit" : detail.currentPulse < 80 ? "warn" : "ok" },
+        { label: "Complaints", value: `${detail.complaintsCount}`, tone: "neutral" },
+        { label: "SLA Breaches", value: `${detail.slaBreaches}`, tone: detail.slaBreaches > 0 ? "crit" : "ok" },
+        { label: "Pickers / Riders", value: `${detail.pickers} / ${detail.riders}`, tone: "neutral" },
+      ],
+      evidence: [
+        { label: "Store", value: `${detail.id} — ${detail.name}` },
+        { label: "Manager", value: detail.managerName },
+        { label: "Zone", value: detail.zone },
+        { label: "Time period", value: parsed.timeRange.label },
+      ],
+      suggestedQuestions: [
+        `Why is ${detail.id} struggling?`,
+        `Compare ${detail.id} with last week`,
+        `What should I investigate first?`,
+      ],
+      drillDown: {
+        label: `Open ${detail.name} Dashboard`,
+        route: `/dark-stores/${detail.id}`,
+      },
+      context: {
+        lastIntent: "STORE_DETAIL",
+        lastStore: detail.id,
+        lastCity: detail.city,
+        lastResults: [detail.id],
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 9. Intent Handler: City Performance
+   */
+  private async getCityPerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const cities = await this.tools.getCityAnalytics(parsed.timeRange);
+
+    const topCitiesText = cities
+      .slice(0, 4)
+      .map(
+        (c) =>
+          `${c.city} (${c.complaintsCount} complaints, avg Pulse ${c.avgPulse}/100, ${c.slaBreaches} SLA breaches)`,
+      )
+      .join("; ");
+
+    const topCity = cities[0];
+    const answer = `City-wise operational summary for ${parsed.timeRange.label}: ${topCitiesText}. ${topCity ? `${topCity.city} has the highest complaint concentration (${topCity.complaintsCount} cases across ${topCity.storeCount} stores)` : ""}.`;
+
+    return {
+      intent: "CITY_PERFORMANCE",
+      answer,
+      summary: `Top city by complaints: ${topCity?.city || "N/A"} (${topCity?.complaintsCount || 0} complaints, ${topCity?.slaBreaches || 0} breaches).`,
+      metrics: cities.slice(0, 4).map((c) => ({
+        label: c.city,
+        value: `${c.complaintsCount} cases (${c.avgPulse} pulse)`,
+        tone: c.avgPulse < 60 ? "crit" : c.avgPulse < 80 ? "warn" : "ok",
+      })),
+      evidence: [
+        { label: "Time period", value: parsed.timeRange.label },
+        { label: "Cities analyzed", value: `${cities.length}` },
+        { label: "Top city complaints", value: `${topCity?.complaintsCount || 0}` },
+      ],
+      suggestedQuestions: [
+        `Which stores are driving complaints in ${topCity?.city || "Kolkata"}?`,
+        "Where are SLA breaches happening?",
+        "Compare Mumbai vs Delhi",
+      ],
+      drillDown: {
+        label: "View City Heatmap",
+        route: "/executive",
+      },
+      context: {
+        lastIntent: "CITY_PERFORMANCE",
+        lastCity: topCity?.city,
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 10. Intent Handler: City Comparison (e.g. Mumbai vs Delhi)
+   */
+  private async getCityComparison(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const city1Name = parsed.parameters.city1 || "Mumbai";
+    const city2Name = parsed.parameters.city2 || "Delhi";
+
+    const allCities = await this.tools.getCityAnalytics(parsed.timeRange);
+    const c1 = allCities.find((c) => c.city.toLowerCase() === city1Name.toLowerCase()) || {
+      city: city1Name,
+      complaintsCount: 0,
+      avgPulse: 70,
+      slaBreaches: 0,
+      storeCount: 0,
+    };
+    const c2 = allCities.find((c) => c.city.toLowerCase() === city2Name.toLowerCase()) || {
+      city: city2Name,
+      complaintsCount: 0,
+      avgPulse: 70,
+      slaBreaches: 0,
+      storeCount: 0,
+    };
+
+    const diffComplaints = c1.complaintsCount - c2.complaintsCount;
+    const diffPulse = c1.avgPulse - c2.avgPulse;
+
+    const answer = `City comparison (${c1.city} vs ${c2.city}) for ${parsed.timeRange.label}:\n• Complaints: ${c1.city} has ${c1.complaintsCount} cases across ${c1.storeCount} stores vs ${c2.city}'s ${c2.complaintsCount} cases across ${c2.storeCount} stores (${diffComplaints >= 0 ? `+${diffComplaints}` : diffComplaints} delta).\n• Health: ${c1.city} averages Pulse ${c1.avgPulse}/100 vs ${c2.city}'s ${c2.avgPulse}/100 (${diffPulse >= 0 ? `+${diffPulse}` : diffPulse} pts).\n• SLA Breaches: ${c1.city} has ${c1.slaBreaches} breaches vs ${c2.city}'s ${c2.slaBreaches} breaches.`;
+
+    return {
+      intent: "CITY_COMPARISON",
+      answer,
+      summary: `Comparison: ${c1.city} (${c1.complaintsCount} cases, Pulse ${c1.avgPulse}) vs ${c2.city} (${c2.complaintsCount} cases, Pulse ${c2.avgPulse}).`,
+      metrics: [
+        { label: `${c1.city} complaints`, value: `${c1.complaintsCount}`, tone: "neutral" },
+        { label: `${c2.city} complaints`, value: `${c2.complaintsCount}`, tone: "neutral" },
+        { label: `${c1.city} Pulse`, value: `${c1.avgPulse}/100`, tone: c1.avgPulse < 70 ? "warn" : "ok" },
+        { label: `${c2.city} Pulse`, value: `${c2.avgPulse}/100`, tone: c2.avgPulse < 70 ? "warn" : "ok" },
+      ],
+      evidence: [
+        { label: `${c1.city} stores`, value: `${c1.storeCount}` },
+        { label: `${c2.city} stores`, value: `${c2.storeCount}` },
+        { label: "Time window", value: parsed.timeRange.label },
+      ],
+      suggestedQuestions: [
+        `Which stores are driving complaints in ${c1.complaintsCount >= c2.complaintsCount ? c1.city : c2.city}?`,
+        "Where are SLA breaches happening?",
+        "What are the biggest operational issues right now?",
+      ],
+      drillDown: {
+        label: "View Executive Dashboard",
+        route: "/executive",
+      },
+      context: {
+        lastIntent: "CITY_COMPARISON",
+        lastCity: c1.complaintsCount >= c2.complaintsCount ? c1.city : c2.city,
+      },
+    };
+  }
+
+  /**
+   * 11. Intent Handler: SLA Performance
+   */
+  private async getSlaPerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const sla = await this.tools.getSLAAnalytics(parsed.timeRange, parsed.parameters);
+
+    const cityText = sla.byCity.length
+      ? `Concentrated in: ${sla.byCity.slice(0, 3).map((c) => `${c.city} (${c.breaches})`).join(", ")}.`
+      : "No city-level clusters.";
+
+    const answer = `SLA performance for ${parsed.timeRange.label}: Out of ${sla.activeTotal} active cases, ${sla.breached} cases (${sla.breachRate}%) have breached resolution SLA, and ${sla.atRisk} cases are currently at risk. Critical P1 breaches: ${sla.p1Breaches}, P2 breaches: ${sla.p2Breaches}. ${cityText}`;
+
+    return {
+      intent: "SLA_PERFORMANCE",
+      answer,
+      summary: `SLA status: ${sla.breached} breached cases (${sla.breachRate}% breach rate), ${sla.atRisk} at-risk cases.`,
+      metrics: [
+        { label: "Active support queue", value: `${sla.activeTotal}`, tone: "neutral" },
+        { label: "SLA breached cases", value: `${sla.breached}`, tone: sla.breached > 0 ? "crit" : "ok" },
+        { label: "SLA breach rate", value: `${sla.breachRate}%`, tone: sla.breachRate > 20 ? "crit" : "ok" },
+        { label: "P1 critical breaches", value: `${sla.p1Breaches}`, tone: sla.p1Breaches > 0 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Active queue", value: `${sla.activeTotal}` },
+        { label: "SLA breaches", value: `${sla.breached}` },
+        { label: "Breach percentage", value: `${sla.breachRate}%` },
+        { label: "P1 / P2 breaches", value: `${sla.p1Breaches} / ${sla.p2Breaches}` },
+      ],
+      suggestedQuestions: [
+        "Which stores have the most complaints?",
+        "Are complaints increasing?",
+        "What should I investigate first?",
+      ],
+      drillDown: {
+        label: "Open Operations Queue",
+        route: "/operations",
+      },
+      context: {
+        lastIntent: "SLA_PERFORMANCE",
+        lastCity: sla.byCity[0]?.city,
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 12. Intent Handler: Automation Performance
+   */
+  private async getAutomationPerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const auto = await this.tools.getAutomationMetrics(parsed.timeRange);
+
+    const refundInRupees = Math.round(auto.autoApprovedRefundsPaise / 100);
+    const answer = `Automation performance for ${parsed.timeRange.label}: Out of ${auto.totalComplaints} processed issues, ${auto.autoResolvedCount} cases (${auto.autoResolutionRate}%) were auto-resolved without agent intervention (totaling ₹${refundInRupees} in auto-approved refunds). ${auto.manualQueueCount} cases are routed to the manual support queue.`;
+
+    return {
+      intent: "AUTOMATION_PERFORMANCE",
+      answer,
+      summary: `Automation: ${auto.autoResolutionRate}% auto-resolution rate (${auto.autoResolvedCount} auto-resolved, ${auto.manualQueueCount} manual).`,
+      metrics: [
+        { label: "Total issues processed", value: `${auto.totalComplaints}`, tone: "neutral" },
+        { label: "Auto-resolved cases", value: `${auto.autoResolvedCount}`, tone: "ok" },
+        { label: "Manual support queue", value: `${auto.manualQueueCount}`, tone: "warn" },
+        { label: "Auto-resolution rate", value: `${auto.autoResolutionRate}%`, tone: auto.autoResolutionRate > 30 ? "ok" : "warn" },
+      ],
+      evidence: [
+        { label: "Time period", value: parsed.timeRange.label },
+        { label: "Total processed", value: `${auto.totalComplaints}` },
+        { label: "Auto-resolved", value: `${auto.autoResolvedCount}` },
+        { label: "Manual queue", value: `${auto.manualQueueCount}` },
+      ],
+      suggestedQuestions: [
+        "How does auto-resolution work?",
+        "What are the top complaint categories?",
+        "Where are SLA breaches happening?",
+      ],
+      drillDown: {
+        label: "View Automation Settings",
+        route: "/settings",
+      },
+      context: {
+        lastIntent: "AUTOMATION_PERFORMANCE",
+        lastTimePeriod: parsed.timeRange.label,
+      },
+    };
+  }
+
+  /**
+   * 13. Intent Handler: Risk & Fraud
+   */
+  private async getRiskSummary(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const risk = await this.tools.getRiskAnalytics();
+
+    const storesText = risk.affectedStores
+      .slice(0, 3)
+      .map((s) => `${s.id} (${s.name})`)
+      .join(", ");
+
+    const answer = `Risk & fraud overview: ${risk.pendingCount} cases are currently flagged for fraud review across ${risk.affectedStores.length} dark stores. Flagged cases are concentrated in: ${storesText || "none"}.`;
+
+    return {
+      intent: "RISK_SUMMARY",
+      answer,
+      summary: `Fraud review: ${risk.pendingCount} pending cases across ${risk.affectedStores.length} stores.`,
+      metrics: [
+        { label: "Pending risk reviews", value: `${risk.pendingCount}`, tone: risk.pendingCount > 0 ? "warn" : "ok" },
+        { label: "Affected stores", value: `${risk.affectedStores.length}`, tone: "neutral" },
+      ],
+      evidence: [
+        { label: "Flagged review cases", value: `${risk.pendingCount}` },
+        { label: "Affected stores", value: `${risk.affectedStores.length}` },
+      ],
+      suggestedQuestions: [
+        "What is happening across the network?",
+        "Which stores have the most complaints?",
+        "Where are SLA breaches happening?",
+      ],
+      drillDown: {
+        label: "Open Fraud Review Board",
+        route: "/fraud",
+      },
+      context: {
+        lastIntent: "RISK_SUMMARY",
+        lastStore: risk.affectedStores[0]?.id,
+        lastCity: risk.affectedStores[0]?.city,
+      },
+    };
+  }
+
+  /**
+   * 14. Intent Handler: Anomalies & Alerts
+   */
+  private async getAnomaliesAndAlerts(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const anomalies = await this.tools.getAnomaliesAndAlerts();
+
+    const critAlerts = anomalies.filter((a) => a.type === "critical_alert");
+    const pulseDrops = anomalies.filter((a) => a.type === "pulse_drop");
+
+    const descList = anomalies.slice(0, 4).map((a) => `• ${a.title}: ${a.description}`).join("\n");
+
+    const answer = `Operational anomalies and alerts summary:\n${descList || "No critical hardware anomalies detected."}\n\nImmediate recommendation: dispatch maintenance teams to resolve active freezer and equipment failures to prevent inventory spoilage.`;
+
+    return {
+      intent: "ANOMALIES_ALERTS",
+      answer,
+      summary: `${critAlerts.length} critical alerts, ${pulseDrops.length} stores with severe PulseScore drops.`,
+      metrics: [
+        { label: "Active critical alerts", value: `${critAlerts.length}`, tone: critAlerts.length > 0 ? "crit" : "ok" },
+        { label: "Critical health stores", value: `${pulseDrops.length}`, tone: pulseDrops.length > 0 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Critical alerts", value: `${critAlerts.length}` },
+        { label: "Severe pulse drops", value: `${pulseDrops.length}` },
+      ],
+      suggestedQuestions: [
+        "What should I investigate first?",
+        "Which stores have the most complaints?",
+        "What is happening across the network?",
+      ],
+      drillDown: {
+        label: "View Network Red Alerts",
+        route: "/executive",
+      },
+      context: {
+        lastIntent: "ANOMALIES_ALERTS",
+        lastStore: anomalies[0]?.entityId,
+      },
+    };
+  }
+
+  /**
+   * 15. Intent Handler: General Period Comparison
+   */
+  private async getPeriodComparison(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const currentRange = parsed.timeRange;
+    const priorRange = parsed.comparisonTimeRange || this.getPriorPeriod(currentRange);
+
+    const comp = await this.tools.comparePeriods(
+      parsed.parameters.metric || "complaints",
+      currentRange,
+      priorRange,
+    );
+
+    const direction = comp.difference > 0 ? "increased" : comp.difference < 0 ? "decreased" : "remained unchanged";
+    const deltaSign = comp.percentageChange >= 0 ? `+${comp.percentageChange}%` : `${comp.percentageChange}%`;
+
+    const answer = `Period comparison (${comp.currentPeriodLabel} vs ${comp.previousPeriodLabel}): ${comp.metric} ${direction} by ${Math.abs(comp.percentageChange)}% (${comp.currentValue} vs ${comp.previousValue}, difference of ${comp.difference >= 0 ? `+${comp.difference}` : comp.difference}).`;
+
+    return {
+      intent: "PERIOD_COMPARISON",
+      answer,
+      summary: `${comp.metric} ${direction} by ${Math.abs(comp.percentageChange)}% (${comp.currentValue} vs ${comp.previousValue}).`,
+      metrics: [
+        { label: `Current (${comp.currentPeriodLabel})`, value: `${comp.currentValue}`, tone: "neutral" },
+        { label: `Prior (${comp.previousPeriodLabel})`, value: `${comp.previousValue}`, tone: "neutral" },
+        { label: "Percentage change", value: deltaSign, tone: comp.percentageChange > 0 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Metric", value: comp.metric },
+        { label: "Current period", value: comp.currentPeriodLabel },
+        { label: "Prior period", value: comp.previousPeriodLabel },
+      ],
+      suggestedQuestions: [
+        "Which stores are driving that?",
+        "What are the top complaint categories?",
+        "Where are SLA breaches happening?",
+      ],
+      drillDown: {
+        label: "View Executive Overview",
+        route: "/executive",
+      },
+      context: {
+        lastIntent: "PERIOD_COMPARISON",
+      },
+    };
+  }
+
+  /**
+   * 16. Intent Handler: DarkOps Knowledge FAQ
+   */
+  private getDarkOpsKnowledge(question: string): AssistantResponse {
+    const q = question.toLowerCase();
+
+    let answer = "";
+    if (q.includes("what is darkops")) {
+      answer =
+        "DarkOps is an operational intelligence and exception management platform for quick-commerce dark store operations. It monitors network health, manages complaints, automates resolution, and provides real-time analytics for decision-making.";
+    } else if (q.includes("how does auto-resolution work") || q.includes("auto resolution")) {
+      answer =
+        "Auto-resolution uses deterministic NLP classification to identify simple refund-eligible cases (like missing items) and automatically routes them for processing without manual agent intervention.";
+    } else if (q.includes("pulsescore")) {
+      answer =
+        "PulseScore is a composite operational health index (12–100) computed from penalty deductions: equipment failures (up to 25 pts), SLA breaches (up to 25 pts), refund rates (up to 20 pts), delivery delays (up to 15 pts), picker delays (up to 10 pts), and inventory discrepancies (up to 5 pts).";
+    } else if (q.includes("llm") || q.includes("nlp")) {
+      answer =
+        "DarkOps uses a deterministic NLP classification engine backed by weighted scoring, exact entity extraction, and database analytics. It does NOT use external LLMs or unexplainable generative AI models.";
+    } else {
+      answer =
+        "DarkOps is an operational intelligence layer connecting customer support, dark store operations, and executive leadership.";
+    }
+
+    return {
+      intent: "GENERAL_DARKOPS_KNOWLEDGE",
+      answer,
+      summary: answer.slice(0, 100) + "...",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [
+        "What is happening across the network?",
+        "Which stores have the most complaints?",
+        "How effective is automation?",
+      ],
+    };
+  }
+
+  /**
+   * 17. Help Response
+   */
+  private getHelpResponse(): AssistantResponse {
+    return {
+      intent: "HELP",
+      answer:
+        "I am the DarkOps Executive Operational Copilot. I analyze live database metrics to answer operational intelligence questions across these capabilities:\n• Network health & PulseScores\n• Complaint volumes & category breakdowns\n• Problem stores & store deep-dives\n• City-level performance & comparisons\n• SLA compliance & breach tracking\n• Automation & auto-resolution rates\n• Fraud & risk reviews\n• Hardware anomalies & red alerts",
+      summary: "Executive Operational Copilot capabilities guide.",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [
+        "What is happening across the network?",
+        "Which stores have the most complaints?",
+        "Are complaints increasing?",
+        "Where are SLA breaches happening?",
+      ],
+    };
+  }
+
+  /**
+   * 18. Unsupported / Out-of-scope response
+   */
+  private getUnsupportedResponse(): AssistantResponse {
+    return {
+      intent: "UNSUPPORTED",
+      answer:
+        "I can help with DarkOps operational intelligence, including network trends, complaints, stores, SLA performance, automation and risk.",
+      summary: "Out of scope query.",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [
+        "What is happening across the network?",
+        "Which stores have the most complaints?",
+        "Are complaints increasing?",
+        "How effective is automation?",
+      ],
+    };
+  }
+
+  private getStoreNotFoundResponse(storeId: string): AssistantResponse {
+    return {
+      intent: "STORE_DETAIL",
+      answer: `I could not find record for store ${storeId} in the operational database. Please check the Store ID.`,
+      summary: `Store ${storeId} not found.`,
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [
+        "Which stores have the most complaints?",
+        "What is happening across the network?",
+      ],
+    };
+  }
+
+  // --- Helper Methods ---
+
+  private tokenize(text: string): string[] {
+    return text
       .toLowerCase()
       .replace(/[^\w\s-]/g, " ")
       .split(/\s+/)
       .filter((t) => t.length > 0);
   }
 
-  private extractTimeRange(question: string): TimeRange {
+  private isOutOfScope(q: string): boolean {
+    const terms = [
+      "weather",
+      "cricket",
+      "recipe",
+      "write an email",
+      "tell a joke",
+      "who won",
+      "football",
+      "movie",
+      "song",
+      "translate",
+    ];
+    return terms.some((t) => q.includes(t));
+  }
+
+  private extractStoreId(q: string): string | null {
+    const match = q.match(/\bds-\d{4}\b/i);
+    return match ? match[0].toUpperCase() : null;
+  }
+
+  private extractCity(q: string): string | null {
+    const cities = [
+      "delhi",
+      "mumbai",
+      "kolkata",
+      "bengaluru",
+      "bangalore",
+      "hyderabad",
+      "chennai",
+      "pune",
+      "ahmedabad",
+      "jaipur",
+      "surat",
+      "lucknow",
+      "indore",
+      "chandigarh",
+      "kochi",
+    ];
+    for (const c of cities) {
+      if (q.includes(c)) {
+        return c === "bangalore" ? "Bengaluru" : c.charAt(0).toUpperCase() + c.slice(1);
+      }
+    }
+    return null;
+  }
+
+  private detectCityComparison(q: string): { city1: string; city2: string } | null {
+    if (!q.includes("compare") && !q.includes("vs")) return null;
+    const citiesFound: string[] = [];
+    const allCities = [
+      "mumbai",
+      "delhi",
+      "kolkata",
+      "bengaluru",
+      "bangalore",
+      "hyderabad",
+      "chennai",
+      "pune",
+      "indore",
+    ];
+    for (const c of allCities) {
+      if (q.includes(c) && !citiesFound.includes(c)) {
+        citiesFound.push(c.charAt(0).toUpperCase() + c.slice(1));
+      }
+    }
+    if (citiesFound.length >= 2) {
+      return { city1: citiesFound[0], city2: citiesFound[1] };
+    }
+    return null;
+  }
+
+  private getTimeRange(q: string, dashboardContext?: { timeFilter?: string }): TimeRange {
     const now = new Date();
-    const q = question.toLowerCase();
 
     if (q.includes("today")) {
-      return {
-        start: new Date(now.setHours(0, 0, 0, 0)),
-        end: new Date(),
-        label: "today",
-      };
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      return { start, end: new Date(), label: "today" };
     }
-
     if (q.includes("yesterday")) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return {
-        start: new Date(yesterday.setHours(0, 0, 0, 0)),
-        end: new Date(yesterday.setHours(23, 59, 59, 999)),
-        label: "yesterday",
-      };
+      const start = new Date(now);
+      start.setDate(start.getDate() - 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+      return { start, end, label: "yesterday" };
     }
-
-    if (q.includes("last 24 hours") || q.includes("24h") || q.includes("24 hours")) {
-      return {
-        start: new Date(now.getTime() - 24 * 60 * 60 * 1000),
-        end: new Date(),
-        label: "last 24 hours",
-      };
+    if (q.includes("last 24 hours") || q.includes("24 hours") || q.includes("24h")) {
+      return { start: new Date(Date.now() - 86400000), end: new Date(), label: "last 24 hours" };
     }
-
-    if (q.includes("this week") || q.includes("last 7 days") || q.includes("7d") || q.includes("7 days")) {
-      return {
-        start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-        end: new Date(),
-        label: "last 7 days",
-      };
+    if (q.includes("last 30 days") || q.includes("30 days") || q.includes("this month")) {
+      return { start: new Date(Date.now() - 30 * 86400000), end: new Date(), label: "last 30 days" };
     }
-
+    if (q.includes("90 days") || q.includes("last quarter")) {
+      return { start: new Date(Date.now() - 90 * 86400000), end: new Date(), label: "last 90 days" };
+    }
+    if (q.includes("this week") || q.includes("last 7 days") || q.includes("7 days")) {
+      return { start: new Date(Date.now() - 7 * 86400000), end: new Date(), label: "last 7 days" };
+    }
     if (q.includes("last week")) {
-      const lastWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-      const lastWeekEnd = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return {
-        start: new Date(lastWeekStart.setHours(0, 0, 0, 0)),
-        end: new Date(lastWeekEnd.setHours(23, 59, 59, 999)),
-        label: "last week",
-      };
+      const end = new Date(Date.now() - 7 * 86400000);
+      const start = new Date(Date.now() - 14 * 86400000);
+      return { start, end, label: "last week" };
     }
 
-    if (q.includes("this month") || q.includes("last 30 days") || q.includes("30d") || q.includes("30 days")) {
-      return {
-        start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
-        end: new Date(),
-        label: "last 30 days",
-      };
+    // Inherit from dashboardContext if present
+    if (dashboardContext?.timeFilter === "30d") {
+      return { start: new Date(Date.now() - 30 * 86400000), end: new Date(), label: "last 30 days" };
+    }
+    if (dashboardContext?.timeFilter === "90d") {
+      return { start: new Date(Date.now() - 90 * 86400000), end: new Date(), label: "last 90 days" };
     }
 
+    // Default: last 7 days
+    return { start: new Date(Date.now() - 7 * 86400000), end: new Date(), label: "last 7 days" };
+  }
+
+  private getPriorPeriod(range: TimeRange): TimeRange {
+    const durationMs = range.end.getTime() - range.start.getTime();
+    const end = new Date(range.start.getTime());
+    const start = new Date(end.getTime() - durationMs);
+    return {
+      start,
+      end,
+      label: `previous ${range.label}`,
+    };
+  }
+
+  private getComparisonRange(q: string, currentRange: TimeRange): TimeRange {
+    if (q.includes("last week")) {
+      const end = new Date(Date.now() - 7 * 86400000);
+      const start = new Date(Date.now() - 14 * 86400000);
+      return { start, end, label: "last week" };
+    }
     if (q.includes("last month")) {
-      const lastMonthStart = new Date(now);
-      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
-      lastMonthStart.setDate(1);
-      const lastMonthEnd = new Date(now);
-      lastMonthEnd.setDate(0);
-      return {
-        start: new Date(lastMonthStart.setHours(0, 0, 0, 0)),
-        end: new Date(lastMonthEnd.setHours(23, 59, 59, 999)),
-        label: "last month",
-      };
+      const end = new Date(Date.now() - 30 * 86400000);
+      const start = new Date(Date.now() - 60 * 86400000);
+      return { start, end, label: "last month" };
     }
-
-    return this.getDefaultTimeRange();
-  }
-
-  private extractComparisonTimeRange(question: string, currentRange: TimeRange): TimeRange | undefined {
-    const q = question.toLowerCase();
-    const periodLength = currentRange.end.getTime() - currentRange.start.getTime();
-
-    if (q.includes("compare") || q.includes("versus") || q.includes("vs") || q.includes("changed") || q.includes("difference")) {
-      if (q.includes("yesterday")) {
-        const yesterday = new Date(currentRange.start);
-        yesterday.setDate(yesterday.getDate() - 1);
-        return {
-          start: new Date(yesterday.setHours(0, 0, 0, 0)),
-          end: new Date(yesterday.setHours(23, 59, 59, 999)),
-          label: "yesterday",
-        };
-      }
-
-      const prevStart = new Date(currentRange.start.getTime() - periodLength);
-      const prevEnd = new Date(currentRange.end.getTime() - periodLength);
-      return {
-        start: prevStart,
-        end: prevEnd,
-        label: "previous period",
-      };
-    }
-
-    return undefined;
-  }
-
-  private getDefaultTimeRange(): TimeRange {
-    const now = new Date();
-    return {
-      start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-      end: new Date(),
-      label: "last 7 days",
-    };
-  }
-
-  private extractEntities(question: string, tokens: string[]): string[] {
-    const entities: string[] = [];
-
-    // Store ID patterns like DS-1462, HYD-042, BLR-021, MUM-001, etc.
-    const storePattern = /\b[A-Z]{2,3}-\d{3,4}\b/gi;
-    const storeMatches = question.match(storePattern);
-    if (storeMatches) {
-      entities.push(...storeMatches.map((s) => s.toUpperCase()));
-    }
-
-    const cities = ["hyderabad", "bengaluru", "bangalore", "mumbai", "delhi", "chennai", "kolkata", "pune", "ahmedabad", "jaipur"];
-    for (const city of cities) {
-      if (tokens.includes(city) || question.toLowerCase().includes(city)) {
-        const normalizedCity = city === "bangalore" ? "Bengaluru" : city.charAt(0).toUpperCase() + city.slice(1);
-        if (!entities.includes(normalizedCity)) {
-          entities.push(normalizedCity);
-        }
-      }
-    }
-
-    return entities;
-  }
-
-  private extractParameters(question: string, tokens: string[], entities: string[], context?: any): Record<string, any> {
-    const parameters: Record<string, any> = {};
-
-    if (tokens.includes("highest") || tokens.includes("top") || tokens.includes("most") || tokens.includes("worst")) {
-      parameters.direction = "desc";
-      parameters.limit = 5;
-    } else if (tokens.includes("lowest") || tokens.includes("least") || tokens.includes("best")) {
-      parameters.direction = "asc";
-      parameters.limit = 5;
-    }
-
-    const cityEntity = entities.find((e) => !e.match(/^[A-Z]{2,3}-\d{3,4}$/));
-    if (cityEntity) {
-      parameters.city = cityEntity;
-    } else if (context?.lastCity) {
-      parameters.city = context.lastCity;
-    }
-
-    const storeEntity = entities.find((e) => e.match(/^[A-Z]{2,3}-\d{3,4}$/));
-    if (storeEntity) {
-      parameters.storeId = storeEntity;
-    }
-
-    return parameters;
-  }
-
-  /**
-   * NETWORK_SUMMARY: Overall operational summary
-   */
-  private async getNetworkSummary(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-
-    const [
-      { count: totalComplaints },
-      { count: resolvedCount },
-      { count: activeQueue },
-      { count: slaBreached },
-      { data: pulseData },
-      { count: fraudReview },
-      { data: categoryData },
-      { data: storeData },
-    ] = await Promise.all([
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "resolved")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .in("status", ["unassigned", "assigned", "in_progress", "escalated_l2"]),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .eq("sla_state", "breached"),
-      this.supabase.from("pulse_scores").select("score"),
-      this.supabase
-        .from("fraud_reviews")
-        .select("*", { count: "exact", head: true })
-        .eq("decision", "pending_review"),
-      this.supabase
-        .from("complaints")
-        .select("category")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("store_id, stores!inner(id, name, city)")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-    ]);
-
-    const totalComplaintsValue = totalComplaints || 0;
-    if (totalComplaintsValue === 0) {
-      return this.getEmptyDataResponse(parsed.timeRange.label);
-    }
-
-    // Auto-resolved count: resolved complaints with assigned_agent_id IS NULL
-    const { count: autoResolvedCount } = await this.supabase
-      .from("complaints")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "resolved")
-      .is("assigned_agent_id", null)
-      .gte("created_at", start.toISOString())
-      .lte("created_at", end.toISOString());
-
-    const autoResolved = autoResolvedCount || 0;
-    const avgPulse =
-      pulseData && pulseData.length > 0
-        ? Math.round(pulseData.reduce((sum, p) => sum + p.score, 0) / pulseData.length)
-        : 0;
-
-    const categoryMap = new Map<string, number>();
-    categoryData?.forEach((c: any) => {
-      const cat = c.category || "other";
-      categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
-    });
-    const topCategoryEntry = Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1])[0];
-    const topCategoryLabel = topCategoryEntry ? CATEGORY_LABEL_MAP[topCategoryEntry[0]] || topCategoryEntry[0] : "None";
-
-    const storeMap = new Map<string, { id: string; name: string; city: string; count: number }>();
-    storeData?.forEach((c: any) => {
-      const store = c.stores;
-      if (store) {
-        const existing = storeMap.get(c.store_id) || { id: store.id, name: store.name, city: store.city, count: 0 };
-        existing.count++;
-        storeMap.set(c.store_id, existing);
-      }
-    });
-
-    const topStoresList = Array.from(storeMap.values()).sort((a, b) => b.count - a.count);
-    const topStore = topStoresList[0];
-    const topStoreIds = topStoresList.slice(0, 3).map((s) => s.id);
-
-    const activeQueueValue = activeQueue || 0;
-    const slaBreachedValue = slaBreached || 0;
-    const fraudReviewValue = fraudReview || 0;
-
-    const answer = `Network overview for ${parsed.timeRange.label}: We are tracking ${totalComplaintsValue} total issues across the network. Currently, ${activeQueueValue} cases are in the active support queue and ${slaBreachedValue} cases have breached SLA.${
-      topCategoryEntry ? ` ${topCategoryLabel} represents the top complaint category (${topCategoryEntry[1]} cases).` : ""
-    }${topStore ? ` ${topStore.name} (${topStore.city}) recorded the highest complaint volume (${topStore.count} cases).` : ""}${
-      fraudReviewValue > 0 ? ` ${fraudReviewValue} cases are currently flagged for fraud review.` : ""
-    }`;
-
-    return {
-      intent: "NETWORK_SUMMARY",
-      answer,
-      summary: `${totalComplaintsValue} total complaints - ${activeQueueValue} active - ${slaBreachedValue} SLA breaches`,
-      metrics: [
-        { label: "Total complaints", value: String(totalComplaintsValue), tone: totalComplaintsValue > 50 ? "warn" : "neutral" },
-        { label: "Resolved", value: String(resolvedCount || 0), tone: "ok" },
-        { label: "Auto-resolved", value: String(autoResolved), tone: "ok" },
-        { label: "Active queue", value: String(activeQueueValue), tone: activeQueueValue > 20 ? "crit" : "warn" },
-        { label: "SLA breaches", value: String(slaBreachedValue), tone: slaBreachedValue > 5 ? "crit" : "warn" },
-        { label: "Fraud review", value: String(fraudReviewValue), tone: fraudReviewValue > 3 ? "warn" : "neutral" },
-        { label: "Network PulseScore", value: `${avgPulse}/100`, tone: avgPulse < 60 ? "crit" : avgPulse < 80 ? "warn" : "ok" },
-      ],
-      evidence: [
-        { label: "Time period", value: parsed.timeRange.label },
-        { label: "Total issues", value: String(totalComplaintsValue) },
-        { label: "Active support cases", value: String(activeQueueValue) },
-        { label: "SLA breaches", value: String(slaBreachedValue) },
-        { label: "Top category", value: topCategoryLabel },
-      ],
-      suggestedQuestions: [
-        "Which stores have the most complaints?",
-        "What are the top complaint categories?",
-        "Are complaints increasing?",
-        "How effective is automation?",
-      ],
-      context: {
-        lastIntent: "NETWORK_SUMMARY",
-        lastStore: topStore?.id,
-        lastCity: topStore?.city,
-        lastCategory: topCategoryEntry?.[0],
-        lastTimePeriod: parsed.timeRange.label,
-        lastResults: topStoreIds,
-      },
-    };
-  }
-
-  /**
-   * COMPLAINT_TRENDS: Analyze complaint volume changes
-   */
-  private async getComplaintTrends(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-    const periodLength = end.getTime() - start.getTime();
-    const comparisonStart = parsed.comparisonTimeRange?.start || new Date(start.getTime() - periodLength);
-    const comparisonEnd = parsed.comparisonTimeRange?.end || new Date(start.getTime() - 1);
-
-    const [{ count: currentCount }, { count: prevCount }, { data: currentCategories }] = await Promise.all([
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", comparisonStart.toISOString())
-        .lte("created_at", comparisonEnd.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("category")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-    ]);
-
-    const current = currentCount || 0;
-    const previous = prevCount || 0;
-
-    if (current === 0 && previous === 0) {
-      return this.getEmptyDataResponse(parsed.timeRange.label);
-    }
-
-    const diff = current - previous;
-    const pctChange = previous > 0 ? Math.round(((current - previous) / previous) * 100) : current > 0 ? 100 : 0;
-    const isIncreasing = diff > 0;
-
-    const categoryMap = new Map<string, number>();
-    currentCategories?.forEach((c: any) => {
-      const cat = c.category || "other";
-      categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
-    });
-    const topCategoryEntry = Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1])[0];
-    const topCategoryLabel = topCategoryEntry ? CATEGORY_LABEL_MAP[topCategoryEntry[0]] || topCategoryEntry[0] : "None";
-
-    let answer = "";
-    if (previous === 0) {
-      answer = `Complaint volume for ${parsed.timeRange.label} stands at ${current} cases.`;
-    } else if (diff === 0) {
-      answer = `Complaint volume remained stable at ${current} cases compared to the previous period.`;
-    } else {
-      answer = `Complaint volume is ${Math.abs(pctChange)}% ${isIncreasing ? "higher" : "lower"} than the previous period (${previous} cases previously vs ${current} cases now).`;
-    }
-
-    if (topCategoryEntry) {
-      answer += ` ${topCategoryLabel} issues account for the largest share of overall complaints (${topCategoryEntry[1]} cases).`;
-    }
-
-    return {
-      intent: "COMPLAINT_TRENDS",
-      answer,
-      summary: `${current} complaints - ${pctChange >= 0 ? "+" : ""}${pctChange}% vs previous period`,
-      metrics: [
-        { label: "Current period", value: String(current), tone: current > 50 ? "warn" : "neutral" },
-        { label: "Previous period", value: String(previous), tone: "neutral" },
-        { label: "Absolute change", value: `${diff >= 0 ? "+" : ""}${diff}`, tone: diff > 0 ? "crit" : "ok" },
-        { label: "Percentage change", value: `${pctChange >= 0 ? "+" : ""}${pctChange}%`, tone: pctChange > 0 ? "crit" : "ok" },
-      ],
-      evidence: [
-        { label: "Current period", value: parsed.timeRange.label },
-        { label: "Current volume", value: String(current) },
-        { label: "Previous volume", value: String(previous) },
-        { label: "Percentage change", value: `${pctChange}%` },
-      ],
-      suggestedQuestions: [
-        "Which stores are driving the increase?",
-        "What categories are driving it?",
-        "Compare with last week",
-      ],
-      context: {
-        lastIntent: "COMPLAINT_TRENDS",
-        lastCategory: topCategoryEntry?.[0],
-        lastTimePeriod: parsed.timeRange.label,
-      },
-    };
-  }
-
-  /**
-   * COMPLAINT_CATEGORIES: Ranked complaint categories
-   */
-  private async getComplaintCategories(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-    const { storeId, city } = parsed.parameters;
-
-    let query = this.supabase
-      .from("complaints")
-      .select("category, store_id, stores!inner(name, city)")
-      .gte("created_at", start.toISOString())
-      .lte("created_at", end.toISOString());
-
-    if (storeId) {
-      query = query.eq("store_id", storeId);
-    } else if (city) {
-      query = query.ilike("stores.city", `%${city}%`);
-    }
-
-    const { data: categoryData } = await query;
-
-    const categoryMap = new Map<string, number>();
-    categoryData?.forEach((c: any) => {
-      const cat = c.category || "other";
-      categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
-    });
-
-    const total = Array.from(categoryMap.values()).reduce((sum, count) => sum + count, 0);
-
-    if (total === 0) {
-      return this.getEmptyDataResponse(parsed.timeRange.label);
-    }
-
-    const sortedCategories = Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]);
-    const scopeLabel = storeId ? `for store ${storeId}` : city ? `in ${city}` : `across the network`;
-
-    const topList = sortedCategories
-      .slice(0, 4)
-      .map(([cat, count]) => `${CATEGORY_LABEL_MAP[cat] || cat} (${count} cases, ${Math.round((count / total) * 100)}%)`)
-      .join(", ");
-
-    const answer = `Complaint breakdown ${scopeLabel} for ${parsed.timeRange.label}: The primary issue types are ${topList}. Total complaints analyzed: ${total}.`;
-
-    return {
-      intent: "COMPLAINT_CATEGORIES",
-      answer,
-      summary: `${sortedCategories.length} categories - ${total} total complaints`,
-      metrics: sortedCategories.slice(0, 5).map(([cat, count]) => ({
-        label: CATEGORY_LABEL_MAP[cat] || cat,
-        value: `${count} (${total > 0 ? Math.round((count / total) * 100) : 0}%)`,
-        tone: count > total * 0.3 ? "warn" : "neutral",
-      })),
-      evidence: [
-        { label: "Scope", value: scopeLabel },
-        { label: "Time period", value: parsed.timeRange.label },
-        { label: "Total complaints", value: String(total) },
-        { label: "Top category", value: CATEGORY_LABEL_MAP[sortedCategories[0]?.[0]] || sortedCategories[0]?.[0] || "None" },
-      ],
-      suggestedQuestions: [
-        "Which stores have the most complaints?",
-        "Are complaints increasing?",
-        "How effective is automation?",
-      ],
-      context: {
-        lastIntent: "COMPLAINT_CATEGORIES",
-        lastStore: storeId,
-        lastCity: city,
-        lastCategory: sortedCategories[0]?.[0],
-        lastTimePeriod: parsed.timeRange.label,
-      },
-    };
-  }
-
-  /**
-   * STORE_PERFORMANCE: Worst performing stores
-   */
-  private async getStorePerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-    const { city, storeId } = parsed.parameters;
-
-    if (storeId) {
-      return this.getStoreDetail({
-        intent: "STORE_DETAIL",
-        timeRange: parsed.timeRange,
-        parameters: { storeId },
-        entities: [storeId],
-        confidence: 0.95,
-      });
-    }
-
-    let complaintQuery = this.supabase
-      .from("complaints")
-      .select("store_id, category, stores!inner(id, name, city)")
-      .gte("created_at", start.toISOString())
-      .lte("created_at", end.toISOString());
-
-    if (city) {
-      complaintQuery = complaintQuery.ilike("stores.city", `%${city}%`);
-    }
-
-    const [{ data: complaintData }, { data: orderData }, { data: pulseData }] = await Promise.all([
-      complaintQuery,
-      this.supabase.from("orders").select("store_id"),
-      this.supabase.from("pulse_scores").select("store_id, score"),
-    ]);
-
-    const complaintMap = new Map<string, { name: string; city: string; count: number; categories: Map<string, number> }>();
-    complaintData?.forEach((c: any) => {
-      const store = c.stores;
-      if (store) {
-        const existing = complaintMap.get(c.store_id) || {
-          name: store.name,
-          city: store.city,
-          count: 0,
-          categories: new Map<string, number>(),
-        };
-        existing.count++;
-        const cat = c.category || "other";
-        existing.categories.set(cat, (existing.categories.get(cat) || 0) + 1);
-        complaintMap.set(c.store_id, existing);
-      }
-    });
-
-    if (complaintMap.size === 0) {
-      return this.getEmptyDataResponse(parsed.timeRange.label);
-    }
-
-    const orderMap = new Map<string, number>();
-    orderData?.forEach((o: any) => {
-      orderMap.set(o.store_id, (orderMap.get(o.store_id) || 0) + 1);
-    });
-
-    const pulseMap = new Map<string, number>();
-    pulseData?.forEach((p: any) => {
-      pulseMap.set(p.store_id, p.score);
-    });
-
-    const storePerformance = Array.from(complaintMap.entries()).map(([sId, info]) => {
-      const orders = orderMap.get(sId) || 0;
-      const complaintRate = orders > 0 ? (info.count / orders) * 100 : null;
-      const topCatEntry = Array.from(info.categories.entries()).sort((a, b) => b[1] - a[1])[0];
-      return {
-        storeId: sId,
-        name: info.name,
-        city: info.city,
-        complaintCount: info.count,
-        orders,
-        complaintRate: complaintRate !== null ? Number(complaintRate.toFixed(2)) : null,
-        pulse: pulseMap.get(sId) || 0,
-        dominantCategory: topCatEntry ? CATEGORY_LABEL_MAP[topCatEntry[0]] || topCatEntry[0] : "General",
-      };
-    });
-
-    const worstStores = storePerformance
-      .sort((a, b) => b.complaintCount - a.complaintCount)
-      .slice(0, 5);
-
-    const storeIds = worstStores.map((s) => s.storeId);
-    const scopeLabel = city ? `in ${city}` : "across the network";
-
-    const worstStoreSummary = worstStores
-      .map((s) => `${s.storeId} (${s.name}) — ${s.complaintCount} complaints${s.complaintRate !== null ? ` (${s.complaintRate}% complaint rate)` : ""}`)
-      .join("; ");
-
-    const answer = `Top problem stores by complaint volume ${scopeLabel} for ${parsed.timeRange.label}: ${worstStoreSummary}. ${worstStores[0].name} has the highest issue volume (${worstStores[0].complaintCount} complaints), driven primarily by ${worstStores[0].dominantCategory}.`;
-
-    return {
-      intent: "STORE_PERFORMANCE",
-      answer,
-      summary: `${worstStores.length} locations identified - Top: ${worstStores[0]?.storeId} (${worstStores[0]?.name})`,
-      metrics: worstStores.map((s) => ({
-        label: `${s.storeId} - ${s.name}`,
-        value: s.complaintRate !== null ? `${s.complaintCount} issues (${s.complaintRate}%)` : `${s.complaintCount} complaints`,
-        tone: s.complaintCount > 15 ? "crit" : s.complaintCount > 5 ? "warn" : "neutral",
-      })),
-      evidence: [
-        { label: "Time period", value: parsed.timeRange.label },
-        { label: "Locations analyzed", value: String(storePerformance.length) },
-        { label: "Top problem store", value: `${worstStores[0]?.storeId} (${worstStores[0]?.name})` },
-        { label: "Dominant issue", value: worstStores[0]?.dominantCategory || "N/A" },
-      ],
-      suggestedQuestions: [
-        `Why is ${worstStores[0]?.storeId} struggling?`,
-        `What are customers complaining about there?`,
-        `Compare ${worstStores[0]?.storeId} with last week`,
-      ],
-      drillDown: {
-        label: `View ${worstStores[0]?.storeId} details`,
-        route: "/dark-stores/$id",
-        params: { id: worstStores[0]?.storeId },
-      },
-      context: {
-        lastIntent: "STORE_PERFORMANCE",
-        lastStore: worstStores[0]?.storeId,
-        lastCity: worstStores[0]?.city,
-        lastResults: storeIds,
-        lastTimePeriod: parsed.timeRange.label,
-      },
-    };
-  }
-
-  /**
-   * CITY_PERFORMANCE: Performance by city/region
-   */
-  private async getCityPerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-
-    const { data: complaintData } = await this.supabase
-      .from("complaints")
-      .select("category, store_id, stores!inner(city)")
-      .gte("created_at", start.toISOString())
-      .lte("created_at", end.toISOString());
-
-    const cityMap = new Map<string, { count: number; categories: Map<string, number> }>();
-    complaintData?.forEach((c: any) => {
-      const city = c.stores?.city || "Unknown";
-      const existing = cityMap.get(city) || { count: 0, categories: new Map<string, number>() };
-      existing.count++;
-      const cat = c.category || "other";
-      existing.categories.set(cat, (existing.categories.get(cat) || 0) + 1);
-      cityMap.set(city, existing);
-    });
-
-    if (cityMap.size === 0) {
-      return this.getEmptyDataResponse(parsed.timeRange.label);
-    }
-
-    const cityPerformance = Array.from(cityMap.entries())
-      .map(([cityName, info]) => {
-        const topCatEntry = Array.from(info.categories.entries()).sort((a, b) => b[1] - a[1])[0];
-        return {
-          city: cityName,
-          count: info.count,
-          dominantCategory: topCatEntry ? CATEGORY_LABEL_MAP[topCatEntry[0]] || topCatEntry[0] : "General",
-        };
-      })
-      .sort((a, b) => b.count - a.count);
-
-    const totalNetworkComplaints = cityPerformance.reduce((sum, c) => sum + c.count, 0);
-    const topCity = cityPerformance[0];
-
-    const cityList = cityPerformance
-      .slice(0, 4)
-      .map((c) => `${c.city}: ${c.count} complaints (${Math.round((c.count / totalNetworkComplaints) * 100)}%)`)
-      .join(", ");
-
-    const answer = `City operational performance for ${parsed.timeRange.label}: Problems are concentrated in ${cityList}. ${topCity.city} leads network complaint volume (${topCity.count} cases), with ${topCity.dominantCategory} representing the largest category.`;
-
-    return {
-      intent: "CITY_PERFORMANCE",
-      answer,
-      summary: `${cityPerformance.length} cities tracked - Highest: ${topCity.city}`,
-      metrics: cityPerformance.map((c) => ({
-        label: c.city,
-        value: `${c.count} complaints`,
-        tone: c.count > 20 ? "crit" : c.count > 10 ? "warn" : "neutral",
-      })),
-      evidence: [
-        { label: "Time period", value: parsed.timeRange.label },
-        { label: "Cities analyzed", value: String(cityMap.size) },
-        { label: "Top problem city", value: topCity.city },
-        { label: "City issue volume", value: String(topCity.count) },
-      ],
-      suggestedQuestions: [
-        `Which stores in ${topCity.city} have the most complaints?`,
-        "What are the top complaint categories?",
-        "Are complaints increasing?",
-      ],
-      context: {
-        lastIntent: "CITY_PERFORMANCE",
-        lastCity: topCity.city,
-        lastTimePeriod: parsed.timeRange.label,
-      },
-    };
-  }
-
-  /**
-   * SLA_PERFORMANCE: SLA breaches and support performance
-   */
-  private async getSlaPerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const [{ count: activeCases }, { count: slaBreached }, { data: breachData }] = await Promise.all([
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .in("status", ["unassigned", "assigned", "in_progress", "escalated_l2"]),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .eq("sla_state", "breached"),
-      this.supabase
-        .from("complaints")
-        .select("store_id, stores!inner(id, name, city), created_at")
-        .eq("sla_state", "breached")
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
-
-    const activeCasesValue = activeCases || 0;
-    const slaBreachedValue = slaBreached || 0;
-
-    const breachStoreMap = new Map<string, { id: string; name: string; city: string; count: number }>();
-    breachData?.forEach((c: any) => {
-      const store = c.stores;
-      if (store) {
-        const existing = breachStoreMap.get(c.store_id) || { id: store.id, name: store.name, city: store.city, count: 0 };
-        existing.count++;
-        breachStoreMap.set(c.store_id, existing);
-      }
-    });
-
-    const affectedStores = Array.from(breachStoreMap.values()).sort((a, b) => b.count - a.count);
-    const breachRate = activeCasesValue > 0 ? Math.round((slaBreachedValue / activeCasesValue) * 100) : 0;
-
-    let answer = `SLA performance overview: There are currently ${activeCasesValue} active support cases across the network. ${slaBreachedValue} cases have breached SLA deadline (${breachRate}% breach rate).`;
-
-    if (affectedStores.length > 0) {
-      answer += ` SLA breaches are most prevalent at: ${affectedStores.map((s) => `${s.id} (${s.name})`).slice(0, 3).join(", ")}.`;
-    }
-
-    return {
-      intent: "SLA_PERFORMANCE",
-      answer,
-      summary: `${slaBreachedValue} SLA breaches - ${activeCasesValue} active support cases`,
-      metrics: [
-        { label: "Active support queue", value: String(activeCasesValue), tone: activeCasesValue > 20 ? "crit" : "warn" },
-        { label: "SLA breached cases", value: String(slaBreachedValue), tone: slaBreachedValue > 5 ? "crit" : "warn" },
-        { label: "SLA breach rate", value: `${breachRate}%`, tone: breachRate > 20 ? "crit" : "warn" },
-        { label: "Affected stores", value: String(breachStoreMap.size), tone: breachStoreMap.size > 3 ? "warn" : "neutral" },
-      ],
-      evidence: [
-        { label: "Active queue", value: String(activeCasesValue) },
-        { label: "SLA breaches", value: String(slaBreachedValue) },
-        { label: "Breach percentage", value: `${breachRate}%` },
-        { label: "Affected locations", value: String(breachStoreMap.size) },
-      ],
-      suggestedQuestions: [
-        "Which stores have the most SLA breaches?",
-        "How effective is automation?",
-        "What are the top complaint categories?",
-      ],
-      drillDown: { label: "View Operations Dashboard", route: "/operations" },
-      context: {
-        lastIntent: "SLA_PERFORMANCE",
-        lastStore: affectedStores[0]?.id,
-        lastResults: affectedStores.map((s) => s.id),
-      },
-    };
-  }
-
-  /**
-   * AUTOMATION_PERFORMANCE: Auto-resolution effectiveness
-   */
-  private async getAutomationPerformance(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-
-    const [{ count: totalComplaints }, { count: resolvedCount }, { count: activeQueue }, { count: autoResolvedCount }] = await Promise.all([
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "resolved")
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .in("status", ["unassigned", "assigned", "in_progress", "escalated_l2"]),
-      this.supabase
-        .from("complaints")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "resolved")
-        .is("assigned_agent_id", null)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-    ]);
-
-    const total = totalComplaints || 0;
-    if (total === 0) {
-      return this.getEmptyDataResponse(parsed.timeRange.label);
-    }
-
-    const autoResolved = autoResolvedCount || 0;
-    const manualQueue = activeQueue || 0;
-    const autoRate = Math.round((autoResolved / total) * 100);
-
-    const answer = `Automation performance for ${parsed.timeRange.label}: Out of ${total} processed issues, ${autoResolved} cases (${autoRate}%) were auto-resolved without agent intervention. ${manualQueue} cases are routed to the manual support queue.`;
-
-    return {
-      intent: "AUTOMATION_PERFORMANCE",
-      answer,
-      summary: `${autoRate}% auto-resolution rate - ${autoResolved} auto-resolved cases`,
-      metrics: [
-        { label: "Total issues processed", value: String(total), tone: "neutral" },
-        { label: "Auto-resolved cases", value: String(autoResolved), tone: "ok" },
-        { label: "Manual support queue", value: String(manualQueue), tone: manualQueue > 20 ? "warn" : "neutral" },
-        { label: "Auto-resolution rate", value: `${autoRate}%`, tone: autoRate > 40 ? "ok" : "warn" },
-      ],
-      evidence: [
-        { label: "Time period", value: parsed.timeRange.label },
-        { label: "Total processed", value: String(total) },
-        { label: "Auto-resolved", value: String(autoResolved) },
-        { label: "Manual queue", value: String(manualQueue) },
-      ],
-      suggestedQuestions: [
-        "What are the top complaint categories?",
-        "Which stores need attention?",
-        "Where are SLA breaches happening?",
-      ],
-      context: { lastIntent: "AUTOMATION_PERFORMANCE", lastTimePeriod: parsed.timeRange.label },
-    };
-  }
-
-  /**
-   * RISK_SUMMARY: Fraud and risk signals
-   */
-  private async getRiskSummary(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const [{ count: pendingReview }, { data: fraudData }] = await Promise.all([
-      this.supabase
-        .from("fraud_reviews")
-        .select("*", { count: "exact", head: true })
-        .eq("decision", "pending_review"),
-      this.supabase
-        .from("fraud_reviews")
-        .select("complaint_id, complaints!inner(store_id, stores!inner(id, name, city))")
-        .eq("decision", "pending_review")
-        .limit(20),
-    ]);
-
-    const pendingCount = pendingReview || 0;
-    const storeMap = new Map<string, { id: string; name: string; city: string; count: number }>();
-    fraudData?.forEach((f: any) => {
-      const store = f.complaints?.stores;
-      if (store) {
-        const existing = storeMap.get(f.complaints.store_id) || { id: store.id, name: store.name, city: store.city, count: 0 };
-        existing.count++;
-        storeMap.set(f.complaints.store_id, existing);
-      }
-    });
-
-    const affectedStores = Array.from(storeMap.values()).sort((a, b) => b.count - a.count);
-
-    let answer = `Risk & fraud overview: ${pendingCount} cases are currently flagged for fraud review across ${affectedStores.length} dark stores.`;
-    if (affectedStores.length > 0) {
-      answer += ` Flagged cases are concentrated in: ${affectedStores.map((s) => `${s.id} (${s.name})`).slice(0, 3).join(", ")}.`;
-    }
-
-    return {
-      intent: "RISK_SUMMARY",
-      answer,
-      summary: `${pendingCount} cases pending fraud review - ${affectedStores.length} stores affected`,
-      metrics: [
-        { label: "Pending risk reviews", value: String(pendingCount), tone: pendingCount > 5 ? "crit" : "warn" },
-        { label: "Affected stores", value: String(affectedStores.length), tone: affectedStores.length > 3 ? "warn" : "neutral" },
-      ],
-      evidence: [
-        { label: "Flagged review cases", value: String(pendingCount) },
-        { label: "Affected stores", value: String(affectedStores.length) },
-      ],
-      suggestedQuestions: [
-        "Which stores have the most complaints?",
-        "What are the top complaint categories?",
-        "How effective is automation?",
-      ],
-      drillDown: { label: "View Fraud Dashboard", route: "/fraud" },
-      context: {
-        lastIntent: "RISK_SUMMARY",
-        lastStore: affectedStores[0]?.id,
-        lastResults: affectedStores.map((s) => s.id),
-      },
-    };
-  }
-
-  /**
-   * STORE_DETAIL: Specific store operational breakdown
-   */
-  private async getStoreDetail(parsed: ParsedQuery): Promise<AssistantResponse> {
-    const { start, end } = parsed.timeRange;
-    const { storeId, recommendation } = parsed.parameters;
-
-    if (!storeId) {
-      return {
-        intent: "STORE_DETAIL",
-        answer: "Please specify a store ID (e.g. HYD-042 or DS-1462) to analyze detailed performance.",
-        summary: "Store ID required",
-        metrics: [],
-        evidence: [],
-        suggestedQuestions: ["Which stores have the most complaints?", "What are the top complaint categories?"],
-      };
-    }
-
-    const periodLength = end.getTime() - start.getTime();
-    const prevStart = new Date(start.getTime() - periodLength);
-    const prevEnd = new Date(start.getTime() - 1);
-
-    const [
-      { data: storeData },
-      { data: complaintData },
-      { count: prevComplaintCount },
-      { data: pulseData },
-      { count: orderCount },
-    ] = await Promise.all([
-      this.supabase.from("stores").select("id, name, city, zone, pickers_on_shift, riders_assigned").eq("id", storeId).maybeSingle(),
-      this.supabase.from("complaints").select("id, category, status, sla_state, created_at").eq("store_id", storeId).gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-      this.supabase.from("complaints").select("*", { count: "exact", head: true }).eq("store_id", storeId).gte("created_at", prevStart.toISOString()).lte("created_at", prevEnd.toISOString()),
-      this.supabase.from("pulse_scores").select("score").eq("store_id", storeId).maybeSingle(),
-      this.supabase.from("orders").select("*", { count: "exact", head: true }).eq("store_id", storeId),
-    ]);
-
-    if (!storeData) {
-      return {
-        intent: "STORE_DETAIL",
-        answer: `Store ID ${storeId} was not found in the DarkOps database.`,
-        summary: "Store not found",
-        metrics: [],
-        evidence: [],
-        suggestedQuestions: ["Which stores have the most complaints?", "Show me problem stores"],
-      };
-    }
-
-    const complaintsCount = complaintData?.length || 0;
-    const prevComplaints = prevComplaintCount || 0;
-    const ordersCount = orderCount || 0;
-    const complaintRate = ordersCount > 0 ? Number(((complaintsCount / ordersCount) * 100).toFixed(2)) : null;
-    const slaBreached = complaintData?.filter((c: any) => c.sla_state === "breached").length || 0;
-    const currentPulse = pulseData?.score || 0;
-
-    const categoryMap = new Map<string, number>();
-    complaintData?.forEach((c: any) => {
-      const cat = c.category || "other";
-      categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
-    });
-
-    const topCategories = Array.from(categoryMap.entries()).sort((a, b) => b[1] - a[1]);
-    const topCategoryLabel = topCategories[0] ? CATEGORY_LABEL_MAP[topCategories[0][0]] || topCategories[0][0] : "General";
-
-    let answer = `${storeData.id} (${storeData.name}, ${storeData.city}) has recorded ${complaintsCount} complaints for ${parsed.timeRange.label}${complaintRate !== null ? ` (${complaintRate}% complaint rate across ${ordersCount} orders)` : ""}. ${topCategoryLabel} represents the largest issue category (${topCategories[0]?.[1] || 0} cases).`;
-
-    if (slaBreached > 0) {
-      answer += ` ${slaBreached} cases have breached SLA.`;
-    }
-
-    if (prevComplaints > 0) {
-      const pctDiff = Math.round(((complaintsCount - prevComplaints) / prevComplaints) * 100);
-      answer += ` Volume is ${Math.abs(pctDiff)}% ${pctDiff >= 0 ? "higher" : "lower"} than the previous period (${prevComplaints} cases).`;
-    }
-
-    if (recommendation || parsed.parameters.followUpType === "why") {
-      answer += ` Recommended next step: Inspect picking and packing workflows at ${storeData.id} in the Operations dashboard and reassign support resources to clear the ${slaBreached} SLA-breached cases.`;
-    }
-
-    return {
-      intent: "STORE_DETAIL",
-      answer,
-      summary: `${storeData.id} (${storeData.name}) - ${complaintsCount} complaints - PulseScore ${currentPulse}`,
-      metrics: [
-        { label: "Complaint volume", value: String(complaintsCount), tone: complaintsCount > 10 ? "crit" : "warn" },
-        { label: "Complaint rate", value: complaintRate !== null ? `${complaintRate}%` : "N/A", tone: "neutral" },
-        { label: "SLA breaches", value: String(slaBreached), tone: slaBreached > 2 ? "crit" : "warn" },
-        { label: "Store PulseScore", value: `${currentPulse}/100`, tone: currentPulse < 60 ? "crit" : currentPulse < 80 ? "warn" : "ok" },
-      ],
-      evidence: [
-        { label: "Store ID & Name", value: `${storeData.id} — ${storeData.name}` },
-        { label: "Location", value: storeData.city },
-        { label: "Time period", value: parsed.timeRange.label },
-        { label: "Dominant category", value: topCategoryLabel },
-        { label: "SLA breaches", value: String(slaBreached) },
-      ],
-      suggestedQuestions: [
-        `What are customers complaining about at ${storeData.id}?`,
-        `Compare ${storeData.id} with last week`,
-        "Which other stores need attention?",
-      ],
-      drillDown: {
-        label: `View ${storeData.id} in Dark Stores`,
-        route: "/dark-stores/$id",
-        params: { id: storeData.id },
-      },
-      context: {
-        lastIntent: "STORE_DETAIL",
-        lastStore: storeData.id,
-        lastCity: storeData.city,
-        lastCategory: topCategories[0]?.[0],
-        lastTimePeriod: parsed.timeRange.label,
-        lastResults: [storeData.id],
-      },
-    };
-  }
-
-  /**
-   * GENERAL_DARKOPS_KNOWLEDGE: Deterministic DarkOps architectural answers
-   */
-  private getDarkOpsKnowledge(question: string): AssistantResponse {
-    const q = question.toLowerCase();
-
-    for (const item of this.darkOpsKnowledge) {
-      if (item.keywords.some((kw) => q.includes(kw))) {
-        return {
-          intent: "GENERAL_DARKOPS_KNOWLEDGE",
-          answer: item.answer,
-          summary: "DarkOps System Knowledge",
-          metrics: [],
-          evidence: [],
-          suggestedQuestions: [
-            "What is happening across the network?",
-            "Which stores have the most complaints?",
-            "What can you do?",
-          ],
-          context: { lastIntent: "GENERAL_DARKOPS_KNOWLEDGE" },
-        };
-      }
-    }
-
-    return this.getUnsupportedResponse();
-  }
-
-  /**
-   * HELP: Interactive capability discovery
-   */
-  private getHelpResponse(): AssistantResponse {
-    const answer = `I am the DarkOps Executive Operational Copilot. I analyze live database metrics to answer operational intelligence questions across these capabilities:
-
-Network
-- "What's happening across the network?"
-- "Give me an operational summary"
-
-Trends
-- "Are complaints increasing?"
-- "Compare complaints this week with last week"
-
-Stores
-- "Which stores have the most complaints?"
-- "Which dark stores are struggling?"
-
-Cities
-- "Which cities have the most issues?"
-- "Where are complaints concentrated?"
-
-SLA
-- "Where are SLA breaches happening?"
-- "How many cases are overdue?"
-
-Automation
-- "How effective is automation?"
-- "How many issues were auto-resolved?"
-
-Risk
-- "Are there any risk areas?"
-- "Any fraud risks?"
-
-You can also ask follow-up questions about specific stores, cities, or categories mentioned in previous responses.`;
-
-    return {
-      intent: "HELP",
-      answer,
-      summary: "Supported analytical capabilities",
-      metrics: [],
-      evidence: [],
-      suggestedQuestions: [
-        "What is happening across the network?",
-        "Which stores have the most complaints?",
-        "Are complaints increasing?",
-        "How effective is automation?",
-      ],
-      context: { lastIntent: "HELP" },
-    };
-  }
-
-  /**
-   * UNSUPPORTED: Gracefully handle out-of-scope queries
-   */
-  private getUnsupportedResponse(): AssistantResponse {
-    return {
-      intent: "UNSUPPORTED",
-      answer: "I can help with DarkOps operational intelligence, including network trends, complaints, stores, SLA performance, automation and risk.",
-      summary: "Operational intelligence assistant",
-      metrics: [],
-      evidence: [],
-      suggestedQuestions: [
-        "What is happening across the network?",
-        "Which stores have the most complaints?",
-        "Are complaints increasing?",
-        "How effective is automation?",
-      ],
-      context: { lastIntent: "UNSUPPORTED" },
-    };
-  }
-
-  /**
-   * EMPTY DATA BEHAVIOR: Gracefully handle zero database records
-   */
-  private getEmptyDataResponse(period: string): AssistantResponse {
-    return {
-      intent: "EMPTY_DATA",
-      answer: "I don't have enough operational data for that period to give you a reliable answer.",
-      summary: "No operational data for period",
-      metrics: [],
-      evidence: [{ label: "Time period", value: period }],
-      suggestedQuestions: [
-        "What is happening across the network?",
-        "Which stores have the most complaints?",
-        "Are complaints increasing?",
-      ],
-      context: { lastIntent: "EMPTY_DATA", lastTimePeriod: period },
-    };
+    return this.getPriorPeriod(currentRange);
   }
 }

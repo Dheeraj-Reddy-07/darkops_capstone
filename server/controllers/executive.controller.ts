@@ -201,7 +201,7 @@ export const chatInsights = async (req: Request, res: Response, next: NextFuncti
 
 export const assistantQuery = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { question, context } = req.body;
+    const { question, context, dashboardContext } = req.body;
     
     if (!question || typeof question !== "string" || question.trim().length === 0) {
       res.status(400).json({
@@ -214,7 +214,7 @@ export const assistantQuery = async (req: Request, res: Response, next: NextFunc
     }
 
     const assistant = new ExecutiveAssistantService();
-    const response = await assistant.query(question.trim(), context);
+    const response = await assistant.query(question.trim(), context, dashboardContext);
     
     res.status(200).json(response);
   } catch (error) {
