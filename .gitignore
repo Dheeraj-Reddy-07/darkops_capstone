@@ -39,3 +39,8 @@ dist-server
 
 # Supabase
 .supabase
+
+# Flutter & Mobile artifacts
+mobile/
+android/app/build/
+android/.gradle/

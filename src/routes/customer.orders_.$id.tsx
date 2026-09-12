@@ -95,7 +95,7 @@ function OrderDetail() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4">
+    <div className="w-full space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">

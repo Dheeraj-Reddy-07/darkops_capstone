@@ -8,15 +8,14 @@ let _client: ReturnType<typeof createClient> | null = null;
 
 export function createSupabaseBrowserClient() {
   if (_client) return _client;
+  const supabaseUrl = (import.meta.env['VITE_SUPABASE_URL'] as string) || 'https://placeholder.supabase.co';
+  const supabaseAnonKey = (import.meta.env['VITE_SUPABASE_ANON_KEY'] as string) || 'placeholder-anon-key';
 
-  const supabaseUrl = import.meta.env["VITE_SUPABASE_URL"] as string;
-  const supabaseAnonKey = import.meta.env["VITE_SUPABASE_ANON_KEY"] as string;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables");
+  if (!import.meta.env['VITE_SUPABASE_URL'] || !import.meta.env['VITE_SUPABASE_ANON_KEY']) {
+    console.warn('VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is not defined in .env. Using fallback client.');
   }
 
-  _client = createClient(supabaseUrl || "", supabaseAnonKey || "", {
+  _client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,

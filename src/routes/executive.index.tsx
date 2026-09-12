@@ -12,13 +12,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Filter } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, ChevronUp, Filter, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Chip, KpiCard, LiveTag, Panel, PanelHeader } from "@/components/ops/primitives";
 import { HeatmapLegend, StoreHeatmap } from "@/components/ops/heatmap";
 import { useExecutive } from "@/hooks/useExecutive";
 import { useStores } from "@/hooks/useStores";
 import { num, cn } from "@/lib/utils";
+import { normalizeRole } from "@/lib/auth-utils";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "@tanstack/react-router";
@@ -29,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExecutiveAssistant } from "@/components/executive/ExecutiveAssistant";
 
 export const Route = createFileRoute("/executive/")({
@@ -115,7 +116,8 @@ function ExecutiveOverviewContent({
   timeFilter: string;
   setTimeFilter: (val: string) => void;
 }) {
-  const { data: userProfile } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: userProfile, isLoading: profileLoading } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
@@ -132,6 +134,9 @@ function ExecutiveOverviewContent({
 
       return profile as any;
     },
+    initialData: () =>
+      (queryClient.getQueryData(["current-user-profile"]) ||
+        queryClient.getQueryData(["current-user"])) as any,
   });
 
   const savedTimeRange = userProfile?.preferences?.defaultTimeRange;
@@ -146,15 +151,40 @@ function ExecutiveOverviewContent({
     }
   }, [savedTimeRange, hasUserChangedTimeFilter, setTimeFilter]);
 
-  const userRole = userProfile?.role as string;
+  const normalizedRole = normalizeRole(userProfile?.role);
+  const userRole = (normalizedRole || userProfile?.role) as string;
   const canAccessExecutive = ["PLATFORM_ADMIN", "EXECUTIVE"].includes(userRole);
   const canAccessStores = ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "STORE_MANAGER"].includes(
     userRole,
   );
 
   // Only fetch executive data if user has permission; pass autoRefresh preference
-  const { data: execData, isLoading: execLoading } = useExecutive(canAccessExecutive, autoRefresh);
-  const { data: storesData, isLoading: storesLoading } = useStores(canAccessExecutive);
+  const {
+    data: execData,
+    isLoading: execLoading,
+    error: execError,
+    refetch: refetchExec,
+  } = useExecutive(canAccessExecutive, autoRefresh);
+  const {
+    data: storesData,
+    isLoading: storesLoading,
+    error: storesError,
+    refetch: refetchStores,
+  } = useStores(canAccessExecutive);
+
+  const hasData = !!execData && !!storesData;
+
+  if (!hasData && (profileLoading || execLoading || storesLoading)) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 p-8">
+        <Loader2 className="size-6 animate-spin text-primary" />
+        <p className="text-sm font-medium text-foreground">Loading executive metrics...</p>
+        <p className="text-xs text-muted-foreground">
+          Aggregating store health, pulse scores, and SLA compliance across network
+        </p>
+      </div>
+    );
+  }
 
   if (!canAccessExecutive) {
     return (
@@ -164,8 +194,31 @@ function ExecutiveOverviewContent({
     );
   }
 
-  if (execLoading || storesLoading) return <div className="p-8">Loading executive metrics...</div>;
-  if (!execData || !storesData) return <div className="p-8 text-crit">Failed to load metrics.</div>;
+  if (execError || storesError || !execData || !storesData) {
+    const errorMsg =
+      (execError as any)?.message ||
+      (storesError as any)?.message ||
+      "Failed to load executive metrics.";
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 p-8 text-center">
+        <AlertTriangle className="size-8 text-crit" />
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">Failed to load metrics</p>
+          <p className="max-w-md text-xs text-muted-foreground">{errorMsg}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            refetchExec();
+            refetchStores();
+          }}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   const {
     kpis: EXEC_KPIS,

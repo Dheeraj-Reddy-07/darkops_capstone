@@ -3,167 +3,170 @@ import { createSupabaseServiceRoleClient } from "../lib/supabase";
 import { DeterministicInsightsProvider } from "../services/insights.service";
 import { ExecutiveAssistantService } from "../services/executive-assistant.service";
 
+let metricsCache: { data: any; expiresAt: number } | null = null;
+
 export const getMetrics = async (req: Request, res: Response, next: NextFunction) => {
+  const reqStart = Date.now();
+  const requestId = (req as any).requestId || "unknown";
+  console.log(`[GET_METRICS_START] RequestID: ${requestId}`);
+
+  // Return cached metrics if fresh (< 15 seconds)
+  if (metricsCache && Date.now() < metricsCache.expiresAt) {
+    console.log(`[GET_METRICS_CACHE_HIT] RequestID: ${requestId}, serving cached in ${Date.now() - reqStart}ms`);
+    return res.status(200).json(metricsCache.data);
+  }
+
   try {
-    // Use service role to bypass RLS — auth is already verified by middleware before this runs
     const supabase = createSupabaseServiceRoleClient();
 
-    // Get basic counts and pulse data
-    const [{ count: storeCount }, { data: rawPulseData }, { count: activeCases }] =
-      await Promise.all([
-        supabase.from("stores").select("*", { count: "exact", head: true }),
-        supabase.from("pulse_scores").select("score, store_id, calculated_at"),
-        supabase
-          .from("complaints")
-          .select("*", { count: "exact", head: true })
-          .in("status", ["unassigned", "assigned", "in_progress", "escalated_l2"]),
-      ]);
+    // 5 clean, non-blocking queries in parallel
+    const [
+      storesResult,
+      complaintsResult,
+      pulseResult,
+      fraudResult,
+      alertsResult,
+    ] = await Promise.all([
+      // 1. Stores with their snapshots
+      supabase
+        .from("stores")
+        .select("id, name, city, store_metrics_snapshots(sla_pct, refund_rate_pct)"),
+      // 2. All complaints (small table, ~92 rows) with all fields needed
+      supabase
+        .from("complaints")
+        .select("id, store_id, status, priority, sla_state, created_at"),
+      // 3. Latest pulse scores
+      supabase
+        .from("pulse_scores")
+        .select("store_id, score, calculated_at")
+        .order("calculated_at", { ascending: false })
+        .limit(600),
+      // 4. Pending fraud reviews count
+      supabase
+        .from("fraud_reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("decision", "pending_review"),
+      // 5. Active critical alerts
+      supabase
+        .from("alerts")
+        .select("*")
+        .eq("severity", "crit")
+        .is("is_resolved", false),
+    ]);
 
-    // Group pulse data by store and take the latest
-    const latestPulseScores = new Map<string, any>();
-    if (rawPulseData) {
-      rawPulseData.forEach((p) => {
-        const existing = latestPulseScores.get(p.store_id);
-        if (
-          !existing ||
-          new Date(p.calculated_at).getTime() > new Date(existing.calculated_at).getTime()
-        ) {
-          latestPulseScores.set(p.store_id, p);
-        }
-      });
-    }
-    const pulseData = Array.from(latestPulseScores.values());
+    console.log(`[GET_METRICS_QUERIES_DONE] Queries finished in ${Date.now() - reqStart}ms`);
 
-    // Calculate pulse metrics
+    const stores = storesResult.data || [];
+    const complaints = complaintsResult.data || [];
+    const pulseScores = pulseResult.data || [];
+
+    // Map latest pulse score per store
+    const latestPulseMap = new Map<string, { score: number; calculated_at: string }>();
+    pulseScores.forEach((p) => {
+      const existing = latestPulseMap.get(p.store_id);
+      if (!existing || new Date(p.calculated_at).getTime() > new Date(existing.calculated_at).getTime()) {
+        latestPulseMap.set(p.store_id, p);
+      }
+    });
+
+    // Store city lookup
+    const storeCityMap = new Map<string, string>();
+    stores.forEach((s) => storeCityMap.set(s.id, s.city));
+
+    // Pulse aggregations
+    const pulseValues = Array.from(latestPulseMap.values());
     let avgPulse = 0;
     let criticalStores = 0;
     let atRiskStores = 0;
-
-    if (pulseData.length > 0) {
-      const sum = pulseData.reduce((acc, curr) => acc + curr.score, 0);
-      avgPulse = Math.round(sum / pulseData.length);
-      criticalStores = pulseData.filter((p) => p.score < 60).length;
-      atRiskStores = pulseData.filter((p) => p.score >= 60 && p.score < 80).length;
+    if (pulseValues.length > 0) {
+      const sum = pulseValues.reduce((acc, curr) => acc + curr.score, 0);
+      avgPulse = Math.round(sum / pulseValues.length);
+      criticalStores = pulseValues.filter((p) => p.score < 60).length;
+      atRiskStores = pulseValues.filter((p) => p.score >= 60 && p.score < 80).length;
     }
 
-    // Count distinct cities across all stores (is_active is not reliably set by seed)
-    const { data: storesByCity } = await supabase.from("stores").select("city");
+    // Complaints aggregations
+    const activeStatuses = ["unassigned", "assigned", "in_progress", "escalated_l2"];
+    const activeCases = complaints.filter((c) => activeStatuses.includes(c.status)).length;
+    const slaAtRisk = complaints.filter((c) => c.sla_state === "at_risk").length;
+    const slaBreached = complaints.filter((c) => c.sla_state === "breached").length;
+    const p1Cases = complaints.filter((c) => c.priority === "P1").length;
+    const resolvedToday = complaints.filter((c) => c.status === "resolved").length;
 
-    const cityCount = new Set(storesByCity?.map((s) => s.city) || []).size;
-
-    // Get city stats for city-wise complaints
-    const { data: cityComplaints } = await supabase
-      .from("complaints")
-      .select("stores!inner(city)")
-      .in("status", ["unassigned", "assigned", "in_progress", "escalated_l2"]);
-
+    // City stats
     const cityStatsMap: Record<string, number> = {};
-    cityComplaints?.forEach((c: any) => {
-      const city = c.stores?.city || "Unknown";
-      cityStatsMap[city] = (cityStatsMap[city] || 0) + 1;
-    });
-
+    complaints
+      .filter((c) => activeStatuses.includes(c.status))
+      .forEach((c) => {
+        const city = storeCityMap.get(c.store_id) || "Unknown";
+        cityStatsMap[city] = (cityStatsMap[city] || 0) + 1;
+      });
     const cityStats = Object.entries(cityStatsMap)
-      .map(([city, complaints]) => ({ city, complaints }))
+      .map(([city, complaintsCount]) => ({ city, complaints: complaintsCount }))
       .sort((a, b) => b.complaints - a.complaints);
 
-    // Get SLA metrics from complaints
-    const { data: complaints } = await supabase
-      .from("complaints")
-      .select("sla_state, status, priority");
-
-    const slaAtRisk = complaints?.filter((c) => c.sla_state === "at_risk").length || 0;
-    const slaBreached = complaints?.filter((c) => c.sla_state === "breached").length || 0;
-    const p1Cases = complaints?.filter((c) => c.priority === "P1").length || 0;
-    const resolvedToday = complaints?.filter((c) => c.status === "resolved").length || 0;
-
-    // Get fraud metrics
-    const { count: pendingFraud } = await supabase
-      .from("fraud_reviews")
-      .select("*", { count: "exact", head: true })
-      .eq("decision", "pending_review");
-
-    // Get 30-day volume series
+    // 30-day volume series
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const { data: recentComplaints } = await supabase
-      .from("complaints")
-      .select("created_at")
-      .gte("created_at", thirtyDaysAgo.toISOString());
-
-    // Group by day for volume series
     const volumeByDay: Record<string, number> = {};
-    recentComplaints?.forEach((c) => {
-      const day = new Date(c.created_at).toISOString().split("T")[0];
-      volumeByDay[day] = (volumeByDay[day] || 0) + 1;
-    });
-
+    complaints
+      .filter((c) => new Date(c.created_at) >= thirtyDaysAgo)
+      .forEach((c) => {
+        const day = new Date(c.created_at).toISOString().split("T")[0];
+        volumeByDay[day] = (volumeByDay[day] || 0) + 1;
+      });
     const volumeSeries = Object.entries(volumeByDay)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Get worst performing stores with full details
-    const { data: worstStoresData } = await supabase.from("stores").select(`
-        id,
-        name,
-        city,
-        pulse_scores!inner(score, calculated_at),
-        store_metrics_snapshots!inner(sla_pct, refund_rate_pct)
-      `);
+    // Worst stores
+    const worstStores = stores
+      .map((s: any) => {
+        const pulse = latestPulseMap.get(s.id)?.score ?? 70;
+        return {
+          id: s.id,
+          name: s.name,
+          city: s.city,
+          pulse,
+          sla: s.store_metrics_snapshots?.[0]?.sla_pct || 0,
+          refundRate: s.store_metrics_snapshots?.[0]?.refund_rate_pct || 0,
+          prevPulse: pulse,
+        };
+      })
+      .sort((a: any, b: any) => a.pulse - b.pulse)
+      .slice(0, 5);
 
-    const worstStores =
-      worstStoresData
-        ?.map((s: any) => {
-          // Sort pulse scores descending so we get the most recent one first
-          const sortedPulseScores =
-            s.pulse_scores?.sort(
-              (a: any, b: any) =>
-                new Date(b.calculated_at).getTime() - new Date(a.calculated_at).getTime(),
-            ) || [];
-          const currentPulse = sortedPulseScores[0]?.score || 0;
-          const prevPulse = sortedPulseScores[7]?.score || currentPulse; // ~7 days ago
-
-          return {
-            id: s.id,
-            name: s.name,
-            city: s.city,
-            pulse: currentPulse,
-            sla: s.store_metrics_snapshots?.[0]?.sla_pct || 0,
-            refundRate: s.store_metrics_snapshots?.[0]?.refund_rate_pct || 0,
-            prevPulse: prevPulse,
-          };
-        })
-        .sort((a, b) => a.pulse - b.pulse)
-        .slice(0, 5) || [];
-
-    // Get red alerts
-    const { data: alerts } = await supabase
-      .from("alerts")
-      .select("*")
-      .eq("severity", "crit")
-      .is("is_resolved", false);
-
-    res.status(200).json({
-      store_count: storeCount || 0,
-      city_count: cityCount,
+    const resultData = {
+      store_count: stores.length,
+      city_count: new Set(stores.map((s) => s.city)).size,
       critical_stores: criticalStores,
       at_risk_stores: atRiskStores,
       avg_pulse: avgPulse,
-      active_cases: activeCases || 0,
+      active_cases: activeCases,
       sla_at_risk: slaAtRisk,
       sla_breached: slaBreached,
       p1_cases: p1Cases,
       resolved_today: resolvedToday,
-      pending_fraud: pendingFraud || 0,
+      pending_fraud: fraudResult.count || 0,
       volume_series: volumeSeries,
       worst_stores: worstStores,
-      red_alerts: alerts || [],
+      red_alerts: alertsResult.data || [],
       city_stats: cityStats,
-    });
+    };
+
+    // Cache for 15s
+    metricsCache = {
+      data: resultData,
+      expiresAt: Date.now() + 15000,
+    };
+
+    console.log(`[GET_METRICS_SUCCESS] Sending response in ${Date.now() - reqStart}ms`);
+    return res.status(200).json(resultData);
   } catch (error) {
+    console.error(`[GET_METRICS_ERROR] in ${Date.now() - reqStart}ms:`, error);
     next(error);
   }
+
 };
 
 export const getInsights = async (req: Request, res: Response, next: NextFunction) => {

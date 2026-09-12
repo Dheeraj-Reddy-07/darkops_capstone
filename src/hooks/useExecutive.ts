@@ -43,12 +43,12 @@ export function useExecutive(enabled: boolean = false, autoRefresh: boolean = fa
       // Transform volume series for chart
       const volumeSeries = (response.volume_series || []).map((v: any) => ({
         day: v.day || v.date,
-        raised: v.raised || v.count || response.active_cases,
-        resolved: v.resolved || Math.round(v.count * 0.8),
+        raised: v.raised || v.count || response.active_cases || 0,
+        resolved: v.resolved || Math.round((v.count || 0) * 0.8),
       }));
 
       // Transform worst stores with store details
-      const worstStores = response.worst_stores.map((w: any) => ({
+      const worstStores = (response.worst_stores || []).map((w: any) => ({
         id: w.id,
         name: w.name,
         city: w.city,
@@ -64,9 +64,9 @@ export function useExecutive(enabled: boolean = false, autoRefresh: boolean = fa
       return {
         kpis,
         network,
-        backlogDelta: response.resolved_today - response.active_cases,
+        backlogDelta: (response.resolved_today || 0) - (response.active_cases || 0),
         volumeSeries,
-        redAlerts: response.red_alerts,
+        redAlerts: response.red_alerts || [],
         worstStores,
         cityStats,
       };

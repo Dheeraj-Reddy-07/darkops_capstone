@@ -35,6 +35,28 @@ export const Route = createFileRoute("/")({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any);
 
+/* ─────────────────────────────── Data ─────────────────────────────── */
+
+interface PublicOverview {
+  store_count: number;
+  active_cases: number;
+  avg_pulse: number;
+  pending_fraud: number;
+}
+
+function usePublicOverview() {
+  return useQuery<PublicOverview>({
+    queryKey: ["public-overview"],
+    queryFn: async () => {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      const res = await fetch(`${apiBase}/api/v1/public/overview`);
+      if (!res.ok) throw new Error("Overview unavailable");
+      return res.json();
+    },
+    retry: 2,
+    staleTime: 60_000,
+  });
+}
 /* ─────────────────────────── Module definitions ───────────────────── */
 
 const MODULES = [

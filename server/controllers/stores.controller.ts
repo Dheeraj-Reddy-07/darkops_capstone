@@ -2,24 +2,28 @@ import { Request, Response, NextFunction } from "express";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "../lib/supabase";
 import { HTTPError } from "../middleware/errors";
 
+let defaultStoresCache: { data: any; meta: any; expiresAt: number } | null = null;
+
 export const getStores = async (req: Request, res: Response, next: NextFunction) => {
+  const reqStart = Date.now();
+  const requestId = (req as any).requestId || "unknown";
+  console.log(`[GET_STORES_START] RequestID: ${requestId}`);
   try {
+    const query: any = req.query;
+    const isDefaultQuery = !query.city && !query.zone && (!query.page || query.page === "1") && (!query.limit || query.limit === "200");
+
+    if (isDefaultQuery && defaultStoresCache && Date.now() < defaultStoresCache.expiresAt) {
+      console.log(`[GET_STORES_CACHE_HIT] RequestID: ${requestId} in ${Date.now() - reqStart}ms`);
+      return res.status(200).json({
+        data: defaultStoresCache.data,
+        meta: defaultStoresCache.meta,
+      });
+    }
+
     // Use service role to bypass RLS for demo purposes
     const adminClient = createSupabaseServiceRoleClient();
-    const query: any = req.query;
 
-    let dbQuery = adminClient.from("stores").select(
-      `
-        *,
-        store_metrics_snapshots (
-          sla_pct, refund_rate_pct, open_issues, avg_resolution_mins
-        ),
-        pulse_scores (
-          score, equipment_pts, sla_pts, refunds_pts, delivery_pts, picker_pts, inventory_pts, calculated_at
-        )
-      `,
-      { count: "exact" },
-    );
+    let dbQuery = adminClient.from("stores").select("*", { count: "exact" });
 
     if (query.city) dbQuery = dbQuery.eq("city", query.city);
     if (query.zone) dbQuery = dbQuery.eq("zone", query.zone);
@@ -30,31 +34,73 @@ export const getStores = async (req: Request, res: Response, next: NextFunction)
     const to = from + limit - 1;
     dbQuery = dbQuery.range(from, to).order("name", { ascending: true });
 
-    const { data, error, count } = await dbQuery;
-    if (error) throw new HTTPError(500, "DATABASE_ERROR", `Database error: ${error.message}`);
+    // Fetch stores, latest pulse scores, and latest metrics snapshots in parallel
+    const [storesRes, pulseRes, metricsRes] = await Promise.all([
+      dbQuery,
+      adminClient
+        .from("pulse_scores")
+        .select("store_id, score, equipment_pts, sla_pts, refunds_pts, delivery_pts, picker_pts, inventory_pts, calculated_at")
+        .order("calculated_at", { ascending: false })
+        .limit(600),
+      adminClient
+        .from("store_metrics_snapshots")
+        .select("store_id, sla_pct, refund_rate_pct, open_issues, avg_resolution_mins, snapshot_at")
+        .order("snapshot_at", { ascending: false })
+        .limit(400),
+    ]);
+    console.log(`[GET_STORES_QUERIES_DONE] RequestID: ${requestId} in ${Date.now() - reqStart}ms`);
 
-    const formattedData = data.map((store) => {
-      // Sort pulse scores descending so we get the most recent one first
-      const sortedPulseScores =
-        store.pulse_scores?.sort(
-          (a: any, b: any) =>
-            new Date(b.calculated_at).getTime() - new Date(a.calculated_at).getTime(),
-        ) || [];
+    if (storesRes.error) throw new HTTPError(500, "DATABASE_ERROR", `Database error: ${storesRes.error.message}`);
+
+    const stores = storesRes.data || [];
+    const count = storesRes.count || stores.length;
+
+    // Map latest pulse score per store
+    const pulseMap = new Map<string, any>();
+    (pulseRes.data || []).forEach((p) => {
+      const existing = pulseMap.get(p.store_id);
+      if (!existing || new Date(p.calculated_at).getTime() > new Date(existing.calculated_at).getTime()) {
+        pulseMap.set(p.store_id, p);
+      }
+    });
+
+    // Map latest metrics snapshot per store
+    const metricsMap = new Map<string, any>();
+    (metricsRes.data || []).forEach((m) => {
+      const existing = metricsMap.get(m.store_id);
+      if (!existing || new Date(m.snapshot_at).getTime() > new Date(existing.snapshot_at).getTime()) {
+        metricsMap.set(m.store_id, m);
+      }
+    });
+
+    const formattedData = stores.map((store) => {
+      const pulseData = pulseMap.get(store.id);
+      const metricsData = metricsMap.get(store.id);
 
       return {
         ...store,
-        metrics: store.store_metrics_snapshots?.[0] || null,
-        pulse_scores: sortedPulseScores[0] || null,
-        pulse: sortedPulseScores[0]?.score || null,
-        store_metrics_snapshots: undefined,
+        metrics: metricsData || null,
+        pulse_scores: pulseData || null,
+        pulse: pulseData?.score || null,
       };
     });
 
+    const meta = { total: count, page, limit };
+    if (isDefaultQuery) {
+      defaultStoresCache = {
+        data: formattedData,
+        meta,
+        expiresAt: Date.now() + 15000,
+      };
+    }
+
+    console.log(`[GET_STORES_SUCCESS] RequestID: ${requestId} in ${Date.now() - reqStart}ms`);
     res.status(200).json({
       data: formattedData,
-      meta: { total: count, page, limit },
+      meta,
     });
   } catch (error) {
+    console.error(`[GET_STORES_ERROR] RequestID: ${(req as any).requestId} in ${Date.now() - reqStart}ms:`, error);
     next(error);
   }
 };

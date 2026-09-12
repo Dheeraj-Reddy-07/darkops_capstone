@@ -72,20 +72,25 @@ function Support() {
   const submit = useSubmitComplaint();
   const uploadUrl = useUploadAttachmentUrl();
 
-  // Read orderId from router location state if coming from order detail
+  // Read orderId and category from router location state if coming from order detail or shortcut
   const location = window.history.state;
   const preselectedOrderId = location?.usr?.orderId || "";
+  const preselectedCategory = location?.usr?.category || "";
 
   // Multi-step form state
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(preselectedOrderId ? 2 : 1);
   const [selectedOrder, setSelectedOrder] = useState(preselectedOrderId);
+  const [category, setCategory] = useState(preselectedCategory);
 
-  // If preselected order, jump to step 2
   useEffect(() => {
-    if (preselectedOrderId) setStep(2);
-  }, [preselectedOrderId]);
-
-  const [category, setCategory] = useState("");
+    if (preselectedOrderId) {
+      setSelectedOrder(preselectedOrderId);
+      setStep(2);
+    }
+    if (preselectedCategory) {
+      setCategory(preselectedCategory);
+    }
+  }, [preselectedOrderId, preselectedCategory]);
   const [details, setDetails] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -210,7 +215,7 @@ function Support() {
   const selectedOrderData = orders?.find((o) => o.id === selectedOrder);
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4">
+    <div className="w-full space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">

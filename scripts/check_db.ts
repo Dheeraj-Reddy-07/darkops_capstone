@@ -22,17 +22,20 @@ async function checkDb() {
   console.log("Auth user:", user, "Error:", error);
 
   // Check tables
-  const tables = ["profiles", "fraud_reviews"];
+  const tables = ["profiles", "stores", "pulse_scores", "complaints", "cases", "fraud_reviews"];
 
   const results = {};
   for (const t of tables) {
-    const { data, error } = await supabase.from(t).select("id").limit(1);
+    const { count, error } = await supabase.from(t).select("*", { count: "exact", head: true });
     if (error) {
       results[t] = `Error: ${error.message}`;
     } else {
-      results[t] = "Exists";
+      results[t] = `Count: ${count}`;
     }
   }
+
+  const { data: profs } = await supabase.from("profiles").select("id, role, email, full_name");
+  console.log("Profiles:", profs);
 
   console.log(JSON.stringify(results, null, 2));
 }

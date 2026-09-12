@@ -13,7 +13,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     headers.set("Authorization", `Bearer ${session.access_token}`);
   }
 
-  const response = await fetch(`/api/v1${endpoint}`, {
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+  const response = await fetch(`${apiBase}/api/v1${endpoint}`, {
     ...options,
     headers,
   });

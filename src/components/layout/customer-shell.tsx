@@ -53,7 +53,7 @@ export function CustomerShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-4xl items-center gap-4 px-5">
+        <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-5">
           <Link to="/customer" className="flex items-center gap-2.5">
             <span className="flex size-6 items-center justify-center rounded-[4px] bg-primary/15">
               <span className="size-2.5 rounded-[2px] bg-primary" />
@@ -120,8 +120,8 @@ export function CustomerShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-5 py-6">{children}</main>
-      <footer className="mx-auto max-w-4xl px-5 pb-8 text-xs text-muted-foreground">
+      <main className="mx-auto max-w-[1600px] px-5 py-6">{children}</main>
+      <footer className="mx-auto max-w-[1600px] px-5 pb-8 text-xs text-muted-foreground">
         {customerProfile?.full_name
           ? `Signed in as ${customerProfile.full_name}`
           : customerProfile?.email

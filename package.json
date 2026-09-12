@@ -10,12 +10,18 @@
     "build:server": "tsc -p tsconfig.server.json",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "seed": "tsx database/seed.ts"
+    "seed": "tsx database/seed.ts",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "build:mobile": "npm run build:client && cap sync android"
   },
   "overrides": {
     "rolldown": "1.2.1"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -43,6 +49,7 @@
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@rolldown/binding-darwin-arm64": "^1.2.1",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "@tailwindcss/vite": "^4.2.1",

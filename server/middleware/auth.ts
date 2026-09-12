@@ -31,22 +31,43 @@ export const addRequestId = (req: Request, res: Response, next: NextFunction) =>
   next();
 };
 
+interface CachedAuth {
+  user: any;
+  profile: any;
+  expiresAt: number;
+}
+const tokenAuthCache = new Map<string, CachedAuth>();
+
 /**
  * Enhanced authentication middleware with better error handling and logging
  */
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServerClient(req, res);
     const requestId = req.requestId || "unknown";
-
     const authHeader = req.headers.authorization;
+
+    // Check token cache first for fast response
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      const cached = tokenAuthCache.get(token);
+      if (cached && Date.now() < cached.expiresAt) {
+        req.auth = {
+          user: cached.user,
+          permissions: getPermissionsForRole(cached.profile.role as AppRole),
+        };
+        return next();
+      }
+    }
+
+    const supabase = createSupabaseServerClient(req, res);
     let user;
     let authError;
 
     // Try Bearer token first, then session cookie
+    let bearerToken = "";
     if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.split(" ")[1];
-      const result = await supabase.auth.getUser(token);
+      bearerToken = authHeader.split(" ")[1];
+      const result = await supabase.auth.getUser(bearerToken);
       user = result.data?.user;
       authError = result.error;
     } else {
@@ -98,6 +119,14 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       },
       permissions,
     };
+
+    if (bearerToken) {
+      tokenAuthCache.set(bearerToken, {
+        user: req.auth.user,
+        profile,
+        expiresAt: Date.now() + 30000,
+      });
+    }
 
     // Log successful authentication (without sensitive data)
     console.log(`[AUTH_SUCCESS] RequestID: ${requestId}, UserID: ${user.id}, Role: ${role}, Permissions: ${Array.from(permissions).join(", ")}`);
