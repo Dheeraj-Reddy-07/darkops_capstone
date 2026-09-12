@@ -37,6 +37,7 @@ interface ParsedQuery {
   parameters: Record<string, any>;
   entities: string[];
   confidence: number;
+  rawQuestion?: string;
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -65,6 +66,12 @@ export class ExecutiveAssistantService {
     switch (parsed.intent) {
       case "NETWORK_SUMMARY":
         return this.getNetworkSummary(parsed);
+      case "PULSE_OVERVIEW":
+        return this.getPulseOverview(parsed);
+      case "CRITICAL_BOTTLENECKS":
+        return this.getCriticalBottlenecks(parsed);
+      case "EXECUTIVE_METRICS":
+        return this.getExecutiveMetrics(parsed);
       case "COMPLAINT_TRENDS":
         return this.getComplaintTrends(parsed);
       case "COMPLAINT_CATEGORIES":
@@ -106,6 +113,16 @@ export class ExecutiveAssistantService {
    * Semantic intent and entity parser
    */
   private parseQuestion(
+    question: string,
+    context?: any,
+    dashboardContext?: { timeFilter?: string },
+  ): ParsedQuery {
+    const res = this.doParseQuestion(question, context, dashboardContext);
+    res.rawQuestion = question;
+    return res;
+  }
+
+  private doParseQuestion(
     question: string,
     context?: any,
     dashboardContext?: { timeFilter?: string },
@@ -289,15 +306,15 @@ export class ExecutiveAssistantService {
       };
     }
 
-    // 10. Smart fallback: if the query sounds operational at all, give NETWORK_SUMMARY
-    //     instead of the generic UNSUPPORTED message
-    if (this.soundsOperational(q)) {
+    // 10. Smart fallback: if the query sounds operational at all, route to appropriate intent
+    const op = this.soundsOperational(q);
+    if (op.isOperational && op.intent) {
       return {
-        intent: "NETWORK_SUMMARY",
+        intent: op.intent,
         timeRange: this.getTimeRange(q, dashboardContext),
         parameters: {},
         entities: [],
-        confidence: 0.6,
+        confidence: 0.7,
       };
     }
 
@@ -326,6 +343,63 @@ export class ExecutiveAssistantService {
     //   - a multi-word phrase: matched with q.includes()
     //   - an array of words: ALL must be present in tokens (AND match)
     const intentSignals: Record<string, Array<{ match: string | string[]; weight: number }>> = {
+      PULSE_OVERVIEW: [
+        { match: "pulse score", weight: 4 },
+        { match: "pulse scores", weight: 4 },
+        { match: "pulsescore", weight: 4 },
+        { match: "store health", weight: 3 },
+        { match: "fleet health", weight: 3 },
+        { match: "average pulse", weight: 4 },
+        { match: "network pulse", weight: 4 },
+        { match: "health distribution", weight: 4 },
+        { match: "store health distribution", weight: 4 },
+        { match: "how healthy", weight: 3 },
+        { match: "health score", weight: 3 },
+        { match: "health index", weight: 3 },
+        { match: "health", weight: 2 },
+        { match: "pulse", weight: 2 },
+      ],
+      CRITICAL_BOTTLENECKS: [
+        { match: "what is going wrong", weight: 4 },
+        { match: "what's going wrong", weight: 4 },
+        { match: "going wrong", weight: 3 },
+        { match: "what is wrong", weight: 3 },
+        { match: "what's wrong", weight: 3 },
+        { match: "what needs fixing", weight: 4 },
+        { match: "needs fixing", weight: 3 },
+        { match: "critical issues", weight: 4 },
+        { match: "critical issue", weight: 3 },
+        { match: "urgent issues", weight: 4 },
+        { match: "urgent problems", weight: 4 },
+        { match: "how bad is it", weight: 4 },
+        { match: "how bad", weight: 3 },
+        { match: "what needs attention", weight: 3 },
+        { match: "any critical issues", weight: 4 },
+        { match: "major issues", weight: 3 },
+        { match: "major problems", weight: 3 },
+        { match: "top bottlenecks", weight: 4 },
+        { match: "main bottlenecks", weight: 4 },
+        { match: "biggest bottlenecks", weight: 4 },
+        { match: "key bottlenecks", weight: 4 },
+        { match: "operational bottlenecks", weight: 4 },
+        { match: "severity assessment", weight: 4 },
+        { match: "trouble spots", weight: 3 },
+        { match: "bottleneck", weight: 3 },
+        { match: "bottlenecks", weight: 3 },
+      ],
+      EXECUTIVE_METRICS: [
+        { match: "give me the numbers", weight: 4 },
+        { match: "show me the numbers", weight: 4 },
+        { match: "the numbers", weight: 3 },
+        { match: "data snapshot", weight: 4 },
+        { match: "metrics snapshot", weight: 4 },
+        { match: "executive metrics", weight: 4 },
+        { match: "kpi snapshot", weight: 4 },
+        { match: "kpi numbers", weight: 4 },
+        { match: "numbers snapshot", weight: 4 },
+        { match: "key numbers", weight: 3 },
+        { match: "high level numbers", weight: 3 },
+      ],
       NETWORK_SUMMARY: [
         // Phrases
         { match: "what is happening", weight: 3 },
@@ -333,6 +407,7 @@ export class ExecutiveAssistantService {
         { match: "what is going on", weight: 3 },
         { match: "what's going on", weight: 3 },
         { match: "how are things", weight: 3 },
+        { match: "how are things looking", weight: 3 },
         { match: "how are we doing", weight: 3 },
         { match: "how is everything", weight: 3 },
         { match: "current situation", weight: 3 },
@@ -343,33 +418,10 @@ export class ExecutiveAssistantService {
         { match: "operational summary", weight: 3 },
         { match: "network summary", weight: 3 },
         { match: "executive summary", weight: 3 },
-        { match: "network health", weight: 3 },
         { match: "overall status", weight: 3 },
-        { match: "overall health", weight: 3 },
         { match: "network status", weight: 3 },
-        { match: "biggest issue", weight: 3 },
-        { match: "biggest problem", weight: 3 },
-        { match: "major issue", weight: 3 },
-        { match: "main issue", weight: 3 },
-        { match: "biggest operational", weight: 3 },
-        { match: "operational issue", weight: 3 },
-        { match: "what is wrong", weight: 3 },
-        { match: "what's wrong", weight: 3 },
-        { match: "going wrong", weight: 3 },
-        { match: "critical issue", weight: 3 },
-        { match: "any issues", weight: 2 },
-        { match: "how bad", weight: 2 },
-        { match: "how bad is it", weight: 3 },
-        { match: "what needs attention", weight: 3 },
-        { match: "needs fixing", weight: 2 },
-        { match: "what needs fixing", weight: 3 },
-        { match: "pulse score", weight: 2 },
+        { match: "network overview", weight: 3 },
         { match: "how is the network", weight: 3 },
-        { match: "the numbers", weight: 2 },
-        { match: "give me the numbers", weight: 3 },
-        { match: "show me the numbers", weight: 3 },
-        { match: "top level", weight: 2 },
-        { match: "high level", weight: 2 },
         { match: "at a glance", weight: 3 },
         { match: "brief me", weight: 3 },
         { match: "briefing", weight: 2 },
@@ -512,6 +564,12 @@ export class ExecutiveAssistantService {
         { match: "breakdown", weight: 1 },
       ],
       CITY_PERFORMANCE: [
+        { match: "which areas", weight: 4 },
+        { match: "which area", weight: 3 },
+        { match: "which areas need attention", weight: 4 },
+        { match: "areas need attention", weight: 4 },
+        { match: "where should we focus", weight: 3 },
+        { match: "where are complaints concentrated", weight: 4 },
         { match: "city wise", weight: 3 },
         { match: "city-wise", weight: 3 },
         { match: "city level", weight: 3 },
@@ -656,29 +714,31 @@ export class ExecutiveAssistantService {
   }
 
   /**
-   * Check if a query sounds operational (should get NETWORK_SUMMARY fallback
-   * rather than the generic UNSUPPORTED "I can't help" message)
+   * Check if a query sounds operational (routes to appropriate intent fallback
+   * rather than the generic UNSUPPORTED message)
    */
-  private soundsOperational(q: string): boolean {
-    const operationalWords = [
-      "store", "stores", "complaint", "complaints", "issue", "issues",
-      "performance", "health", "problem", "problems", "report", "data",
-      "metric", "metrics", "number", "numbers", "count", "total",
-      "active", "critical", "urgent", "important", "concern", "current",
-      "today", "week", "month", "help", "show", "tell", "give", "what",
-      "how", "where", "when", "why", "which", "analyze", "analysis",
-      "check", "look", "see", "view", "operations", "operational",
-      "pulse", "score", "rate", "percentage", "volume", "delivery",
-      "order", "orders", "customer", "customers", "agent", "agents",
-      "team", "shift", "picker", "rider", "queue", "resolve", "resolved",
-      "resolution", "pending", "open", "closed", "fixed", "repair",
-      "maintenance", "inventory", "stock", "network", "summary",
-      "bad", "good", "worst", "best", "top", "bottom", "high", "low",
+  private soundsOperational(q: string): { isOperational: boolean; intent?: string } {
+    const coreWords = [
+      "store", "stores", "complaint", "complaints", "sla", "pulse", "fraud",
+      "breach", "refund", "dark store", "dark stores", "picker", "rider",
+      "chiller", "freezer", "ticket", "tickets", "work order", "inventory"
     ];
-    const tokens = this.tokenize(q);
-    const hits = tokens.filter((t) => operationalWords.includes(t)).length;
-    // If at least 2 operational words are present, treat as operational
-    return hits >= 2 || q.length > 15;
+    const hasCore = coreWords.some((w) => q.includes(w));
+    if (!hasCore) return { isOperational: false };
+
+    if (q.includes("wrong") || q.includes("bad") || q.includes("fix") || q.includes("problem") || q.includes("critical") || q.includes("bottleneck")) {
+      return { isOperational: true, intent: "CRITICAL_BOTTLENECKS" };
+    }
+    if (q.includes("pulse") || q.includes("health")) {
+      return { isOperational: true, intent: "PULSE_OVERVIEW" };
+    }
+    if (q.includes("number") || q.includes("metric") || q.includes("kpi") || q.includes("data")) {
+      return { isOperational: true, intent: "EXECUTIVE_METRICS" };
+    }
+    if (q.includes("area") || q.includes("city") || q.includes("region") || q.includes("where")) {
+      return { isOperational: true, intent: "CITY_PERFORMANCE" };
+    }
+    return { isOperational: true, intent: "NETWORK_SUMMARY" };
   }
 
   /**
@@ -715,7 +775,7 @@ export class ExecutiveAssistantService {
       q.includes("which stores are driving") ||
       q.includes("which stores are responsible") ||
       (q.includes("which stores") &&
-        (context.lastIntent === "NETWORK_SUMMARY" || context.lastIntent === "COMPLAINT_CATEGORIES"))
+        (context.lastIntent === "NETWORK_SUMMARY" || context.lastIntent === "CRITICAL_BOTTLENECKS" || context.lastIntent === "PULSE_OVERVIEW" || context.lastIntent === "EXECUTIVE_METRICS" || context.lastIntent === "COMPLAINT_CATEGORIES"))
     ) {
       return {
         intent: "STORE_PERFORMANCE",
@@ -795,14 +855,28 @@ export class ExecutiveAssistantService {
     const kpis = await this.tools.getNetworkKPIs(parsed.timeRange);
 
     const topStoreText = kpis.topProblemStore
-      ? `${kpis.topProblemStore.name} (${kpis.topProblemStore.city}) recorded the highest complaint volume (${kpis.topProblemStore.complaints} cases).`
+      ? `\n• Top Problem Store: ${kpis.topProblemStore.name} (${kpis.topProblemStore.city}) with ${kpis.topProblemStore.complaints} complaints.`
       : "";
 
     const topCatText = kpis.topCategory
-      ? `${CATEGORY_LABEL_MAP[kpis.topCategory.category] || kpis.topCategory.category} represents the top complaint category (${kpis.topCategory.count} cases).`
+      ? `\n• Dominant Category: ${CATEGORY_LABEL_MAP[kpis.topCategory.category] || kpis.topCategory.category} (${kpis.topCategory.count} cases).`
       : "";
 
-    const answer = `Network overview for ${parsed.timeRange.label}: We are tracking ${kpis.totalComplaints} total issues across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities. Currently, ${kpis.activeCases} cases are in the active support queue and ${kpis.slaBreached} cases have breached SLA. Average network PulseScore is ${kpis.avgPulse}/100, with ${kpis.criticalStores} stores in critical health (<60). ${topCatText} ${topStoreText} ${kpis.pendingFraud} cases are currently flagged for fraud review.`;
+    const raw = (parsed.rawQuestion || "").toLowerCase();
+    const timeLabel = parsed.timeRange.label;
+    let headline = `Network Operations Overview (${timeLabel}):`;
+
+    if (raw.includes("status update") || (raw.includes("status") && !raw.includes("overall"))) {
+      headline = `Current Network Operations Status Update:`;
+    } else if (raw.includes("quick summary") || raw.includes("brief") || raw.includes("summary")) {
+      headline = `Executive Operational Briefing (${timeLabel}):`;
+    } else if (raw.includes("today") || timeLabel.includes("today")) {
+      headline = `Today's Real-Time Operations Status:`;
+    } else if (raw.includes("how are things") || raw.includes("how are we doing") || raw.includes("how is everything")) {
+      headline = `Operational Health & Status Report:`;
+    }
+
+    const answer = `${headline}\n• Ticket Volume: ${kpis.totalComplaints} total complaints tracked across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities.\n• Active Triage: ${kpis.activeCases} active cases in queue (${kpis.slaBreached} breached SLA, ${kpis.p1Cases} P1 critical).\n• Fleet Health: Average PulseScore is ${kpis.avgPulse}/100, with ${kpis.criticalStores} stores in critical condition (<60).${topCatText}${topStoreText}\n• Risk Signals: ${kpis.pendingFraud} cases flagged for fraud review, ${kpis.activeCriticalAlerts} active critical equipment alerts.`;
 
     const topStoreId = kpis.topProblemStore?.id || "DS-1462";
     const topCity = kpis.topProblemStore?.city || "Kolkata";
@@ -827,8 +901,8 @@ export class ExecutiveAssistantService {
       suggestedQuestions: [
         "Which stores have the most complaints?",
         "What are the top complaint categories?",
-        "Are complaints increasing?",
-        "How effective is automation?",
+        "What is our pulse score?",
+        "What is going wrong?",
       ],
       drillDown: {
         label: "Open Operations Board",
@@ -840,6 +914,177 @@ export class ExecutiveAssistantService {
         lastCity: topCity,
         lastTimePeriod: parsed.timeRange.label,
         lastResults: [topStoreId],
+      },
+    };
+  }
+
+  /**
+   * 1b. Intent Handler: Pulse Overview & Health Distribution
+   */
+  private async getPulseOverview(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const kpis = await this.tools.getNetworkKPIs(parsed.timeRange);
+    const worstStores = await this.tools.getStoreRankings("pulse_asc", 3);
+
+    const worstList = worstStores
+      .map((s) => `${s.name} (${s.id}: Pulse ${s.pulse}/100, ${s.openComplaints} complaints)`)
+      .join("\n• ");
+
+    const answer = `PulseScore fleet health analysis:\n• Network Average: ${kpis.avgPulse}/100 across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities.\n• Health Breakdown: ${kpis.criticalStores} stores in critical status (<60), ${kpis.atRiskStores} at risk (60–79), and ${kpis.healthyStores} healthy (80+).\n• Lowest Health Stores:\n• ${worstList || "None recorded"}\n\nPrimary score deduction factors: ${kpis.activeCriticalAlerts} active critical equipment alerts and ${kpis.slaBreached} SLA breaches.`;
+
+    const worstStore = worstStores[0];
+
+    return {
+      intent: "PULSE_OVERVIEW",
+      answer,
+      summary: `Network PulseScore is ${kpis.avgPulse}/100 with ${kpis.criticalStores} stores in critical health (<60).`,
+      metrics: [
+        { label: "Network Pulse", value: `${kpis.avgPulse}/100`, tone: kpis.avgPulse < 60 ? "crit" : kpis.avgPulse < 80 ? "warn" : "ok" },
+        { label: "Critical Stores (<60)", value: `${kpis.criticalStores}`, tone: "crit" },
+        { label: "At Risk (60-79)", value: `${kpis.atRiskStores}`, tone: "warn" },
+        { label: "Healthy (80+)", value: `${kpis.healthyStores}`, tone: "ok" },
+      ],
+      evidence: [
+        { label: "Fleet size", value: `${kpis.storeCount} dark stores` },
+        { label: "Average PulseScore", value: `${kpis.avgPulse}/100` },
+        { label: "Worst store", value: worstStore ? `${worstStore.id} (${worstStore.pulse}/100)` : "N/A" },
+      ],
+      suggestedQuestions: [
+        worstStore ? `Why is ${worstStore.id} struggling?` : "Which stores have the most complaints?",
+        "Which stores have the lowest pulse?",
+        "What equipment breakdowns are recorded?",
+      ],
+      drillDown: {
+        label: "View Dark Store Network",
+        route: "/dark-stores",
+      },
+      context: {
+        lastIntent: "PULSE_OVERVIEW",
+        lastStore: worstStore?.id,
+        lastCity: worstStore?.city,
+        lastResults: worstStores.map((s) => s.id),
+      },
+    };
+  }
+
+  /**
+   * 1c. Intent Handler: Critical Bottlenecks & Exceptions
+   */
+  private async getCriticalBottlenecks(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const [kpis, anomalies, sla] = await Promise.all([
+      this.tools.getNetworkKPIs(parsed.timeRange),
+      this.tools.getAnomaliesAndAlerts(),
+      this.tools.getSLAAnalytics(parsed.timeRange),
+    ]);
+
+    const topStore = kpis.topProblemStore;
+    const topCat = kpis.topCategory;
+
+    const issues: string[] = [];
+    if (sla.breached > 0) {
+      issues.push(`1. SLA Compliance: ${sla.breached} tickets have breached resolution SLA (${sla.p1Breaches} are critical P1 cases)`);
+    }
+    if (anomalies.length > 0) {
+      issues.push(`2. Hardware Red Alerts: ${anomalies.slice(0, 2).map((a) => `${a.title} at ${a.entityName || a.entityId}`).join("; ")}`);
+    }
+    if (topStore) {
+      issues.push(`3. Problem Store Hotspot: ${topStore.name} (${topStore.city}) leads the network with ${topStore.complaints} complaints`);
+    }
+    if (topCat) {
+      issues.push(`4. Customer Driver: ${CATEGORY_LABEL_MAP[topCat.category] || topCat.category} represents the largest failure mode (${topCat.count} complaints)`);
+    }
+    if (kpis.pendingFraud > 0) {
+      issues.push(`5. Risk Exposure: ${kpis.pendingFraud} cases flagged for potential fraud review`);
+    }
+
+    const raw = (parsed.rawQuestion || "").toLowerCase();
+    let headline = "Critical operational bottlenecks requiring intervention:";
+
+    if (raw.includes("how bad")) {
+      const riskLevel = sla.breachRate > 40 ? "HIGH RISK" : "MODERATE RISK";
+      headline = `Operational Severity Assessment (${riskLevel} — ${sla.breachRate}% SLA breach rate):`;
+    } else if (raw.includes("fixing") || raw.includes("fix") || raw.includes("action")) {
+      headline = "Prioritized Operational Fixes Needed Across Dark Stores:";
+    } else if (raw.includes("going wrong") || raw.includes("wrong")) {
+      headline = "Top Operational Bottlenecks & Exceptions Detected:";
+    } else if (raw.includes("critical issue") || raw.includes("critical") || raw.includes("urgent")) {
+      headline = "Active Critical Incidents & High-Severity Exceptions:";
+    }
+
+    const answer = `${headline}\n${issues.join("\n")}\n\nOverall network status is under elevated strain with ${kpis.criticalStores} stores in critical health (<60 PulseScore) and a ${sla.breachRate}% SLA breach rate.`;
+
+    return {
+      intent: "CRITICAL_BOTTLENECKS",
+      answer,
+      summary: `${sla.breached} SLA breaches (${sla.p1Breaches} P1), ${anomalies.length} hardware alerts, ${kpis.criticalStores} critical stores.`,
+      metrics: [
+        { label: "SLA Breaches", value: `${sla.breached}`, tone: "crit" },
+        { label: "P1 Critical Breaches", value: `${sla.p1Breaches}`, tone: "crit" },
+        { label: "Active Hardware Alerts", value: `${anomalies.length}`, tone: anomalies.length > 0 ? "crit" : "ok" },
+        { label: "Critical Health Stores", value: `${kpis.criticalStores}`, tone: "crit" },
+      ],
+      evidence: [
+        { label: "Active queue", value: `${kpis.activeCases} cases` },
+        { label: "SLA breach rate", value: `${sla.breachRate}%` },
+        { label: "Top problem store", value: topStore ? `${topStore.id} (${topStore.name})` : "N/A" },
+      ],
+      suggestedQuestions: [
+        "What should I investigate first?",
+        topStore ? `Why is ${topStore.id} struggling?` : "Which stores have the most complaints?",
+        "Where are SLA breaches happening?",
+      ],
+      drillDown: {
+        label: "Open Operations Queue",
+        route: "/operations",
+      },
+      context: {
+        lastIntent: "CRITICAL_BOTTLENECKS",
+        lastStore: topStore?.id,
+        lastCity: topStore?.city,
+        lastResults: topStore ? [topStore.id] : [],
+      },
+    };
+  }
+
+  /**
+   * 1d. Intent Handler: Executive Metrics Snapshot
+   */
+  private async getExecutiveMetrics(parsed: ParsedQuery): Promise<AssistantResponse> {
+    const [kpis, sla, auto] = await Promise.all([
+      this.tools.getNetworkKPIs(parsed.timeRange),
+      this.tools.getSLAAnalytics(parsed.timeRange),
+      this.tools.getAutomationMetrics(parsed.timeRange),
+    ]);
+
+    const answer = `Executive numbers snapshot for ${parsed.timeRange.label}:\n• Complaint Volume: ${kpis.totalComplaints} total logged (${kpis.activeCases} active, ${auto.autoResolvedCount} auto-resolved)\n• SLA Compliance: ${sla.breached} breached (${sla.breachRate}% breach rate), ${sla.p1Breaches} critical P1 breaches\n• Store Fleet: 200 dark stores across ${kpis.cityCount} cities, average PulseScore ${kpis.avgPulse}/100 (${kpis.criticalStores} stores <60)\n• Risk & Automation: ₹${Math.round(auto.autoApprovedRefundsPaise / 100)} auto-refunded, ${kpis.pendingFraud} pending fraud reviews, ${kpis.activeCriticalAlerts} active critical alerts.`;
+
+    return {
+      intent: "EXECUTIVE_METRICS",
+      answer,
+      summary: `${kpis.totalComplaints} complaints, ${sla.breached} SLA breaches, Pulse ${kpis.avgPulse}/100, ${kpis.criticalStores} critical stores.`,
+      metrics: [
+        { label: "Total Complaints", value: `${kpis.totalComplaints}`, tone: "neutral" },
+        { label: "SLA Breaches", value: `${sla.breached} (${sla.breachRate}%)`, tone: sla.breached > 0 ? "crit" : "ok" },
+        { label: "Network Pulse", value: `${kpis.avgPulse}/100`, tone: kpis.avgPulse < 60 ? "crit" : "warn" },
+        { label: "Critical Alerts", value: `${kpis.activeCriticalAlerts}`, tone: kpis.activeCriticalAlerts > 0 ? "crit" : "ok" },
+      ],
+      evidence: [
+        { label: "Time period", value: parsed.timeRange.label },
+        { label: "Active cases", value: `${kpis.activeCases}` },
+        { label: "Auto-resolution rate", value: `${auto.autoResolutionRate}%` },
+        { label: "Fraud reviews", value: `${kpis.pendingFraud}` },
+      ],
+      suggestedQuestions: [
+        "What are the biggest operational issues right now?",
+        "Which stores have the most complaints?",
+        "How effective is automation?",
+      ],
+      drillDown: {
+        label: "View Executive Dashboard",
+        route: "/executive",
+      },
+      context: {
+        lastIntent: "EXECUTIVE_METRICS",
+        lastTimePeriod: parsed.timeRange.label,
       },
     };
   }
@@ -1615,15 +1860,15 @@ export class ExecutiveAssistantService {
     return {
       intent: "UNSUPPORTED",
       answer:
-        "I can help with DarkOps operational intelligence, including network trends, complaints, stores, SLA performance, automation and risk.",
-      summary: "Out of scope query.",
+        "I could not match that to a specific DarkOps operational metric. As your Executive Copilot, I monitor live database telemetry and can investigate:\n• Network Pulse & Fleet Health (e.g. 'What is our pulse score?')\n• Operational Bottlenecks (e.g. 'What is going wrong?' or 'Any critical issues?')\n• Problem Stores (e.g. 'Which stores have the most complaints?')\n• SLA Performance (e.g. 'Where are SLA breaches happening?')\n• Regional Hotspots (e.g. 'Which areas need attention?')\n• Automation & Auto-Refunds (e.g. 'How effective is automation?')\n• Fraud & Risk Reviews (e.g. 'Any fraud risks?')",
+      summary: "I specialize in DarkOps operational analytics, SLA tracking, store health, and exception triage.",
       metrics: [],
       evidence: [],
       suggestedQuestions: [
         "What is happening across the network?",
+        "What is our pulse score?",
+        "What is going wrong?",
         "Which stores have the most complaints?",
-        "Are complaints increasing?",
-        "How effective is automation?",
       ],
     };
   }
