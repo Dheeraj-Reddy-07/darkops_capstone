@@ -132,7 +132,12 @@ export class ExecutiveAssistantService {
       q.includes("is this an llm") ||
       q.includes("use an llm") ||
       q.includes("pulsescore work") ||
-      q.includes("what is pulsescore")
+      q.includes("what is pulsescore") ||
+      q.includes("how does pulsescore") ||
+      q.includes("explain pulsescore") ||
+      q.includes("explain darkops") ||
+      q.includes("how does the system work") ||
+      q.includes("how does this work")
     ) {
       return {
         intent: "GENERAL_DARKOPS_KNOWLEDGE",
@@ -149,7 +154,10 @@ export class ExecutiveAssistantService {
       q === "what can you do" ||
       q === "what can you do?" ||
       q.includes("what questions can i ask") ||
-      q.includes("what are your capabilities")
+      q.includes("what are your capabilities") ||
+      q === "?" ||
+      q.includes("how do i use this") ||
+      q.includes("what can i ask")
     ) {
       return {
         intent: "HELP",
@@ -181,9 +189,30 @@ export class ExecutiveAssistantService {
     // 6. Direct entity matches (e.g. DS-1462)
     const storeId = this.extractStoreId(q);
     if (storeId) {
-      if (q.includes("why") || q.includes("struggling") || q.includes("problem") || q.includes("drop")) {
+      if (q.includes("why") || q.includes("struggling") || q.includes("problem") || q.includes("drop") || q.includes("root cause") || q.includes("wrong")) {
         return {
           intent: "STORE_ROOT_CAUSE",
+          timeRange: this.getTimeRange(q, dashboardContext),
+          parameters: { storeId },
+          entities: [storeId],
+          confidence: 0.95,
+        };
+      }
+      if (q.includes("compare") || q.includes("vs") || q.includes("versus")) {
+        const timeRange = this.getTimeRange(q, dashboardContext);
+        const compRange = this.getComparisonRange(q, timeRange);
+        return {
+          intent: "STORE_COMPARISON",
+          timeRange,
+          comparisonTimeRange: compRange,
+          parameters: { storeId },
+          entities: [storeId],
+          confidence: 0.95,
+        };
+      }
+      if (q.includes("fix") || q.includes("investigate") || q.includes("action") || q.includes("recommend")) {
+        return {
+          intent: "STORE_RECOMMENDATION",
           timeRange: this.getTimeRange(q, dashboardContext),
           parameters: { storeId },
           entities: [storeId],
@@ -202,7 +231,7 @@ export class ExecutiveAssistantService {
     // 7. General Period Comparison (e.g. "compare complaints this week with last week")
     if (
       q.includes("compare") &&
-      (q.includes("last week") || q.includes("last month") || q.includes("yesterday") || q.includes("previous period"))
+      (q.includes("last week") || q.includes("last month") || q.includes("yesterday") || q.includes("previous period") || q.includes("previous week"))
     ) {
       const timeRange = this.getTimeRange(q, dashboardContext);
       const comparisonRange = this.getComparisonRange(q, timeRange);
@@ -216,188 +245,39 @@ export class ExecutiveAssistantService {
       };
     }
 
-    // 8. Anomalies & Alerts
-    if (
-      q.includes("unusual") ||
-      q.includes("alert") ||
-      q.includes("freezer") ||
-      q.includes("equipment") ||
-      q.includes("needs attention") ||
-      q.includes("concerned about") ||
-      q.includes("any problems")
-    ) {
-      return {
-        intent: "ANOMALIES_ALERTS",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: {},
-        entities: [],
-        confidence: 0.9,
-      };
-    }
-
-    // 9. Automation & Resolution
-    if (
-      q.includes("automation") ||
-      q.includes("auto-resolved") ||
-      q.includes("auto resolved") ||
-      q.includes("auto-approved") ||
-      q.includes("auto approved") ||
-      q.includes("manual intervention")
-    ) {
-      return {
-        intent: "AUTOMATION_PERFORMANCE",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: {},
-        entities: [],
-        confidence: 0.92,
-      };
-    }
-
-    // 10. Fraud & Risk
-    if (
-      q.includes("fraud") ||
-      q.includes("suspicious") ||
-      q.includes("risk review") ||
-      q.includes("fraud risk") ||
-      q.includes("risk pattern")
-    ) {
-      return {
-        intent: "RISK_SUMMARY",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: {},
-        entities: [],
-        confidence: 0.92,
-      };
-    }
-
-    // 11. SLA Performance
-    if (
-      q.includes("sla") ||
-      q.includes("breach") ||
-      q.includes("overdue") ||
-      q.includes("target 95") ||
-      q.includes("p1 case") ||
-      q.includes("compliance")
-    ) {
+    // 8. Weighted keyword scoring system for intent classification
+    const scored = this.scoreIntents(q, tokens);
+    if (scored) {
       const city = this.extractCity(q);
-      return {
-        intent: "SLA_PERFORMANCE",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: { city },
-        entities: city ? [city] : [],
-        confidence: 0.9,
-      };
+      const baseParams: Record<string, any> = {};
+      if (city) baseParams.city = city;
+      
+      // Build intent-specific parameters
+      switch (scored.intent) {
+        case "SLA_PERFORMANCE":
+        case "COMPLAINT_CATEGORIES":
+        case "STORE_PERFORMANCE":
+        case "COMPLAINT_TRENDS":
+        case "CITY_PERFORMANCE":
+          return {
+            intent: scored.intent,
+            timeRange: this.getTimeRange(q, dashboardContext),
+            parameters: baseParams,
+            entities: city ? [city] : [],
+            confidence: scored.confidence,
+          };
+        default:
+          return {
+            intent: scored.intent,
+            timeRange: this.getTimeRange(q, dashboardContext),
+            parameters: baseParams,
+            entities: city ? [city] : [],
+            confidence: scored.confidence,
+          };
+      }
     }
 
-    // 12. Complaint Categories
-    if (
-      q.includes("category") ||
-      q.includes("categories") ||
-      q.includes("missing item") ||
-      q.includes("late delivery") ||
-      q.includes("damaged item") ||
-      q.includes("quality issue") ||
-      q.includes("complaining about") ||
-      q.includes("type of complaint")
-    ) {
-      const city = this.extractCity(q);
-      return {
-        intent: "COMPLAINT_CATEGORIES",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: { city },
-        entities: city ? [city] : [],
-        confidence: 0.9,
-      };
-    }
-
-    // 13. City Performance
-    if (
-      q.includes("city") ||
-      q.includes("cities") ||
-      q.includes("regional") ||
-      q.includes("regions") ||
-      q.includes("where are complaints concentrated")
-    ) {
-      return {
-        intent: "CITY_PERFORMANCE",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: {},
-        entities: [],
-        confidence: 0.9,
-      };
-    }
-
-    // 14. Store Performance / Problem Stores
-    if (
-      q.includes("which store") ||
-      q.includes("which stores") ||
-      q.includes("what dark store") ||
-      q.includes("what dark stores") ||
-      q.includes("problem store") ||
-      q.includes("struggling") ||
-      q.includes("lowest pulse") ||
-      q.includes("worst store") ||
-      q.includes("stores have the most")
-    ) {
-      const city = this.extractCity(q);
-      return {
-        intent: "STORE_PERFORMANCE",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: { city },
-        entities: city ? [city] : [],
-        confidence: 0.9,
-      };
-    }
-
-    // 15. Complaint Trends
-    if (
-      q.includes("trend") ||
-      q.includes("increasing") ||
-      q.includes("rising") ||
-      q.includes("going up") ||
-      q.includes("what's changed") ||
-      q.includes("what has changed") ||
-      q.includes("spike") ||
-      q.includes("backlog")
-    ) {
-      const city = this.extractCity(q);
-      return {
-        intent: "COMPLAINT_TRENDS",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: { city },
-        entities: city ? [city] : [],
-        confidence: 0.9,
-      };
-    }
-
-    // 16. Network Summary / Availability
-    if (
-      q.includes("happening") ||
-      q.includes("operational summary") ||
-      q.includes("network health") ||
-      q.includes("how are we doing") ||
-      q.includes("availability") ||
-      q.includes("uptime") ||
-      q.includes("overall status") ||
-      q.includes("network status") ||
-      q.includes("overview") ||
-      q.includes("biggest operational") ||
-      q.includes("operational issue") ||
-      q.includes("operational issues") ||
-      q.includes("biggest issue") ||
-      q.includes("biggest problem") ||
-      q.includes("major issue")
-    ) {
-      return {
-        intent: "NETWORK_SUMMARY",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: {},
-        entities: [],
-        confidence: 0.9,
-      };
-    }
-
-    // Fallback: If any recognized city is in query
+    // 9. Fallback: If any recognized city is in query, show that city's stores
     const cityInQuery = this.extractCity(q);
     if (cityInQuery) {
       return {
@@ -409,6 +289,18 @@ export class ExecutiveAssistantService {
       };
     }
 
+    // 10. Smart fallback: if the query sounds operational at all, give NETWORK_SUMMARY
+    //     instead of the generic UNSUPPORTED message
+    if (this.soundsOperational(q)) {
+      return {
+        intent: "NETWORK_SUMMARY",
+        timeRange: this.getTimeRange(q, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.6,
+      };
+    }
+
     return {
       intent: "UNSUPPORTED",
       timeRange: this.getTimeRange(q, dashboardContext),
@@ -416,6 +308,377 @@ export class ExecutiveAssistantService {
       entities: [],
       confidence: 0,
     };
+  }
+
+  /**
+   * Weighted keyword scoring for robust intent classification.
+   * Each intent has an array of { keywords/phrases, weight }.
+   * Single token keywords get +weight for each occurrence,
+   * multi-word phrases get +weight if found as substring.
+   * Highest-scoring intent above threshold wins.
+   */
+  private scoreIntents(q: string, tokens: string[]): { intent: string; confidence: number } | null {
+    const tokenSet = new Set(tokens);
+
+    // intent -> [ { match: string | string[], weight: number } ]
+    // A match can be:
+    //   - a single word: matched against tokenSet (exact word match)
+    //   - a multi-word phrase: matched with q.includes()
+    //   - an array of words: ALL must be present in tokens (AND match)
+    const intentSignals: Record<string, Array<{ match: string | string[]; weight: number }>> = {
+      NETWORK_SUMMARY: [
+        // Phrases
+        { match: "what is happening", weight: 3 },
+        { match: "what's happening", weight: 3 },
+        { match: "what is going on", weight: 3 },
+        { match: "what's going on", weight: 3 },
+        { match: "how are things", weight: 3 },
+        { match: "how are we doing", weight: 3 },
+        { match: "how is everything", weight: 3 },
+        { match: "current situation", weight: 3 },
+        { match: "current status", weight: 3 },
+        { match: "status update", weight: 3 },
+        { match: "quick summary", weight: 3 },
+        { match: "give me a summary", weight: 3 },
+        { match: "operational summary", weight: 3 },
+        { match: "network summary", weight: 3 },
+        { match: "executive summary", weight: 3 },
+        { match: "network health", weight: 3 },
+        { match: "overall status", weight: 3 },
+        { match: "overall health", weight: 3 },
+        { match: "network status", weight: 3 },
+        { match: "biggest issue", weight: 3 },
+        { match: "biggest problem", weight: 3 },
+        { match: "major issue", weight: 3 },
+        { match: "main issue", weight: 3 },
+        { match: "biggest operational", weight: 3 },
+        { match: "operational issue", weight: 3 },
+        { match: "what is wrong", weight: 3 },
+        { match: "what's wrong", weight: 3 },
+        { match: "going wrong", weight: 3 },
+        { match: "critical issue", weight: 3 },
+        { match: "any issues", weight: 2 },
+        { match: "how bad", weight: 2 },
+        { match: "how bad is it", weight: 3 },
+        { match: "what needs attention", weight: 3 },
+        { match: "needs fixing", weight: 2 },
+        { match: "what needs fixing", weight: 3 },
+        { match: "pulse score", weight: 2 },
+        { match: "how is the network", weight: 3 },
+        { match: "the numbers", weight: 2 },
+        { match: "give me the numbers", weight: 3 },
+        { match: "show me the numbers", weight: 3 },
+        { match: "top level", weight: 2 },
+        { match: "high level", weight: 2 },
+        { match: "at a glance", weight: 3 },
+        { match: "brief me", weight: 3 },
+        { match: "briefing", weight: 2 },
+        { match: "dashboard", weight: 1 },
+        // Single words
+        { match: "overview", weight: 2 },
+        { match: "summary", weight: 2 },
+        { match: "happening", weight: 2 },
+        { match: "situation", weight: 2 },
+        { match: "update", weight: 1 },
+        { match: "status", weight: 1 },
+        { match: "uptime", weight: 2 },
+        { match: "availability", weight: 2 },
+      ],
+      ANOMALIES_ALERTS: [
+        { match: "red flag", weight: 3 },
+        { match: "red flags", weight: 3 },
+        { match: "any alert", weight: 3 },
+        { match: "any alerts", weight: 3 },
+        { match: "active alert", weight: 3 },
+        { match: "critical alert", weight: 3 },
+        { match: "hardware failure", weight: 3 },
+        { match: "equipment failure", weight: 3 },
+        { match: "equipment issue", weight: 3 },
+        { match: "freezer failure", weight: 3 },
+        { match: "freezer down", weight: 3 },
+        { match: "needs attention", weight: 2 },
+        { match: "concerned about", weight: 2 },
+        { match: "any problems", weight: 2 },
+        { match: "anything unusual", weight: 3 },
+        { match: "anomaly", weight: 3 },
+        { match: "anomalies", weight: 3 },
+        { match: "urgent", weight: 2 },
+        { match: "emergency", weight: 2 },
+        // Single words
+        { match: "alert", weight: 2 },
+        { match: "alerts", weight: 2 },
+        { match: "unusual", weight: 2 },
+        { match: "freezer", weight: 2 },
+        { match: "equipment", weight: 2 },
+        { match: "broken", weight: 2 },
+        { match: "malfunction", weight: 2 },
+        { match: "outage", weight: 2 },
+        { match: "offline", weight: 2 },
+        { match: "down", weight: 1 },
+      ],
+      AUTOMATION_PERFORMANCE: [
+        { match: "auto resolution", weight: 3 },
+        { match: "auto-resolution", weight: 3 },
+        { match: "auto resolved", weight: 3 },
+        { match: "auto-resolved", weight: 3 },
+        { match: "auto approved", weight: 3 },
+        { match: "auto-approved", weight: 3 },
+        { match: "automation rate", weight: 3 },
+        { match: "how effective is automation", weight: 3 },
+        { match: "manual intervention", weight: 3 },
+        { match: "manual queue", weight: 3 },
+        { match: "automatically resolved", weight: 3 },
+        { match: "automated resolution", weight: 3 },
+        { match: "how many auto", weight: 3 },
+        { match: "automation performance", weight: 3 },
+        { match: "how well is automation", weight: 3 },
+        { match: "is automation working", weight: 3 },
+        { match: "resolution rate", weight: 2 },
+        // Single words
+        { match: "automation", weight: 3 },
+        { match: "automate", weight: 2 },
+        { match: "automated", weight: 2 },
+      ],
+      RISK_SUMMARY: [
+        { match: "fraud review", weight: 3 },
+        { match: "fraud risk", weight: 3 },
+        { match: "risk review", weight: 3 },
+        { match: "risk pattern", weight: 3 },
+        { match: "suspicious pattern", weight: 3 },
+        { match: "suspicious activity", weight: 3 },
+        { match: "flagged case", weight: 3 },
+        { match: "any fraud", weight: 3 },
+        { match: "fraud cases", weight: 3 },
+        { match: "fraud flag", weight: 3 },
+        { match: "risk flag", weight: 3 },
+        { match: "under review", weight: 2 },
+        // Single words
+        { match: "fraud", weight: 3 },
+        { match: "suspicious", weight: 2 },
+        { match: "flagged", weight: 2 },
+      ],
+      SLA_PERFORMANCE: [
+        { match: "sla breach", weight: 3 },
+        { match: "sla breaches", weight: 3 },
+        { match: "sla performance", weight: 3 },
+        { match: "sla compliance", weight: 3 },
+        { match: "sla status", weight: 3 },
+        { match: "cases overdue", weight: 3 },
+        { match: "how many overdue", weight: 3 },
+        { match: "overdue cases", weight: 3 },
+        { match: "overdue tickets", weight: 3 },
+        { match: "are we meeting sla", weight: 3 },
+        { match: "within sla", weight: 3 },
+        { match: "p1 case", weight: 3 },
+        { match: "p1 breach", weight: 3 },
+        { match: "priority 1", weight: 2 },
+        { match: "target 95", weight: 2 },
+        { match: "response time", weight: 2 },
+        { match: "resolution time", weight: 2 },
+        // Single words
+        { match: "sla", weight: 3 },
+        { match: "breach", weight: 2 },
+        { match: "breaches", weight: 2 },
+        { match: "overdue", weight: 2 },
+        { match: "compliance", weight: 2 },
+        { match: "deadline", weight: 2 },
+        { match: "escalated", weight: 2 },
+      ],
+      COMPLAINT_CATEGORIES: [
+        { match: "complaint category", weight: 3 },
+        { match: "complaint categories", weight: 3 },
+        { match: "complaint type", weight: 3 },
+        { match: "complaint types", weight: 3 },
+        { match: "type of complaint", weight: 3 },
+        { match: "types of complaint", weight: 3 },
+        { match: "complaining about", weight: 3 },
+        { match: "what are people complaining", weight: 3 },
+        { match: "top complaints", weight: 3 },
+        { match: "main complaints", weight: 3 },
+        { match: "common complaints", weight: 3 },
+        { match: "most common complaint", weight: 3 },
+        { match: "complaint breakdown", weight: 3 },
+        { match: "what kind of issues", weight: 3 },
+        { match: "what types of issues", weight: 3 },
+        { match: "what are customers", weight: 2 },
+        { match: "missing item", weight: 2 },
+        { match: "late delivery", weight: 2 },
+        { match: "damaged item", weight: 2 },
+        { match: "quality issue", weight: 2 },
+        { match: "wrong item", weight: 2 },
+        // Single words
+        { match: "category", weight: 2 },
+        { match: "categories", weight: 2 },
+        { match: "breakdown", weight: 1 },
+      ],
+      CITY_PERFORMANCE: [
+        { match: "city wise", weight: 3 },
+        { match: "city-wise", weight: 3 },
+        { match: "city level", weight: 3 },
+        { match: "by city", weight: 3 },
+        { match: "per city", weight: 3 },
+        { match: "across cities", weight: 3 },
+        { match: "which cities", weight: 3 },
+        { match: "which city", weight: 3 },
+        { match: "regional performance", weight: 3 },
+        { match: "regional breakdown", weight: 3 },
+        { match: "regional summary", weight: 3 },
+        { match: "complaints concentrated", weight: 3 },
+        { match: "geography", weight: 2 },
+        { match: "geographic", weight: 2 },
+        { match: "worst city", weight: 3 },
+        { match: "worst performing area", weight: 3 },
+        { match: "worst performing areas", weight: 3 },
+        { match: "best performing area", weight: 3 },
+        { match: "area wise", weight: 3 },
+        { match: "location wise", weight: 3 },
+        // Single words
+        { match: "cities", weight: 2 },
+        { match: "regional", weight: 2 },
+        { match: "regions", weight: 2 },
+      ],
+      STORE_PERFORMANCE: [
+        { match: "which store", weight: 3 },
+        { match: "which stores", weight: 3 },
+        { match: "what stores", weight: 3 },
+        { match: "problem store", weight: 3 },
+        { match: "problem stores", weight: 3 },
+        { match: "worst store", weight: 3 },
+        { match: "worst stores", weight: 3 },
+        { match: "worst performing store", weight: 3 },
+        { match: "best performing store", weight: 3 },
+        { match: "store ranking", weight: 3 },
+        { match: "store rankings", weight: 3 },
+        { match: "top store", weight: 2 },
+        { match: "bottom store", weight: 3 },
+        { match: "store health", weight: 3 },
+        { match: "store performance", weight: 3 },
+        { match: "dark store", weight: 2 },
+        { match: "dark stores", weight: 2 },
+        { match: "lowest pulse", weight: 3 },
+        { match: "struggling store", weight: 3 },
+        { match: "underperforming", weight: 2 },
+        { match: "locations need attention", weight: 3 },
+        { match: "about store", weight: 2 },
+        { match: "stores have the most", weight: 3 },
+        // Single words
+        { match: "struggling", weight: 2 },
+        { match: "underperforming", weight: 2 },
+      ],
+      COMPLAINT_TRENDS: [
+        { match: "are complaints increasing", weight: 3 },
+        { match: "complaints increasing", weight: 3 },
+        { match: "complaints going up", weight: 3 },
+        { match: "issues going up", weight: 3 },
+        { match: "issues increasing", weight: 3 },
+        { match: "complaints rising", weight: 3 },
+        { match: "complaint trend", weight: 3 },
+        { match: "complaint trends", weight: 3 },
+        { match: "volume trend", weight: 3 },
+        { match: "what's changed", weight: 3 },
+        { match: "what has changed", weight: 3 },
+        { match: "how many complaints", weight: 3 },
+        { match: "complaint volume", weight: 3 },
+        { match: "total complaints", weight: 3 },
+        { match: "complaint count", weight: 3 },
+        { match: "how many issues", weight: 3 },
+        { match: "issue volume", weight: 3 },
+        { match: "getting worse", weight: 2 },
+        { match: "getting better", weight: 2 },
+        { match: "improving", weight: 2 },
+        { match: "deteriorating", weight: 2 },
+        { match: "refund situation", weight: 3 },
+        { match: "refund amount", weight: 3 },
+        { match: "total refund", weight: 3 },
+        { match: "how much refund", weight: 3 },
+        // Single words
+        { match: "trend", weight: 2 },
+        { match: "trends", weight: 2 },
+        { match: "increasing", weight: 2 },
+        { match: "rising", weight: 2 },
+        { match: "spike", weight: 2 },
+        { match: "backlog", weight: 2 },
+        { match: "growing", weight: 1 },
+        { match: "worsening", weight: 2 },
+        { match: "declining", weight: 2 },
+        { match: "refund", weight: 1 },
+        { match: "refunds", weight: 1 },
+      ],
+    };
+
+    const scores: Record<string, number> = {};
+
+    for (const [intent, signals] of Object.entries(intentSignals)) {
+      let score = 0;
+      for (const signal of signals) {
+        if (typeof signal.match === "string") {
+          // Multi-word phrase or single word?
+          if (signal.match.includes(" ")) {
+            // Phrase match
+            if (q.includes(signal.match)) {
+              score += signal.weight;
+            }
+          } else {
+            // Single word: check token set
+            if (tokenSet.has(signal.match)) {
+              score += signal.weight;
+            }
+          }
+        } else if (Array.isArray(signal.match)) {
+          // AND match: all words must be present
+          if (signal.match.every((w) => tokenSet.has(w))) {
+            score += signal.weight;
+          }
+        }
+      }
+      if (score > 0) {
+        scores[intent] = score;
+      }
+    }
+
+    // Find the highest scoring intent
+    let bestIntent: string | null = null;
+    let bestScore = 0;
+    for (const [intent, score] of Object.entries(scores)) {
+      if (score > bestScore) {
+        bestScore = score;
+        bestIntent = intent;
+      }
+    }
+
+    // Minimum threshold: at least 2 points to be confident
+    if (bestIntent && bestScore >= 2) {
+      const confidence = Math.min(0.95, 0.7 + bestScore * 0.05);
+      return { intent: bestIntent, confidence };
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if a query sounds operational (should get NETWORK_SUMMARY fallback
+   * rather than the generic UNSUPPORTED "I can't help" message)
+   */
+  private soundsOperational(q: string): boolean {
+    const operationalWords = [
+      "store", "stores", "complaint", "complaints", "issue", "issues",
+      "performance", "health", "problem", "problems", "report", "data",
+      "metric", "metrics", "number", "numbers", "count", "total",
+      "active", "critical", "urgent", "important", "concern", "current",
+      "today", "week", "month", "help", "show", "tell", "give", "what",
+      "how", "where", "when", "why", "which", "analyze", "analysis",
+      "check", "look", "see", "view", "operations", "operational",
+      "pulse", "score", "rate", "percentage", "volume", "delivery",
+      "order", "orders", "customer", "customers", "agent", "agents",
+      "team", "shift", "picker", "rider", "queue", "resolve", "resolved",
+      "resolution", "pending", "open", "closed", "fixed", "repair",
+      "maintenance", "inventory", "stock", "network", "summary",
+      "bad", "good", "worst", "best", "top", "bottom", "high", "low",
+    ];
+    const tokens = this.tokenize(q);
+    const hits = tokens.filter((t) => operationalWords.includes(t)).length;
+    // If at least 2 operational words are present, treat as operational
+    return hits >= 2 || q.length > 15;
   }
 
   /**
