@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState, useRouter } from "@tanstack/react-router";
-import { LogOut, User, Home, Package, AlertCircle, MessageSquare } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -120,44 +120,7 @@ export function CustomerShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-[1600px] px-5 py-6 pb-20 md:pb-6">{children}</main>
-
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur md:hidden pb-[env(safe-area-inset-bottom)] shadow-lg">
-        <div className="flex h-14 items-center justify-around px-2">
-          {NAV.map((n) => {
-            const isActive = n.exact
-              ? pathname === n.to
-              : pathname.startsWith(n.to) ||
-                (n.to === "/customer/orders" && pathname.startsWith("/customer/support"));
-            const Icon =
-              n.to === "/customer"
-                ? Home
-                : n.to === "/customer/orders"
-                ? Package
-                : n.to === "/customer/complaints"
-                ? AlertCircle
-                : MessageSquare;
-
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-2 py-1 text-[10px] transition-colors",
-                  isActive
-                    ? "font-semibold text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className={cn("size-4", isActive ? "text-primary" : "text-muted-foreground")} />
-                <span>{n.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
+      <main className="mx-auto max-w-[1600px] px-5 py-6">{children}</main>
       <footer className="mx-auto max-w-[1600px] px-5 pb-8 text-xs text-muted-foreground">
         {customerProfile?.full_name
           ? `Signed in as ${customerProfile.full_name}`
