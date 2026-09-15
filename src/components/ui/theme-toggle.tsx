@@ -3,7 +3,7 @@ import { Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * DarkOps ThemeToggle — a compact, premium Sun/Moon icon toggle.
+ * DarkOps ThemeToggle - a compact, premium Sun/Moon icon toggle.
  * Reads and writes the active theme via next-themes.
  */
 export function ThemeToggle({ className }: { className?: string }) {

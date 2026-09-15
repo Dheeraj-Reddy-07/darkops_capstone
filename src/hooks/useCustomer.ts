@@ -3,6 +3,27 @@ import { fetchApi } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import { format } from "date-fns";
 
+export interface CustomerProfileData {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  created_at: string;
+}
+
+export function useCustomerProfile() {
+  return useQuery({
+    queryKey: ["customer-profile"],
+    queryFn: async () => {
+      const response = await fetchApi("/customers/me/profile");
+      return response.data as CustomerProfileData;
+    },
+    retry: false,
+  });
+}
+
 export interface CustomerOrder {
   id: string;
   placedAt: string;
@@ -26,7 +47,7 @@ export interface OrderDetail extends CustomerOrder {
   }>;
 }
 
-export function useCustomerOrders() {
+export function useCustomerOrders(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["customer-orders"],
     queryFn: async () => {
@@ -50,9 +71,7 @@ export function useCustomerOrders() {
                 : row.status,
         eta: row.eta_at ? format(new Date(row.eta_at), "HH:mm 'IST'") : undefined,
         itemsPreview:
-          row.order_items?.map((i: any) => i.name).join(", ") ||
-          row.items_preview ||
-          "Order items",
+          row.order_items?.map((i: any) => i.name).join(", ") || row.items_preview || "Order items",
         deliveredAt: row.delivered_at
           ? format(new Date(row.delivered_at), "dd MMM, HH:mm 'IST'")
           : undefined,
@@ -60,11 +79,12 @@ export function useCustomerOrders() {
       }));
       return orders;
     },
+    enabled: options?.enabled ?? true,
     retry: false,
   });
 }
 
-export function useCustomerOrderById(orderId: string) {
+export function useCustomerOrderById(orderId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["customer-order", orderId],
     queryFn: async () => {
@@ -106,7 +126,7 @@ export function useCustomerOrderById(orderId: string) {
       };
       return order;
     },
-    enabled: !!orderId,
+    enabled: !!orderId && (options?.enabled ?? true),
     retry: false,
   });
 }
@@ -128,6 +148,9 @@ export interface CustomerComplaint {
   slaBreached?: boolean | undefined;
   isLiveCallEligible?: boolean | undefined;
   slaDueAt?: string | undefined;
+  slaDueIso?: string | undefined;
+  rawCreatedAt?: string | undefined;
+  rawUpdatedAt?: string | undefined;
   /** Backend-computed customer-facing status label (reflects real automation outcome) */
   customerStatusLabel?: string | undefined;
   /** Backend-computed customer-facing status detail text */
@@ -170,12 +193,15 @@ export function useCustomerComplaints() {
         status: row.status,
         priority: row.priority,
         createdAt: format(new Date(row.created_at), "dd MMM, HH:mm 'IST'"),
+        rawCreatedAt: row.created_at || undefined,
+        rawUpdatedAt: row.updated_at || undefined,
         resolution: row.resolution,
         automationResult: row.automation_result,
         storeName: row.store_name,
         slaBreached: row.sla_breached,
         isLiveCallEligible: row.is_live_call_eligible,
         slaDueAt: row.sla_due_at ? format(new Date(row.sla_due_at), "HH:mm 'IST'") : undefined,
+        slaDueIso: row.sla_due_at || undefined,
         customerStatusLabel: row.customer_status_label,
         customerStatusDetail: row.customer_status_detail,
       }));
@@ -206,7 +232,10 @@ export function useCustomerComplaintById(complaintId: string) {
         storeName: response.data.store_name,
         slaBreached: response.data.sla_breached,
         isLiveCallEligible: response.data.is_live_call_eligible,
-        slaDueAt: response.data.sla_due_at ? format(new Date(response.data.sla_due_at), "HH:mm 'IST'") : undefined,
+        slaDueAt: response.data.sla_due_at
+          ? format(new Date(response.data.sla_due_at), "HH:mm 'IST'")
+          : undefined,
+        slaDueIso: response.data.sla_due_at || undefined,
         customerStatusLabel: response.data.customer_status_label,
         customerStatusDetail: response.data.customer_status_detail,
         orderValue: response.data.order_value_paise

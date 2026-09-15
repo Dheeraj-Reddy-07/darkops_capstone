@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-namespace */
 import { Request, Response, NextFunction } from "express";
-import { createSupabaseServerClient } from "../lib/supabase";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "../lib/supabase";
 import { getPermissionsForRole } from "../lib/rbac";
 import { AppRole, AuthContext, AppPermission } from "../../src/types/auth";
 import { HTTPError } from "./errors";
@@ -38,6 +39,128 @@ interface CachedAuth {
 }
 const tokenAuthCache = new Map<string, CachedAuth>();
 
+const SERVER_MOCK_PROFILES: Record<
+  string,
+  {
+    id: string;
+    email: string;
+    full_name: string;
+    role: AppRole;
+    is_active: boolean;
+    store_id?: string;
+  }
+> = {
+  "admin@darkops.com": {
+    id: "usr-admin-001",
+    email: "admin@darkops.com",
+    full_name: "System Admin",
+    role: "PLATFORM_ADMIN",
+    is_active: true,
+  },
+  "exec@darkops.com": {
+    id: "usr-exec-001",
+    email: "exec@darkops.com",
+    full_name: "Network Exec",
+    role: "EXECUTIVE",
+    is_active: true,
+  },
+  "manager@darkops.com": {
+    id: "usr-mgr-001",
+    email: "manager@darkops.com",
+    full_name: "Ops Manager",
+    role: "OPERATIONS",
+    is_active: true,
+  },
+  "support@darkops.com": {
+    id: "usr-supp-001",
+    email: "support@darkops.com",
+    full_name: "Customer Support",
+    role: "CUSTOMER_SUPPORT",
+    is_active: true,
+  },
+  "agent.a@darkops.com": {
+    id: "usr-agent-a",
+    email: "agent.a@darkops.com",
+    full_name: "Priya Sharma",
+    role: "CUSTOMER_SUPPORT",
+    is_active: true,
+  },
+  "agent.b@darkops.com": {
+    id: "usr-agent-b",
+    email: "agent.b@darkops.com",
+    full_name: "Rohan Mehta",
+    role: "CUSTOMER_SUPPORT",
+    is_active: true,
+  },
+  "storemanager@darkops.com": {
+    id: "usr-sm-001",
+    email: "storemanager@darkops.com",
+    full_name: "Store Manager",
+    role: "STORE_MANAGER",
+    is_active: true,
+    store_id: "DS-1462",
+  },
+  "customer@darkops.com": {
+    id: "usr-cust-001",
+    email: "customer@darkops.com",
+    full_name: "Rajat Sharma",
+    role: "CUSTOMER",
+    is_active: true,
+  },
+  "normal@darkops.com": {
+    id: "usr-norm-001",
+    email: "normal@darkops.com",
+    full_name: "Rajat Sharma",
+    role: "CUSTOMER",
+    is_active: true,
+  },
+  "suspicious@darkops.com": {
+    id: "usr-susp-001",
+    email: "suspicious@darkops.com",
+    full_name: "Vikram Malhotra",
+    role: "CUSTOMER",
+    is_active: true,
+  },
+  "sla@darkops.com": {
+    id: "usr-sla-001",
+    email: "sla@darkops.com",
+    full_name: "Ananya Desai",
+    role: "CUSTOMER",
+    is_active: true,
+  },
+  "fraud@darkops.com": {
+    id: "usr-fraud-001",
+    email: "fraud@darkops.com",
+    full_name: "Fraud Analyst",
+    role: "OPERATIONS",
+    is_active: true,
+  },
+  "operations@darkops.com": {
+    id: "usr-ops-001",
+    email: "operations@darkops.com",
+    full_name: "Operations Agent",
+    role: "OPERATIONS",
+    is_active: true,
+  },
+};
+
+function resolveServerMockProfile(tokenOrEmail: string) {
+  const norm = (tokenOrEmail || "").replace("mock-token-", "").toLowerCase().trim();
+  const found = Object.values(SERVER_MOCK_PROFILES).find(
+    (p) => p.email.toLowerCase() === norm || p.id === norm,
+  );
+  if (found) return found;
+
+  const email = norm.includes("@") ? norm : `${norm}@darkops.com`;
+  return {
+    id: `usr-gen-${email.replace(/[^a-z0-9]/g, "")}`,
+    email,
+    full_name: email.split("@")[0] || "Demo User",
+    role: "CUSTOMER" as AppRole,
+    is_active: true,
+  };
+}
+
 /**
  * Enhanced authentication middleware with better error handling and logging
  */
@@ -46,9 +169,57 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     const requestId = req.requestId || "unknown";
     const authHeader = req.headers.authorization;
 
-    // Check token cache first for fast response
+    // Check token cache or mock token
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.split(" ")[1];
+      if (token.startsWith("mock-token-")) {
+        // Serve from cache when available to avoid a profile lookup per request.
+        const cachedMock = tokenAuthCache.get(token);
+        if (cachedMock && Date.now() < cachedMock.expiresAt) {
+          req.auth = {
+            user: cachedMock.user,
+            permissions: getPermissionsForRole(cachedMock.profile.role as AppRole),
+          };
+          return next();
+        }
+
+        // Prefer the REAL profile row (real UUID, store_id, etc.) resolved by
+        // email so that per-user data queries (e.g. assigned_to = user.id) match
+        // the seeded data. Fall back to the synthetic mock profile only when the
+        // real profile cannot be resolved (e.g. offline/fallback env).
+        const email = token.replace("mock-token-", "").toLowerCase().trim();
+        let profile: any = null;
+        try {
+          const admin = createSupabaseServiceRoleClient();
+          const { data: realProfile } = await admin
+            .from("profiles")
+            .select("*")
+            .eq("email", email)
+            .maybeSingle();
+          if (realProfile && realProfile.id) {
+            profile = { ...realProfile, id: realProfile.id, email: realProfile.email || email };
+          }
+        } catch {
+          /* fall back to synthetic mock profile below */
+        }
+
+        if (!profile) {
+          profile = resolveServerMockProfile(token);
+        }
+
+        const role = profile.role as AppRole;
+        req.auth = {
+          user: profile,
+          permissions: getPermissionsForRole(role),
+        };
+        tokenAuthCache.set(token, {
+          user: profile,
+          profile,
+          expiresAt: Date.now() + 30000,
+        });
+        return next();
+      }
+
       const cached = tokenAuthCache.get(token);
       if (cached && Date.now() < cached.expiresAt) {
         req.auth = {
@@ -57,6 +228,26 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         };
         return next();
       }
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const isFallbackEnv = !supabaseUrl || supabaseUrl.includes("placeholder");
+
+    if (isFallbackEnv) {
+      const isCustomerRoute =
+        req.originalUrl.includes("/customers") || req.originalUrl.includes("/report-issue");
+      const isSupportRoute = req.originalUrl.includes("/support");
+      const defaultEmail = isCustomerRoute
+        ? "customer@darkops.com"
+        : isSupportRoute
+          ? "support@darkops.com"
+          : "exec@darkops.com";
+      const defaultProfile = resolveServerMockProfile(defaultEmail);
+      req.auth = {
+        user: defaultProfile,
+        permissions: getPermissionsForRole(defaultProfile.role as AppRole),
+      };
+      return next();
     }
 
     const supabase = createSupabaseServerClient(req, res);
@@ -129,7 +320,9 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     }
 
     // Log successful authentication (without sensitive data)
-    console.log(`[AUTH_SUCCESS] RequestID: ${requestId}, UserID: ${user.id}, Role: ${role}, Permissions: ${Array.from(permissions).join(", ")}`);
+    console.log(
+      `[AUTH_SUCCESS] RequestID: ${requestId}, UserID: ${user.id}, Role: ${role}, Permissions: ${Array.from(permissions).join(", ")}`,
+    );
 
     next();
   } catch (error) {
@@ -163,7 +356,9 @@ export const requirePermission = (permission: AppPermission | AppPermission[]) =
       const userRole = req.auth.user.role;
       const userPermissions = Array.from(req.auth!.permissions);
 
-      console.log(`[PERMISSION_CHECK] RequestID: ${requestId}, UserID: ${req.auth.user.id}, Role: ${userRole}, Required: ${permissionsToCheck.join(" or ")}, UserPermissions: ${userPermissions.join(", ")}`);
+      console.log(
+        `[PERMISSION_CHECK] RequestID: ${requestId}, UserID: ${req.auth.user.id}, Role: ${userRole}, Required: ${permissionsToCheck.join(" or ")}, UserPermissions: ${userPermissions.join(", ")}`,
+      );
 
       const hasPermission = permissionsToCheck.some((p) => req.auth!.permissions.has(p));
 

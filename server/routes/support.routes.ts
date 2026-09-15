@@ -4,6 +4,8 @@ import {
   getMyStats,
   getMyTickets,
   getTeamTickets,
+  getTeamWorkload,
+  getTeamPerformance,
   getUnassignedTickets,
   getMyResolvedTickets,
   getTicketActivity,
@@ -44,6 +46,18 @@ router.get(
   rateLimit(60, 60000),
   requirePermission("support.read"),
   getTeamTickets,
+);
+router.get(
+  "/team/workload",
+  rateLimit(60, 60000),
+  requirePermission("support.read"),
+  getTeamWorkload,
+);
+router.get(
+  "/team/performance",
+  rateLimit(60, 60000),
+  requirePermission("support.read"),
+  getTeamPerformance,
 );
 router.get(
   "/unassigned/tickets",

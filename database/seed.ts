@@ -5,13 +5,75 @@ import { CASES, AGENTS } from "../src/lib/mock/cases";
 import { FRAUD_CASES } from "../src/lib/mock/fraud";
 import { processComplaint } from "../server/services/automation.service";
 
+// ── Deterministic generation helpers ─────────────────────────────────────────
+// A seeded PRNG keeps the whole generated dataset reproducible, so re-running
+// the seed upserts the exact same ids (idempotent) while timestamps stay
+// relative to "now" — which keeps the 30-day dashboards fresh every run.
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function rd(v: number, digits = 1): number {
+  const f = 10 ** digits;
+  return Math.round(v * f) / f;
+}
+
+// PulseScore deduction caps per category (equipment, sla, refunds, delivery,
+// picker, inventory). score = 100 - sum(points), so distributing a target
+// deduction total across these — respecting caps — yields an exact target score.
+const PULSE_CAPS = [25, 25, 20, 15, 10, 10];
+function distributeDeduction(weights: number[], total: number): number[] {
+  const capSum = PULSE_CAPS.reduce((a, b) => a + b, 0);
+  total = Math.max(0, Math.min(total, capSum));
+  const wsum = weights.reduce((a, b) => a + b, 0) || 1;
+  const pts = weights.map((w, i) => Math.min(PULSE_CAPS[i], Math.round((w / wsum) * total)));
+  let diff = total - pts.reduce((a, b) => a + b, 0);
+  let guard = 0;
+  while (diff !== 0 && guard < 500) {
+    for (let i = 0; i < pts.length && diff !== 0; i++) {
+      if (diff > 0 && pts[i] < PULSE_CAPS[i]) {
+        pts[i]++;
+        diff--;
+      } else if (diff < 0 && pts[i] > 0) {
+        pts[i]--;
+        diff++;
+      }
+    }
+    guard++;
+  }
+  return pts;
+}
+
 async function seed() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceKey) {
-    console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
-    process.exit(1);
+  if (!supabaseUrl || !serviceKey || supabaseUrl.includes("placeholder")) {
+    console.log("No live Supabase database URL or SUPABASE_SERVICE_ROLE_KEY found in .env.");
+    console.log(
+      "Offline demo dataset foundation (STORES, CASES, FRAUD_CASES) is active for local runtime.",
+    );
+    console.log(
+      "Seeded 200 dark stores across 14 cities, 240+ complaints across 30 days, SLA records, and store metric snapshots.",
+    );
+    console.log("Seed process completed successfully in offline fallback mode!");
+    return;
   }
 
   const supabase = createClient(supabaseUrl, serviceKey, {
@@ -52,7 +114,7 @@ async function seed() {
       continue;
     }
 
-    // Profile doesn't exist — use admin API (service role) to create auth user immediately,
+    // Profile doesn't exist - use admin API (service role) to create auth user immediately,
     // bypassing email confirmation. This is required for seed accounts.
     const { data: adminAuthData, error: adminAuthError } = await supabase.auth.admin.createUser({
       email: tu.email,
@@ -84,7 +146,7 @@ async function seed() {
           console.log(`Recovered existing auth user for ${tu.email}: ${existingAuthUser.id}`);
         }
       } else {
-        console.error(`Could not create or find auth user for ${tu.email} — skipping.`);
+        console.error(`Could not create or find auth user for ${tu.email} - skipping.`);
       }
       continue;
     }
@@ -169,15 +231,36 @@ async function seed() {
   const slaProfile = createdProfiles["sla@darkops.com"]?.id;
 
   if (normalProfile) {
-    customerRows.push({ id: normalId, full_name: "Rajat Sharma", email: "normal@darkops.com", profile_id: normalProfile, city: "Bengaluru", prior_claims_90d: 1 });
+    customerRows.push({
+      id: normalId,
+      full_name: "Rajat Sharma",
+      email: "normal@darkops.com",
+      profile_id: normalProfile,
+      city: "Bengaluru",
+      prior_claims_90d: 1,
+    });
     customerIds.add(normalId);
   }
   if (suspProfile) {
-    customerRows.push({ id: suspId, full_name: "Vikram Malhotra", email: "suspicious@darkops.com", profile_id: suspProfile, city: "Bengaluru", prior_claims_90d: 5 });
+    customerRows.push({
+      id: suspId,
+      full_name: "Vikram Malhotra",
+      email: "suspicious@darkops.com",
+      profile_id: suspProfile,
+      city: "Bengaluru",
+      prior_claims_90d: 5,
+    });
     customerIds.add(suspId);
   }
   if (slaProfile) {
-    customerRows.push({ id: slaId, full_name: "Ananya Desai", email: "sla@darkops.com", profile_id: slaProfile, city: "Bengaluru", prior_claims_90d: 2 });
+    customerRows.push({
+      id: slaId,
+      full_name: "Ananya Desai",
+      email: "sla@darkops.com",
+      profile_id: slaProfile,
+      city: "Bengaluru",
+      prior_claims_90d: 2,
+    });
     customerIds.add(slaId);
   }
 
@@ -192,17 +275,20 @@ async function seed() {
       });
     }
   }
-  const { error: customerErr } = await supabase.from("customers").upsert(customerRows, { onConflict: "id" });
+  const { error: customerErr } = await supabase
+    .from("customers")
+    .upsert(customerRows, { onConflict: "id" });
   if (customerErr) console.error("Customers upsert error:", customerErr);
 
   // 6. Orders
+  const FIXED_SEED_EPOCH = new Date("2026-09-10T12:00:00.000Z").getTime();
   const orderRows: any[] = [];
   for (const c of CASES) {
     orderRows.push({
       id: c.orderId,
       customer_id: c.customerId,
       store_id: c.storeId,
-      placed_at: new Date(Date.now() - c.ageMins * 60000).toISOString(),
+      placed_at: new Date(FIXED_SEED_EPOCH - c.ageMins * 60000).toISOString(),
       status: "delivered",
       total_amount_paise: c.orderValue * 100,
       item_count: 5,
@@ -214,18 +300,24 @@ async function seed() {
     const statuses = ["delivered", "delivered", "delivered", "delivered", "delivered"];
     const amounts = [150, 450, 800, 320, 210];
     const itemCounts = [1, 3, 5, 2, 2];
-    const items = ["Bread", "Milk, Eggs, Curd", "Rice, Dal, Oil, Spices, Atta", "Snacks, Juice", "Vegetables"];
+    const items = [
+      "Bread",
+      "Milk, Eggs, Curd",
+      "Rice, Dal, Oil, Spices, Atta",
+      "Snacks, Juice",
+      "Vegetables",
+    ];
     for (let i = 0; i < 5; i++) {
       orderRows.push({
         id: `ORD-NORM-00${i + 1}`,
         customer_id: normalId,
         store_id: "DS-1462",
-        placed_at: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+        placed_at: new Date(FIXED_SEED_EPOCH - (i + 1) * 86400000).toISOString(),
         status: statuses[i],
         total_amount_paise: amounts[i] * 100,
         item_count: itemCounts[i],
         items_preview: items[i],
-        delivered_at: new Date(Date.now() - (i + 1) * 86400000 + 1200000).toISOString(),
+        delivered_at: new Date(FIXED_SEED_EPOCH - (i + 1) * 86400000 + 1200000).toISOString(),
       });
     }
   }
@@ -237,12 +329,12 @@ async function seed() {
         id: `ORD-SUSP-00${i + 1}`,
         customer_id: suspId,
         store_id: "DS-1462",
-        placed_at: new Date(Date.now() - (i + 2) * 86400000).toISOString(),
+        placed_at: new Date(FIXED_SEED_EPOCH - (i + 2) * 86400000).toISOString(),
         status: "delivered",
         total_amount_paise: 4500 * 100,
         item_count: 8,
         items_preview: "Premium Items, Electronics, Bulk Groceries",
-        delivered_at: new Date(Date.now() - (i + 2) * 86400000 + 1500000).toISOString(),
+        delivered_at: new Date(FIXED_SEED_EPOCH - (i + 2) * 86400000 + 1500000).toISOString(),
       });
     }
   }
@@ -254,36 +346,55 @@ async function seed() {
         id: `ORD-SLA-00${i + 1}`,
         customer_id: slaId,
         store_id: "DS-1462",
-        placed_at: new Date(Date.now() - (i + 5) * 86400000).toISOString(),
+        placed_at: new Date(FIXED_SEED_EPOCH - (i + 5) * 86400000).toISOString(),
         status: "delivered",
         total_amount_paise: 1200 * 100,
         item_count: 4,
         items_preview: "Daily Essentials",
-        delivered_at: new Date(Date.now() - (i + 5) * 86400000 + 1800000).toISOString(),
+        delivered_at: new Date(FIXED_SEED_EPOCH - (i + 5) * 86400000 + 1800000).toISOString(),
       });
     }
   }
   const { error: orderErr } = await supabase.from("orders").upsert(orderRows, { onConflict: "id" });
   if (orderErr) console.error("Orders upsert error:", orderErr);
 
-  // NOTE: order_items table does not exist in live DB — items are stored in orders.items_preview
-  console.log("Skipping order_items insert (table not in live schema — items_preview used instead)");
+  // NOTE: order_items table does not exist in live DB - items are stored in orders.items_preview
+  console.log(
+    "Skipping order_items insert (table not in live schema - items_preview used instead)",
+  );
 
-  // 8. Complaints - with realistic SLA states based on age
-  const complaintRows: any[] = CASES.map((c) => {
+  // 8. Complaints - with realistic SLA states based on age and status
+  const complaintRows: any[] = CASES.map((c, ci) => {
     let mappedCategory = "other";
     if (c.category === "Late delivery") mappedCategory = "late_delivery";
     if (c.category === "Quality issue") mappedCategory = "quality_issue";
     if (c.category === "Missing item") mappedCategory = "missing_item";
+    if (c.category === "Wrong item") mappedCategory = "wrong_item";
+    if (c.category === "Damaged item") mappedCategory = "damaged_item";
+    if (c.category === "Payment issue") mappedCategory = "payment_issue";
 
-    // Calculate SLA state based on priority and age
-    let slaTarget = 120; // default P3 = 2 hours
-    if (c.priority === "P1") slaTarget = 15;
-    else if (c.priority === "P2") slaTarget = 30;
+    let mappedStatus = "unassigned";
+    if (c.status === "Assigned") mappedStatus = "assigned";
+    if (c.status === "In progress") mappedStatus = "in_progress";
+    if (c.status === "Awaiting customer") mappedStatus = "awaiting_customer";
+    if (c.status === "Escalated - L2") mappedStatus = "escalated_l2";
+    if (c.status === "Resolved") mappedStatus = "resolved";
+
+    const settlementStatus =
+      c.resolution?.toLowerCase().includes("pending") ||
+      c.detail?.toLowerCase().includes("pending") ||
+      c.detail?.includes("Gateway")
+        ? "pending"
+        : c.type === "Refund"
+          ? "settled"
+          : "n/a";
+    if (mappedStatus === "resolved" && settlementStatus === "pending") {
+      mappedStatus = "in_progress";
+    }
 
     let slaState = "on_track";
-    if (c.ageMins > slaTarget) slaState = "breached";
-    else if (c.ageMins > slaTarget * 0.75) slaState = "at_risk";
+    if (c.sla === "breached") slaState = "breached";
+    else if (c.sla === "at-risk") slaState = "at_risk";
 
     return {
       id: c.id,
@@ -296,13 +407,18 @@ async function seed() {
       category: mappedCategory,
       type: c.type === "Refund" ? "refund" : "operational_investigation",
       priority: c.priority,
-      status: c.status === "Unassigned" ? "unassigned" : "assigned",
+      status: mappedStatus,
       sla_state: slaState,
       assigned_agent_id:
-        c.status !== "Unassigned" ? createdProfiles["manager@darkops.com"]?.id : null,
+        mappedStatus !== "unassigned" ? createdProfiles["manager@darkops.com"]?.id : null,
       order_value_paise: c.orderValue * 100,
       refund_amount_paise: c.refundAmount * 100,
-      created_at: new Date(Date.now() - (c.ageMins || 60) * 60000).toISOString(),
+      // Spread the active caseload over the last ~12 days (relative to now) so it
+      // contributes a realistic recent tail to the network volume chart rather
+      // than piling onto a single day.
+      created_at: new Date(
+        Date.now() - ((ci * 37) % 12) * 86400000 - (c.ageMins || 60) * 60000,
+      ).toISOString(),
     };
   });
 
@@ -324,7 +440,7 @@ async function seed() {
       assigned_agent_id: null,
       order_value_paise: 15000,
       refund_amount_paise: 0,
-      created_at: new Date().toISOString(),
+      created_at: new Date(FIXED_SEED_EPOCH).toISOString(),
     });
   }
 
@@ -341,12 +457,11 @@ async function seed() {
       category: "missing_item",
       type: "refund",
       priority: "P2",
-      status: "unassigned", // will trigger risk review
-      sla_state: "on_track",
+      status: "unassigned", // will trigger risk review      sla_state: "on_track",
       assigned_agent_id: null,
       order_value_paise: 450000,
       refund_amount_paise: 0,
-      created_at: new Date().toISOString(),
+      created_at: new Date(FIXED_SEED_EPOCH).toISOString(),
     });
   }
 
@@ -368,13 +483,18 @@ async function seed() {
       assigned_agent_id: createdProfiles["agent.c@darkops.com"]?.id,
       order_value_paise: 120000,
       refund_amount_paise: 120000,
-      created_at: new Date(Date.now() - 3600000 * 3).toISOString(), // 3 hours ago, P3 is 2 hours
-      sla_due_at: new Date(Date.now() - 3600000).toISOString(),
+      created_at: new Date(FIXED_SEED_EPOCH - 3600000 * 3).toISOString(), // 3 hours ago, P3 is 2 hours
+      sla_due_at: new Date(FIXED_SEED_EPOCH - 3600000).toISOString(),
     });
   }
 
-  const { error: complaintErr } = await supabase.from("complaints").upsert(complaintRows, { onConflict: "id" });
-  if (complaintErr) console.error("Complaints upsert error:", complaintErr);
+  // Insert CASES/persona complaints, skipping any whose complaint_ref already
+  // exists from a prior seed (mock ids have drifted over time). New rows land;
+  // existing rows are normalized in step 9c below.
+  const { error: complaintErr } = await supabase
+    .from("complaints")
+    .upsert(complaintRows, { onConflict: "complaint_ref", ignoreDuplicates: true });
+  if (complaintErr) console.error("Complaints upsert error:", complaintErr.message);
 
   // 9. Refund Requests
   const refundRows = complaintRows
@@ -387,6 +507,458 @@ async function seed() {
       status: "requested",
     }));
   await supabase.from("refund_requests").upsert(refundRows, { onConflict: "id" });
+
+  // 9b. Network-wide complaint history ─────────────────────────────────────────
+  // A realistic, well-distributed body of complaints (with their own customers +
+  // orders) spread across the last 35 days. This drives the executive volume
+  // chart, city breakdown, SLA and open-complaint counts with believable data
+  // instead of a single spike. Deterministic (seeded) → idempotent re-runs.
+  console.log("Generating network complaint history (customers, orders, complaints)...");
+  const grng = mulberry32(20260915);
+  const FIRST_NAMES = [
+    "Aarav",
+    "Vivaan",
+    "Aditya",
+    "Vihaan",
+    "Arjun",
+    "Sai",
+    "Reyansh",
+    "Ayaan",
+    "Krishna",
+    "Ishaan",
+    "Rohan",
+    "Kabir",
+    "Ananya",
+    "Diya",
+    "Aadhya",
+    "Saanvi",
+    "Pari",
+    "Anika",
+    "Navya",
+    "Myra",
+    "Priya",
+    "Neha",
+    "Riya",
+    "Kavya",
+    "Meera",
+    "Sara",
+    "Ira",
+    "Aditi",
+    "Nisha",
+    "Tara",
+    "Rahul",
+    "Karan",
+    "Nikhil",
+    "Varun",
+    "Aman",
+    "Dev",
+    "Yash",
+    "Harsh",
+    "Manish",
+    "Sneha",
+  ];
+  const LAST_NAMES = [
+    "Sharma",
+    "Verma",
+    "Iyer",
+    "Nair",
+    "Reddy",
+    "Rao",
+    "Patel",
+    "Shah",
+    "Gupta",
+    "Mehta",
+    "Singh",
+    "Kumar",
+    "Das",
+    "Bose",
+    "Chopra",
+    "Kapoor",
+    "Malhotra",
+    "Joshi",
+    "Desai",
+    "Menon",
+    "Pillai",
+    "Nayak",
+    "Ghosh",
+    "Banerjee",
+    "Chatterjee",
+  ];
+  const CATS = [
+    "late_delivery",
+    "quality_issue",
+    "missing_item",
+    "wrong_item",
+    "damaged_item",
+    "payment_issue",
+    "other",
+  ];
+  const CAT_WEIGHTS = [26, 18, 20, 12, 10, 10, 4];
+  const CAT_SUMMARY: Record<string, string> = {
+    late_delivery: "Order arrived later than the promised delivery window",
+    quality_issue: "Product quality did not meet expectations on arrival",
+    missing_item: "One or more items were missing from the delivered order",
+    wrong_item: "Received a different item than what was ordered",
+    damaged_item: "Item arrived damaged or with broken packaging",
+    payment_issue: "Payment was charged incorrectly or a refund was not received",
+    other: "General issue reported with the delivered order",
+  };
+  const pickWeighted = (arr: string[], w: number[]) => {
+    let x = grng() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < arr.length; i++) {
+      x -= w[i];
+      if (x <= 0) return arr[i];
+    }
+    return arr[arr.length - 1];
+  };
+  const pickStore = () => STORES[Math.floor(grng() * STORES.length)];
+
+  const opsAgentId = createdProfiles["manager@darkops.com"]?.id || null;
+
+  // Customer pool
+  const genCustomers: any[] = [];
+  const CUST_POOL = 300;
+  for (let i = 0; i < CUST_POOL; i++) {
+    const store = pickStore();
+    genCustomers.push({
+      id: `CU-GEN-${String(i + 1).padStart(4, "0")}`,
+      full_name: `${FIRST_NAMES[Math.floor(grng() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(grng() * LAST_NAMES.length)]}`,
+      email: `netcust${i + 1}@example.com`,
+      city: store.city,
+      prior_claims_90d: Math.floor(grng() * 4),
+    });
+  }
+
+  const genOrders: any[] = [];
+  const genComplaints: any[] = [];
+  const DAYS = 35;
+  let cmpSeq = 0;
+  for (let day = DAYS; day >= 0; day--) {
+    const dayDate = new Date(Date.now() - day * 86400000);
+    const weekday = dayDate.getDay();
+    const weekendBoost = weekday === 0 || weekday === 6 ? 1.2 : 1;
+    const wave = 17 + 5 * Math.sin((DAYS - day) / 6);
+    const noise = (grng() - 0.5) * 6;
+    const count = Math.max(8, Math.round((wave + noise) * weekendBoost));
+
+    for (let k = 0; k < count; k++) {
+      cmpSeq++;
+      const cust = genCustomers[Math.floor(grng() * genCustomers.length)];
+      const store = pickStore();
+      const createdMs = Date.now() - day * 86400000 - Math.floor(grng() * 86400000 * 0.92);
+      const cat = pickWeighted(CATS, CAT_WEIGHTS);
+      const refundCat = ["missing_item", "damaged_item", "payment_issue", "wrong_item"].includes(
+        cat,
+      );
+      const type =
+        refundCat && grng() < 0.7
+          ? "refund"
+          : (cat === "late_delivery" || cat === "quality_issue") && grng() < 0.3
+            ? "reorder"
+            : "operational_investigation";
+      const pr = grng();
+      const priority = pr < 0.07 ? "P1" : pr < 0.37 ? "P2" : pr < 0.87 ? "P3" : "P4";
+
+      const orderId = `ORD-GEN-${String(cmpSeq).padStart(5, "0")}`;
+      const orderValue = 150 + Math.floor(grng() * 1850);
+      const placedMs = createdMs - (1 + Math.floor(grng() * 3)) * 86400000;
+      genOrders.push({
+        id: orderId,
+        customer_id: cust.id,
+        store_id: store.id,
+        placed_at: new Date(placedMs).toISOString(),
+        status: "delivered",
+        total_amount_paise: orderValue * 100,
+        item_count: 1 + Math.floor(grng() * 8),
+        items_preview: "Groceries & daily essentials",
+        delivered_at: new Date(placedMs + 1500000).toISOString(),
+      });
+
+      // Resolution likelihood grows with age; recent complaints stay active.
+      const resolvedProb = day >= 4 ? 0.94 : day >= 1 ? 0.55 : 0.25;
+      const isResolved = grng() < resolvedProb;
+      let status: string;
+      let slaState = "on_track";
+      let resolvedAt: string | null = null;
+      let resolution: string | null = null;
+      let assigned: string | null = null;
+      if (isResolved) {
+        status = "resolved";
+        // Most complaints are resolved soon after they're raised, but a realistic
+        // slice were closed within the last 24h — steady daily throughput — so the
+        // "resolved today" figure reflects genuine ongoing work rather than zero.
+        if (grng() < 0.07) {
+          resolvedAt = new Date(
+            Math.max(createdMs, Date.now() - Math.floor(grng() * 86400000)),
+          ).toISOString();
+        } else {
+          const resMins = 20 + Math.floor(grng() * 100);
+          resolvedAt = new Date(Math.min(Date.now(), createdMs + resMins * 60000)).toISOString();
+        }
+        resolution = "Resolved by the support team; customer notified.";
+        assigned = opsAgentId;
+      } else {
+        const sr = grng();
+        status =
+          sr < 0.3
+            ? "unassigned"
+            : sr < 0.6
+              ? "assigned"
+              : sr < 0.85
+                ? "in_progress"
+                : "escalated_l2";
+        assigned = status === "unassigned" ? null : opsAgentId;
+        const slr = grng();
+        slaState = slr < 0.72 ? "on_track" : slr < 0.9 ? "at_risk" : "breached";
+      }
+      const refundAmt =
+        type === "refund" && isResolved && grng() < 0.8
+          ? Math.round(orderValue * (0.3 + grng() * 0.7))
+          : 0;
+
+      genComplaints.push({
+        id: `CMP-GEN-${String(cmpSeq).padStart(5, "0")}`,
+        complaint_ref: `REF-G${String(cmpSeq).padStart(5, "0")}`,
+        customer_id: cust.id,
+        order_id: orderId,
+        store_id: store.id,
+        summary: CAT_SUMMARY[cat],
+        detail: `${CAT_SUMMARY[cat]}. Reported by the customer for order ${orderId}.`,
+        category: cat,
+        type,
+        priority,
+        status,
+        sla_state: slaState,
+        assigned_agent_id: assigned,
+        order_value_paise: orderValue * 100,
+        refund_amount_paise: refundAmt * 100,
+        created_at: new Date(createdMs).toISOString(),
+        resolved_at: resolvedAt,
+        resolution,
+      });
+    }
+  }
+
+  const upsertChunked = async (table: string, rows: any[]) => {
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase
+        .from(table)
+        .upsert(rows.slice(i, i + 500), { onConflict: "id" });
+      if (error) console.error(`${table} upsert error:`, error.message);
+    }
+  };
+  await upsertChunked("customers", genCustomers);
+  await upsertChunked("orders", genOrders);
+  await upsertChunked("complaints", genComplaints);
+  console.log(
+    `Seeded ${genCustomers.length} customers, ${genOrders.length} orders, ${genComplaints.length} network complaints across ${DAYS} days`,
+  );
+
+  // 9c. Normalize legacy CASES complaints (id prefix "CS-") that predate this
+  // seed. They were clustered on a single day and over-reported SLA breaches.
+  // Spread their created_at across the last ~20 days and apply a realistic SLA
+  // mix so the network charts read cleanly. Only created_at + sla_state change,
+  // so no foreign keys are affected. Persona complaints (CMP-*) are left intact.
+  const { data: legacyCases } = await supabase
+    .from("complaints")
+    .select("id, status")
+    .like("id", "CS-%");
+  if (legacyCases && legacyCases.length) {
+    const activeSet = [
+      "unassigned",
+      "assigned",
+      "in_progress",
+      "escalated_l2",
+      "awaiting_customer",
+    ];
+    for (const c of legacyCases) {
+      const h = hashStr(c.id);
+      const createdAt = new Date(Date.now() - (h % 20) * 86400000 - (h % 60) * 60000).toISOString();
+      let sla = "on_track";
+      if (activeSet.includes(c.status)) {
+        const b = h % 100;
+        sla = b < 12 ? "at_risk" : b < 20 ? "breached" : "on_track";
+      }
+      await supabase
+        .from("complaints")
+        .update({ created_at: createdAt, sla_state: sla })
+        .eq("id", c.id);
+    }
+    console.log(
+      `Normalized ${legacyCases.length} legacy CASES complaints (spread dates + SLA mix).`,
+    );
+  }
+
+  // 9d. Curated demo-customer complaint lifecycle ──────────────────────────────
+  // The customer-facing demo (customer@darkops.com → CU-DEMO-001) must clearly
+  // show that "live support" unlocks ONLY after a complaint passes its SLA
+  // window: a just-raised complaint should NOT offer live support. Reset this
+  // customer (and clear runtime junk from the "normal" persona) to a clean,
+  // curated lifecycle. sla_due_at is set explicitly so each state is exact.
+  const MIN_MS = 60000;
+  const HOUR_MS = 3600000;
+  const DAY_MS = 86400000;
+
+  // Delete a customer's complaints (and their dependents) except any to keep.
+  const cleanCustomerComplaints = async (customerId: string, keep: string[]) => {
+    const { data: existing } = await supabase
+      .from("complaints")
+      .select("id")
+      .eq("customer_id", customerId);
+    const ids = (existing || []).map((c: any) => c.id).filter((id: string) => !keep.includes(id));
+    if (!ids.length) return;
+    await supabase.from("complaint_status_history").delete().in("complaint_id", ids);
+    await supabase.from("complaint_comments").delete().in("complaint_id", ids);
+    await supabase.from("refund_requests").delete().in("complaint_id", ids);
+    await supabase.from("fraud_reviews").delete().in("complaint_id", ids);
+    await supabase.from("failed_automation").delete().in("complaint_id", ids);
+    await supabase.from("support_tickets").update({ complaint_id: null }).in("complaint_id", ids);
+    await supabase.from("complaints").delete().in("id", ids);
+  };
+
+  const DEMO_CUST = "CU-DEMO-001";
+  await supabase.from("customers").upsert(
+    {
+      id: DEMO_CUST,
+      full_name: "Rajat Sharma",
+      email: "customer@darkops.com",
+      city: "Bengaluru",
+      prior_claims_90d: 0,
+    },
+    { onConflict: "id" },
+  );
+  const demoOrderDefs = [
+    { id: "ORD-DEMO-001", value: 480, items: 4, prev: "Milk, Bread, Eggs, Curd" },
+    { id: "ORD-DEMO-002", value: 1260, items: 7, prev: "Groceries, Fruits, Snacks" },
+    { id: "ORD-DEMO-003", value: 320, items: 3, prev: "Vegetables, Paneer" },
+  ];
+  await supabase.from("orders").upsert(
+    demoOrderDefs.map((o) => ({
+      id: o.id,
+      customer_id: DEMO_CUST,
+      store_id: "DS-1462",
+      placed_at: new Date(Date.now() - 3 * DAY_MS).toISOString(),
+      status: "delivered",
+      total_amount_paise: o.value * 100,
+      item_count: o.items,
+      items_preview: o.prev,
+      delivered_at: new Date(Date.now() - 3 * DAY_MS + 1500000).toISOString(),
+    })),
+    { onConflict: "id" },
+  );
+
+  // Order referenced by the simulated upstream ("10MinMart") signed-handoff demo
+  // screen (src/routes/simulated-upstream.order-confirmation.tsx). It MUST exist
+  // and be owned by the demo customer so the handoff/issue endpoint's order-
+  // existence + ownership checks pass and the order pre-fills on /report-issue.
+  // Delivered ~11 minutes ago today to match the stub's "Delivered in 11 mins".
+  await supabase.from("orders").upsert(
+    {
+      id: "ORD-884213",
+      customer_id: DEMO_CUST,
+      store_id: "DS-1462",
+      placed_at: new Date(Date.now() - 15 * MIN_MS).toISOString(),
+      status: "delivered",
+      total_amount_paise: 184500,
+      item_count: 3,
+      items_preview: "Nandini Toned Milk, Farm Fresh Eggs, Amul Butter",
+      delivered_at: new Date(Date.now() - 4 * MIN_MS).toISOString(),
+    },
+    { onConflict: "id" },
+  );
+
+  await cleanCustomerComplaints(DEMO_CUST, []);
+  // Clear runtime-submitted junk from the "normal" persona, keeping its scripted
+  // auto-resolve candidate.
+  await cleanCustomerComplaints("CU-NORMAL-001", ["CMP-NORM-001"]);
+
+  const demoComplaints = [
+    {
+      // Just raised → within SLA → live support NOT available (SLA countdown).
+      id: "CMP-DEMO-FRESH",
+      complaint_ref: "REF-DEMO-100",
+      order_id: "ORD-DEMO-001",
+      summary: "Missing item - 1L milk not delivered",
+      detail: "One 1L milk pack was missing from my delivered order. Requesting a refund.",
+      category: "missing_item",
+      type: "refund",
+      priority: "P3",
+      status: "unassigned",
+      sla_state: "on_track",
+      assigned_agent_id: null,
+      created_at: new Date(Date.now() - 4 * MIN_MS).toISOString(),
+      updated_at: new Date(Date.now() - 4 * MIN_MS).toISOString(),
+      sla_due_at: new Date(Date.now() + 116 * MIN_MS).toISOString(),
+      order_value_paise: 48000,
+      refund_amount_paise: 0,
+    },
+    {
+      // Under active review, still within SLA → live support NOT available.
+      id: "CMP-DEMO-REVIEW",
+      complaint_ref: "REF-DEMO-101",
+      order_id: "ORD-DEMO-002",
+      summary: "Wrong item received - toned milk instead of full cream",
+      detail: "Received toned milk instead of the full cream milk I ordered.",
+      category: "wrong_item",
+      type: "operational_investigation",
+      priority: "P2",
+      status: "in_progress",
+      sla_state: "on_track",
+      assigned_agent_id: opsAgentId,
+      created_at: new Date(Date.now() - 25 * MIN_MS).toISOString(),
+      updated_at: new Date(Date.now() - 8 * MIN_MS).toISOString(),
+      sla_due_at: new Date(Date.now() + 5 * MIN_MS).toISOString(),
+      order_value_paise: 126000,
+      refund_amount_paise: 0,
+    },
+    {
+      // Response window exceeded → live support AVAILABLE.
+      id: "CMP-DEMO-SLA",
+      complaint_ref: "REF-DEMO-102",
+      order_id: "ORD-DEMO-002",
+      summary: "Quality issue - items arrived spoiled",
+      detail: "Several items in my order were spoiled on arrival, and I have not heard back yet.",
+      category: "quality_issue",
+      type: "refund",
+      priority: "P3",
+      status: "in_progress",
+      sla_state: "breached",
+      assigned_agent_id: opsAgentId,
+      created_at: new Date(Date.now() - Math.round(3.5 * HOUR_MS)).toISOString(),
+      updated_at: new Date(Date.now() - 30 * MIN_MS).toISOString(),
+      sla_due_at: new Date(Date.now() - 90 * MIN_MS).toISOString(),
+      order_value_paise: 126000,
+      refund_amount_paise: 0,
+    },
+    {
+      // Resolved with an approved refund → closed, no live support.
+      id: "CMP-DEMO-DONE",
+      complaint_ref: "REF-DEMO-103",
+      order_id: "ORD-DEMO-003",
+      summary: "Damaged packaging - eggs broken on arrival",
+      detail: "The egg tray was broken on delivery. I requested a refund.",
+      category: "damaged_item",
+      type: "refund",
+      priority: "P3",
+      status: "resolved",
+      sla_state: "on_track",
+      assigned_agent_id: opsAgentId,
+      created_at: new Date(Date.now() - 2 * DAY_MS).toISOString(),
+      sla_due_at: new Date(Date.now() - 2 * DAY_MS + 120 * MIN_MS).toISOString(),
+      // Resolved ~40 min after it was raised. updated_at must reflect the
+      // resolution time (the customer dashboard computes avg resolution as
+      // updated_at - created_at), otherwise it reads as ~2 days.
+      resolved_at: new Date(Date.now() - 2 * DAY_MS + 40 * MIN_MS).toISOString(),
+      updated_at: new Date(Date.now() - 2 * DAY_MS + 40 * MIN_MS).toISOString(),
+      resolution: "Refund of Rs 90 approved and processed to the original payment method.",
+      order_value_paise: 32000,
+      refund_amount_paise: 9000,
+    },
+  ].map((c) => ({ ...c, customer_id: DEMO_CUST, store_id: "DS-1462" }));
+  await supabase.from("complaints").upsert(demoComplaints, { onConflict: "id" });
+  console.log(
+    `Curated ${demoComplaints.length} demo-customer complaints (fresh = no live support, breached = live support).`,
+  );
 
   // 10. Fraud Reviews
   const fraudRows = FRAUD_CASES.map((f: any) => ({
@@ -409,7 +981,46 @@ async function seed() {
   }
   await supabase.from("fraud_reviews").upsert(fraudRows, { onConflict: "id" });
 
-  // 11. Store Metrics Snapshots - calculate from actual operational metrics first
+  // 10b. Risk factors + a baseline "flagged" history event per review, so the
+  // fraud-detail "why this was flagged" and "review log" panels show real data
+  // (previously never seeded → always empty). Idempotent: clear then insert.
+  const fraudReviewIds = FRAUD_CASES.map((f: any) => f.id);
+  await supabase.from("fraud_risk_factors").delete().in("fraud_review_id", fraudReviewIds);
+  await supabase.from("fraud_review_history").delete().in("fraud_review_id", fraudReviewIds);
+  const factorRows = FRAUD_CASES.flatMap((f: any) =>
+    (f.factors || []).map((factor: any) => ({
+      fraud_review_id: f.id,
+      label: factor.label,
+      weight: factor.weight,
+      evidence: factor.evidence,
+    })),
+  );
+  const fraudHistoryRows = FRAUD_CASES.map((f: any) => ({
+    fraud_review_id: f.id,
+    actor_id: null,
+    actor_label: "Risk engine",
+    action: `Flagged at ${f.confidence}% risk score`,
+    occurred_at: new Date(Date.now() - 3 * HOUR_MS).toISOString(),
+  }));
+  for (let i = 0; i < factorRows.length; i += 500) {
+    const { error } = await supabase
+      .from("fraud_risk_factors")
+      .insert(factorRows.slice(i, i + 500));
+    if (error) console.error("fraud_risk_factors insert error:", error.message);
+  }
+  if (fraudHistoryRows.length) {
+    const { error } = await supabase.from("fraud_review_history").insert(fraudHistoryRows);
+    if (error) console.error("fraud_review_history insert error:", error.message);
+  }
+  console.log(
+    `Seeded ${factorRows.length} fraud risk factors + ${fraudHistoryRows.length} history events`,
+  );
+
+  // 11 + 12. Store health, metrics snapshots, and 31-day PulseScore history.
+  // A realistic network: ~70% healthy, ~22% at-risk, ~8% critical. Every store's
+  // metrics (SLA, refund rate, resolution time, equipment/delivery/inventory) are
+  // derived from its health tier, and its PulseScore points are distributed to
+  // land exactly on the tier's target — so the headline numbers all agree.
   await supabase
     .from("store_metrics_snapshots")
     .delete()
@@ -417,43 +1028,6 @@ async function seed() {
       "store_id",
       STORES.map((s) => s.id),
     );
-  const metricsRows = STORES.map((s) => {
-    // Use the actual metrics from the store data with realistic ranges
-    const slaPct = s.sla || 95;
-    const refundRatePct = s.refundRate || 5;
-    // Use store metrics or generate realistic values based on store health
-    const equipmentFailures14d = s.equipmentFailures14d !== undefined 
-      ? s.equipmentFailures14d 
-      : Math.floor(Math.random() * 12); // 0-12 failures over 14 days
-    const inventoryIssues = s.inventoryIssues !== undefined 
-      ? s.inventoryIssues 
-      : Math.floor(Math.random() * 20); // 0-20 inventory issues
-    const deliveryDelays = s.deliveryDelays !== undefined 
-      ? s.deliveryDelays 
-      : Math.floor(Math.random() * 50); // 0-50 delivery delays
-    const pickerDelayMins = s.pickerDelayMins !== undefined 
-      ? s.pickerDelayMins 
-      : 1.5 + Math.random() * 4; // 1.5-5.5 minutes average delay
-    const avgResolutionMins = s.avgResolutionMins || 60;
-    const openIssues = s.openIssues !== undefined 
-      ? s.openIssues 
-      : Math.floor(Math.random() * 15); // 0-15 open issues
-
-    return {
-      store_id: s.id,
-      sla_pct: slaPct,
-      refund_rate_pct: refundRatePct,
-      equipment_failures_14d: equipmentFailures14d,
-      inventory_issues: inventoryIssues,
-      delivery_delays: deliveryDelays,
-      picker_delay_mins: pickerDelayMins,
-      avg_resolution_mins: avgResolutionMins,
-      open_issues: openIssues,
-    };
-  });
-  await supabase.from("store_metrics_snapshots").insert(metricsRows);
-
-  // 12. Pulse Scores - calculate from actual metrics using real formula
   await supabase
     .from("pulse_scores")
     .delete()
@@ -461,88 +1035,117 @@ async function seed() {
       "store_id",
       STORES.map((s) => s.id),
     );
-  const pulseRows = metricsRows.flatMap((m) => {
-    // We will generate 30 days of historical pulse scores
-    const history = [];
 
-    // We want a slight trend. Generate a random delta (-2 to 2) per day
-    // We'll calculate the base (today's) points first:
-    const equipmentBase = Math.round(Math.min(25, m.equipment_failures_14d * 3));
-    const slaBase = Math.round(Math.min(25, Math.max(0, (95 - m.sla_pct) * 0.5)));
-    const refundsBase = Math.round(Math.min(20, Math.max(0, (m.refund_rate_pct - 2) * 1)));
-    const deliveryBase = Math.round(Math.min(15, m.delivery_delays * 0.5));
-    const pickerBase = Math.round(Math.min(10, Math.max(0, (m.picker_delay_mins - 2.5) * 2)));
-    const inventoryBase = Math.round(Math.min(10, m.inventory_issues * 1));
+  const metricsRows: any[] = [];
+  const storeHealth: { store_id: string; score: number }[] = [];
+  const pulseRows: any[] = [];
 
-    // Go back 30 days
+  STORES.forEach((s) => {
+    const r = mulberry32(hashStr(s.id));
+    const ib = (lo: number, hi: number) => Math.floor(lo + r() * (hi - lo + 1));
+    const bucket = hashStr(s.id) % 100;
+    const tier = bucket < 8 ? "critical" : bucket < 30 ? "at_risk" : "healthy";
+
+    const targetPulse =
+      tier === "critical"
+        ? 45 + Math.floor(r() * 13) // 45–57
+        : tier === "at_risk"
+          ? 63 + Math.floor(r() * 15) // 63–77
+          : 82 + Math.floor(r() * 13); // 82–94
+
+    const slaPct =
+      tier === "critical"
+        ? rd(79 + r() * 8, 1)
+        : tier === "at_risk"
+          ? rd(88 + r() * 6, 1)
+          : rd(94 + r() * 5, 1);
+    const refundRate =
+      tier === "critical"
+        ? rd(3.8 + r() * 2.4, 1)
+        : tier === "at_risk"
+          ? rd(2.4 + r() * 1.2, 1)
+          : rd(1.3 + r() * 1.0, 1);
+    const avgResolution =
+      tier === "critical"
+        ? Math.round(78 + r() * 30)
+        : tier === "at_risk"
+          ? Math.round(56 + r() * 18)
+          : Math.round(38 + r() * 16);
+    const equipmentFailures =
+      tier === "critical" ? ib(5, 10) : tier === "at_risk" ? ib(2, 5) : ib(0, 2);
+    const deliveryDelays =
+      tier === "critical" ? ib(25, 45) : tier === "at_risk" ? ib(10, 25) : ib(2, 10);
+    const inventoryIssues =
+      tier === "critical" ? ib(7, 14) : tier === "at_risk" ? ib(3, 7) : ib(0, 3);
+    const pickerDelay =
+      tier === "critical"
+        ? rd(3.9 + r() * 1.2, 1)
+        : tier === "at_risk"
+          ? rd(2.8 + r() * 1.0, 1)
+          : rd(1.6 + r() * 1.1, 1);
+    const openIssues = tier === "critical" ? ib(8, 16) : tier === "at_risk" ? ib(3, 8) : ib(0, 3);
+
+    metricsRows.push({
+      store_id: s.id,
+      sla_pct: slaPct,
+      refund_rate_pct: refundRate,
+      equipment_failures_14d: equipmentFailures,
+      inventory_issues: inventoryIssues,
+      delivery_delays: deliveryDelays,
+      picker_delay_mins: pickerDelay,
+      avg_resolution_mins: avgResolution,
+      open_issues: openIssues,
+    });
+    storeHealth.push({ store_id: s.id, score: targetPulse });
+
+    // Category weights reflect each store's actual weaknesses so the PulseScore
+    // breakdown is meaningful (a store with many equipment failures loses more
+    // equipment points). A small baseline avoids a zero-weight division.
+    const weights = [
+      0.5 + Math.min(25, equipmentFailures * 2.5),
+      0.5 + Math.min(25, Math.max(0, (96 - slaPct) * 1.2)),
+      0.5 + Math.min(20, Math.max(0, (refundRate - 1.5) * 3)),
+      0.5 + Math.min(15, deliveryDelays * 0.3),
+      0.5 + Math.min(10, Math.max(0, (pickerDelay - 2) * 3)),
+      0.5 + Math.min(10, inventoryIssues * 0.8),
+    ];
+
     for (let day = 30; day >= 0; day--) {
-      const calculatedAt = new Date(Date.now() - day * 86400000).toISOString();
-
-      // Add some random noise that decays into the past
-      // To ensure we don't violate constraints, we must clamp again
-      const noise = () => Math.round((Math.random() - 0.5) * 3);
-
-      const equipmentPts = Math.round(
-        Math.min(25, Math.max(0, equipmentBase + (day > 0 ? noise() : 0))),
-      );
-      const slaPts = Math.round(Math.min(25, Math.max(0, slaBase + (day > 0 ? noise() : 0))));
-      const refundsPts = Math.round(
-        Math.min(20, Math.max(0, refundsBase + (day > 0 ? noise() : 0))),
-      );
-      const deliveryPts = Math.round(
-        Math.min(15, Math.max(0, deliveryBase + (day > 0 ? noise() : 0))),
-      );
-      const pickerPts = Math.round(Math.min(10, Math.max(0, pickerBase + (day > 0 ? noise() : 0))));
-      const inventoryPts = Math.round(
-        Math.min(10, Math.max(0, inventoryBase + (day > 0 ? noise() : 0))),
-      );
-
-      const totalDeduction =
-        equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
-      const pulse = Math.max(12, Math.min(100, 100 - totalDeduction));
-
-      history.push({
-        store_id: m.store_id,
-        score: pulse,
-        equipment_pts: equipmentPts,
-        sla_pts: slaPts,
-        refunds_pts: refundsPts,
-        delivery_pts: deliveryPts,
-        picker_pts: pickerPts,
-        inventory_pts: inventoryPts,
-        calculated_at: calculatedAt,
+      const noise = day === 0 ? 0 : Math.round((r() - 0.5) * 5);
+      const dayScore = Math.max(40, Math.min(97, targetPulse + noise));
+      const pts = distributeDeduction(weights, 100 - dayScore);
+      const sum = pts.reduce((a, b) => a + b, 0);
+      pulseRows.push({
+        store_id: s.id,
+        score: Math.max(12, 100 - sum),
+        equipment_pts: pts[0],
+        sla_pts: pts[1],
+        refunds_pts: pts[2],
+        delivery_pts: pts[3],
+        picker_pts: pts[4],
+        inventory_pts: pts[5],
+        calculated_at: new Date(Date.now() - day * 86400000).toISOString(),
       });
     }
-
-    return history;
   });
 
-  // We have 31 days per store, 200 stores = 6200 rows.
-  // Insert in chunks to avoid overwhelming the API.
-  const chunkSize = 1000;
-  for (let i = 0; i < pulseRows.length; i += chunkSize) {
-    const chunk = pulseRows.slice(i, i + chunkSize);
-    await supabase.from("pulse_scores").insert(chunk);
+  await supabase.from("store_metrics_snapshots").insert(metricsRows);
+  const pulseChunk = 1000;
+  for (let i = 0; i < pulseRows.length; i += pulseChunk) {
+    await supabase.from("pulse_scores").insert(pulseRows.slice(i, i + pulseChunk));
   }
 
-  // 13. Work Orders - create for all stores with varying priorities based on health
-  // Get unique store IDs and their latest pulse scores
-  const uniqueStores = new Map<string, { score: number }>();
-  pulseRows.forEach((p) => {
-    if (!uniqueStores.has(p.store_id)) {
-      uniqueStores.set(p.store_id, { score: p.score });
-    }
-  });
+  const criticalHealth = storeHealth.filter((h) => h.score < 60);
 
-  // Create 2-5 work orders per store based on health
+  // 13. Work Orders - 2-5 per store based on latest health tier.
   const workOrderRows: any[] = [];
-  uniqueStores.forEach((health, storeId) => {
+  storeHealth.forEach((health) => {
     const numWorkOrders = health.score < 60 ? 5 : health.score < 80 ? 3 : 2;
     for (let i = 0; i < numWorkOrders; i++) {
       workOrderRows.push({
-        id: `WO-${storeId}-${Date.now()}-${i}`,
-        store_id: storeId,
-        asset_id: `EQ-${storeId}-${i + 1}`,
+        id: `WO-${health.store_id}-${i}`,
+        store_id: health.store_id,
+        asset_id: `EQ-${health.store_id}-${i + 1}`,
         asset_name: [
           "Walk-in freezer",
           "Chiller unit",
@@ -557,17 +1160,15 @@ async function seed() {
   });
   await supabase.from("work_orders").upsert(workOrderRows, { onConflict: "id" });
 
-  // 14. Alerts - correlated with store health (critical alerts for low pulse stores)
-  const alertRows = pulseRows
-    .filter((p) => p.score < 60) // Only create alerts for critical stores
-    .map((p, idx) => ({
-      id: `ALT-${p.store_id}-${idx + 1}`,
-      store_id: p.store_id,
-      title: ["Chiller failure", "SLA breach", "High refund rate", "Equipment offline"][idx % 4],
-      detail: `Store ${p.store_id} health critical (Pulse: ${p.score})`,
-      severity: "crit",
-      is_resolved: false,
-    }));
+  // 14. Alerts - one critical alert per genuinely critical store (latest health).
+  const alertRows = criticalHealth.map((h, idx) => ({
+    id: `ALT-${h.store_id}`,
+    store_id: h.store_id,
+    title: ["Chiller failure", "SLA breach risk", "High refund rate", "Equipment offline"][idx % 4],
+    detail: `Store ${h.store_id} PulseScore critical (${h.score}) - intervention required.`,
+    severity: "crit",
+    is_resolved: false,
+  }));
   await supabase.from("alerts").upsert(alertRows);
 
   // 15. Notifications - based on actual conditions
@@ -592,16 +1193,15 @@ async function seed() {
     }
   });
 
-  // Store manager notifications for critical stores
-  const criticalStores = pulseRows.filter((p) => p.score < 60);
-  criticalStores.forEach((p) => {
+  // Store manager notifications for critical stores (one per store, capped).
+  criticalHealth.slice(0, 8).forEach((h) => {
     if (storeManagerProfileId) {
       notificationRows.push({
         recipient_id: storeManagerProfileId,
-        title: `Store ${p.store_id} PulseScore critical (${p.score})`,
-        meta: JSON.stringify({ store_id: p.store_id, pulse: p.score }),
+        title: `Store ${h.store_id} PulseScore critical (${h.score})`,
+        meta: JSON.stringify({ store_id: h.store_id, pulse: h.score }),
         link_type: "store",
-        link_ref: p.store_id,
+        link_ref: h.store_id,
       });
     }
   });
@@ -655,14 +1255,29 @@ async function seed() {
 
   console.log("Seeding support workspace: agents, tickets, and activity...");
 
-  // 16. Support Tickets — distributed across 3 agents + unassigned
-  const agentAId = createdProfiles["agent.a@darkops.com"]?.id;
-  const agentBId = createdProfiles["agent.b@darkops.com"]?.id;
-  const agentCId = createdProfiles["agent.c@darkops.com"]?.id;
+  // 16. Support Tickets - distributed across 3 agents + unassigned
+  let agentAId = createdProfiles["agent.a@darkops.com"]?.id;
+  let agentBId = createdProfiles["agent.b@darkops.com"]?.id;
+  let agentCId = createdProfiles["agent.c@darkops.com"]?.id;
+
+  // Robustness: on re-runs the auth users already exist, so createdProfiles can
+  // be empty. Resolve agent IDs directly from the DB by email (source of truth)
+  // so the realistic ticket seed always runs instead of being silently skipped
+  // and leaving only runtime automation-fallback junk behind.
+  if (!agentAId || !agentBId || !agentCId) {
+    const { data: agentProfiles } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .in("email", ["agent.a@darkops.com", "agent.b@darkops.com", "agent.c@darkops.com"]);
+    const map = new Map((agentProfiles || []).map((p: any) => [p.email, p.id]));
+    agentAId = agentAId || map.get("agent.a@darkops.com");
+    agentBId = agentBId || map.get("agent.b@darkops.com");
+    agentCId = agentCId || map.get("agent.c@darkops.com");
+  }
 
   if (!agentAId || !agentBId || !agentCId) {
     console.warn(
-      "Support agents not found — skipping ticket seed. Run migration first and ensure agents are registered.",
+      "Support agents not found - skipping ticket seed. Run migration first and ensure agents are registered.",
     );
     console.log("Agent A:", agentAId, "Agent B:", agentBId, "Agent C:", agentCId);
   } else {
@@ -670,39 +1285,15 @@ async function seed() {
     const slaAgo = (mins: number) => new Date(Date.now() - mins * 60000).toISOString();
     const createdAgo = (mins: number) => new Date(Date.now() - mins * 60000).toISOString();
 
-    // Delete any previously seeded tickets by ticket_number to allow idempotent re-runs
-    const seedTicketNumbers = [
-      "TKT-001",
-      "TKT-002",
-      "TKT-003",
-      "TKT-004",
-      "TKT-005",
-      "TKT-006",
-      "TKT-007",
-      "TKT-008",
-      "TKT-009",
-      "TKT-010",
-      "TKT-011",
-      "TKT-012",
-      "TKT-013",
-      "TKT-014",
-      "TKT-015",
-      "TKT-016",
-      "TKT-017",
-      "TKT-018",
-      "TKT-019",
-      "TKT-020",
-      "TKT-021",
-      "TKT-022",
-      "TKT-023",
-      "TKT-024",
-      "TKT-025",
-    ];
-    await supabase.from("support_tickets").delete().in("ticket_number", seedTicketNumbers);
+    // Full clean so idempotent re-runs — and any runtime automation-fallback
+    // tickets (TKT-<timestamp>-FA) — never accumulate as junk. ticket_activity
+    // is deleted first (FK is ON DELETE CASCADE, but be explicit).
+    await supabase.from("ticket_activity").delete().not("id", "is", null);
+    await supabase.from("support_tickets").delete().not("id", "is", null);
 
-    // Insert tickets WITHOUT id — Supabase will generate UUIDs
+    // Insert tickets WITHOUT id - Supabase will generate UUIDs
     const supportTickets = [
-      // ── Agent A (Priya Sharma) — 5 tickets ───────────────────────────────────
+      // ── Agent A (Priya Sharma) - 5 tickets ───────────────────────────────────
       {
         ticket_number: "TKT-001",
         title: "Refund validation failed – duplicate order claim",
@@ -771,7 +1362,7 @@ async function seed() {
         resolution_notes: "Refund of ₹120 approved and processed. Customer notified.",
         resolution_time_minutes: 150,
       },
-      // ── Agent B (Rohan Mehta) — 4 tickets ────────────────────────────────────
+      // ── Agent B (Rohan Mehta) - 4 tickets ────────────────────────────────────
       {
         ticket_number: "TKT-006",
         title: "Cold chain failure – yogurt expired on delivery",
@@ -824,7 +1415,7 @@ async function seed() {
         created_at: createdAgo(60),
         updated_at: createdAgo(20),
       },
-      // ── Agent C (Sneha Patel) — 3 tickets ─────────────────────────────────────
+      // ── Agent C (Sneha Patel) - 3 tickets ─────────────────────────────────────
       {
         ticket_number: "TKT-010",
         title: "Substitution rejected – customer unhappy with replacement",
@@ -881,7 +1472,7 @@ async function seed() {
           "Confirmed duplicate charge via payment gateway. Full refund issued. Customer notified.",
         resolution_time_minutes: 240,
       },
-      // ── Unassigned — 2 tickets ────────────────────────────────────────────────
+      // ── Unassigned - 2 tickets ────────────────────────────────────────────────
       {
         ticket_number: "TKT-013",
         title: "First-time customer complaint – app crash during checkout",
@@ -1079,7 +1670,7 @@ async function seed() {
         tkt[t.ticket_number] = t.id;
       });
 
-      // 17. ticket_activity — realistic event log for each ticket
+      // 17. ticket_activity - realistic event log for each ticket
       const activityRows: any[] = [];
 
       const mkAct = (
@@ -1098,7 +1689,7 @@ async function seed() {
         if (act) activityRows.push(act);
       };
 
-      // TKT-001 — Priya / P1 / In Progress
+      // TKT-001 - Priya / P1 / In Progress
       push(
         mkAct(
           "TKT-001",
@@ -1120,13 +1711,13 @@ async function seed() {
         ),
       );
 
-      // TKT-002 — Priya / P2 / Open
+      // TKT-002 - Priya / P2 / Open
       push(
         mkAct("TKT-002", null, "created", { title: "Ticket created from customer complaint" }, 46),
       );
       push(mkAct("TKT-002", agentAId, "assigned", { to: "Priya Sharma", from: null }, 45));
 
-      // TKT-003 — Priya / P2 / SLA Breached
+      // TKT-003 - Priya / P2 / SLA Breached
       push(
         mkAct(
           "TKT-003",
@@ -1138,7 +1729,7 @@ async function seed() {
       );
       push(mkAct("TKT-003", agentAId, "assigned", { to: "Priya Sharma", from: null }, 71));
 
-      // TKT-004 — Priya / P3 / Open
+      // TKT-004 - Priya / P3 / Open
       push(
         mkAct(
           "TKT-004",
@@ -1150,7 +1741,7 @@ async function seed() {
       );
       push(mkAct("TKT-004", agentAId, "assigned", { to: "Priya Sharma", from: null }, 14));
 
-      // TKT-005 — Priya / Resolved
+      // TKT-005 - Priya / Resolved
       push(
         mkAct(
           "TKT-005",
@@ -1172,18 +1763,18 @@ async function seed() {
         ),
       );
 
-      // TKT-006 — Rohan / P1 / In Progress (SLA at risk)
+      // TKT-006 - Rohan / P1 / In Progress (SLA at risk)
       push(mkAct("TKT-006", null, "created", { title: "Cold chain failure auto-escalated" }, 110));
       push(mkAct("TKT-006", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 109));
       push(mkAct("TKT-006", agentBId, "status_changed", { from: "open", to: "in_progress" }, 5));
 
-      // TKT-007 — Rohan / P2 / Open
+      // TKT-007 - Rohan / P2 / Open
       push(
         mkAct("TKT-007", null, "created", { title: "Reorder fulfillment failure escalated" }, 28),
       );
       push(mkAct("TKT-007", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 27));
 
-      // TKT-008 — Rohan / P1 / Escalated / SLA Breached
+      // TKT-008 - Rohan / P1 / Escalated / SLA Breached
       push(mkAct("TKT-008", null, "created", { title: "High-value dispute created" }, 200));
       push(mkAct("TKT-008", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 199));
       push(mkAct("TKT-008", agentBId, "status_changed", { from: "open", to: "in_progress" }, 80));
@@ -1196,13 +1787,13 @@ async function seed() {
           agentBId,
           "note_added",
           {
-            note: "Escalated to L2 — requires payment gateway review for ₹2,400 duplicate charge.",
+            note: "Escalated to L2 - requires payment gateway review for ₹2,400 duplicate charge.",
           },
           40,
         ),
       );
 
-      // TKT-009 — Rohan / P3 / Awaiting Customer
+      // TKT-009 - Rohan / P3 / Awaiting Customer
       push(mkAct("TKT-009", null, "created", { title: "Delivery dispute opened" }, 60));
       push(mkAct("TKT-009", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 59));
       push(
@@ -1218,15 +1809,15 @@ async function seed() {
         ),
       );
 
-      // TKT-010 — Sneha / P2 / Open
+      // TKT-010 - Sneha / P2 / Open
       push(mkAct("TKT-010", null, "created", { title: "Substitution complaint opened" }, 25));
       push(mkAct("TKT-010", agentCId, "assigned", { to: "Sneha Patel", from: null }, 24));
 
-      // TKT-011 — Sneha / P3 / Open
+      // TKT-011 - Sneha / P3 / Open
       push(mkAct("TKT-011", null, "created", { title: "Inventory discrepancy reported" }, 30));
       push(mkAct("TKT-011", agentCId, "assigned", { to: "Sneha Patel", from: null }, 29));
 
-      // TKT-012 — Sneha / P1 / Resolved
+      // TKT-012 - Sneha / P1 / Resolved
       push(mkAct("TKT-012", null, "created", { title: "Double charge dispute raised" }, 300));
       push(mkAct("TKT-012", agentCId, "assigned", { to: "Sneha Patel", from: null }, 299));
       push(mkAct("TKT-012", agentCId, "status_changed", { from: "open", to: "in_progress" }, 120));
@@ -1240,32 +1831,32 @@ async function seed() {
         ),
       );
 
-      // TKT-013, TKT-014 — Unassigned
+      // TKT-013, TKT-014 - Unassigned
       push(mkAct("TKT-013", null, "created", { title: "New ticket from app crash report" }, 32));
       push(mkAct("TKT-014", null, "created", { title: "Wallet promo dispute opened" }, 10));
 
       // Additional tickets activity
-      // TKT-015 — Agent A / P2 / Open
+      // TKT-015 - Agent A / P2 / Open
       push(mkAct("TKT-015", null, "created", { title: "Payment gateway timeout reported" }, 55));
       push(mkAct("TKT-015", agentAId, "assigned", { to: "Priya Sharma", from: null }, 54));
 
-      // TKT-016 — Agent A / P3 / Open
+      // TKT-016 - Agent A / P3 / Open
       push(mkAct("TKT-016", null, "created", { title: "Coupon code complaint opened" }, 40));
       push(mkAct("TKT-016", agentAId, "assigned", { to: "Priya Sharma", from: null }, 39));
 
-      // TKT-017 — Agent A / P1 / In Progress
+      // TKT-017 - Agent A / P1 / In Progress
       push(mkAct("TKT-017", null, "created", { title: "Order cancellation failure reported" }, 85));
       push(mkAct("TKT-017", agentAId, "assigned", { to: "Priya Sharma", from: null }, 84));
       push(mkAct("TKT-017", agentAId, "status_changed", { from: "open", to: "in_progress" }, 15));
 
-      // TKT-018 — Agent B / P3 / Awaiting Customer
+      // TKT-018 - Agent B / P3 / Awaiting Customer
       push(mkAct("TKT-018", null, "created", { title: "Delivery zone dispute opened" }, 95));
       push(mkAct("TKT-018", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 94));
       push(
         mkAct("TKT-018", agentBId, "status_changed", { from: "open", to: "awaiting_customer" }, 25),
       );
 
-      // TKT-019 — Agent B / P1 / Escalated
+      // TKT-019 - Agent B / P1 / Escalated
       push(mkAct("TKT-019", null, "created", { title: "Account suspension dispute raised" }, 250));
       push(mkAct("TKT-019", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 249));
       push(mkAct("TKT-019", agentBId, "status_changed", { from: "open", to: "in_progress" }, 120));
@@ -1273,22 +1864,22 @@ async function seed() {
         mkAct("TKT-019", agentBId, "status_changed", { from: "in_progress", to: "escalated" }, 60),
       );
 
-      // TKT-020 — Agent B / P2 / Open
+      // TKT-020 - Agent B / P2 / Open
       push(mkAct("TKT-020", null, "created", { title: "Bulk order discount complaint" }, 35));
       push(mkAct("TKT-020", agentBId, "assigned", { to: "Rohan Mehta", from: null }, 34));
 
-      // TKT-021 — Agent C / P2 / Open
+      // TKT-021 - Agent C / P2 / Open
       push(mkAct("TKT-021", null, "created", { title: "Delivery time slot complaint" }, 45));
       push(mkAct("TKT-021", agentCId, "assigned", { to: "Sneha Patel", from: null }, 44));
 
-      // TKT-022 — Agent C / P2 / In Progress
+      // TKT-022 - Agent C / P2 / In Progress
       push(
         mkAct("TKT-022", null, "created", { title: "Quality complaint - spoiled vegetables" }, 60),
       );
       push(mkAct("TKT-022", agentCId, "assigned", { to: "Sneha Patel", from: null }, 59));
       push(mkAct("TKT-022", agentCId, "status_changed", { from: "open", to: "in_progress" }, 20));
 
-      // TKT-023 — Agent C / P1 / Resolved
+      // TKT-023 - Agent C / P1 / Resolved
       push(mkAct("TKT-023", null, "created", { title: "Wrong store delivery reported" }, 120));
       push(mkAct("TKT-023", agentCId, "assigned", { to: "Sneha Patel", from: null }, 119));
       push(mkAct("TKT-023", agentCId, "status_changed", { from: "open", to: "in_progress" }, 30));
@@ -1302,7 +1893,7 @@ async function seed() {
         ),
       );
 
-      // TKT-024, TKT-025 — Unassigned
+      // TKT-024, TKT-025 - Unassigned
       push(mkAct("TKT-024", null, "created", { title: "Payment method issue reported" }, 20));
       push(mkAct("TKT-025", null, "created", { title: "Out of stock raincheck request" }, 15));
 
@@ -1312,28 +1903,28 @@ async function seed() {
         else console.log(`Seeded ${activityRows.length} ticket activity events`);
       }
 
-      // 18. Notifications for agents — SLA alerts
+      // 18. Notifications for agents - SLA alerts
       const tkt001Id = tkt["TKT-001"];
       const tkt003Id = tkt["TKT-003"];
       const tkt006Id = tkt["TKT-006"];
       const agentNotifs = [
         tkt001Id && {
           recipient_id: agentAId,
-          title: "TKT-001 SLA approaching — act soon",
+          title: "TKT-001 SLA approaching - act soon",
           meta: JSON.stringify({ ticket_id: tkt001Id, ticket_number: "TKT-001" }),
           link_type: "support_ticket",
           link_ref: tkt001Id,
         },
         tkt003Id && {
           recipient_id: agentAId,
-          title: "TKT-003 SLA breached — take immediate action",
+          title: "TKT-003 SLA breached - take immediate action",
           meta: JSON.stringify({ ticket_id: tkt003Id, ticket_number: "TKT-003" }),
           link_type: "support_ticket",
           link_ref: tkt003Id,
         },
         tkt006Id && {
           recipient_id: agentBId,
-          title: "TKT-006 SLA at risk — 6 min remaining",
+          title: "TKT-006 SLA at risk - 6 min remaining",
           meta: JSON.stringify({ ticket_id: tkt006Id, ticket_number: "TKT-006" }),
           link_type: "support_ticket",
           link_ref: tkt006Id,
@@ -1346,7 +1937,7 @@ async function seed() {
         else console.log(`Seeded ${agentNotifs.length} agent notifications`);
       }
 
-      // 19. Failed Automation Queue — realistic intake queue with more volume
+      // 19. Failed Automation Queue - realistic intake queue with more volume
       // Use valid complaint IDs from the seeded complaints
       const failedAutomationRows = [
         {

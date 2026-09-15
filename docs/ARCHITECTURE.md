@@ -1,4 +1,4 @@
-# DarkOps — Architecture
+# DarkOps - Architecture
 
 ## 1. Existing Codebase (What We Found)
 
@@ -19,7 +19,7 @@
 
 ### ⚠ Critical Architectural Observation
 
-This is **TanStack Start** — an SSR meta-framework, NOT a plain Vite SPA. The server entry is at `src/server.ts` and routes through **Nitro** (Cloudflare target by default).
+This is **TanStack Start** - an SSR meta-framework, NOT a plain Vite SPA. The server entry is at `src/server.ts` and routes through **Nitro** (Cloudflare target by default).
 
 This means:
 
@@ -93,7 +93,7 @@ pulse = max(12, 100 - deduction)
 
 ### Existing Business Logic
 
-- **Case statuses**: Unassigned → Assigned → In progress → Awaiting customer → Escalated — L2 → Resolved
+- **Case statuses**: Unassigned → Assigned → In progress → Awaiting customer → Escalated - L2 → Resolved
 - **SLA states**: on-track (< 150 min), at-risk (150–240 min), breached (> 240 min)
 - **Fraud decisions**: Pending review → Approved / Denied / Escalated
 - **Store statuses**: critical (pulse < 60), at-risk (60–79), healthy (≥ 80)
@@ -114,7 +114,7 @@ pulse = max(12, 100 - deduction)
 │  ┌──────────────┐    ┌────────────────────────────┐  │
 │  │  React SSR   │    │  API Routes / Server Fns   │  │
 │  │  (existing   │    │  /api/v1/*                 │  │
-│  │   Lovable UI)│    │  (NEW — server-side only)  │  │
+│  │   Lovable UI)│    │  (NEW - server-side only)  │  │
 │  └──────────────┘    └────────────────┬───────────┘  │
 │                                       │              │
 └───────────────────────────────────────┼──────────────┘
@@ -162,21 +162,21 @@ pulse = max(12, 100 - deduction)
 d:/Deloitte Capstone/DarkOps/
 ├── src/
 │   ├── routes/
-│   │   ├── __root.tsx              (existing — add auth guard)
-│   │   ├── index.tsx               (existing — redirect)
-│   │   ├── executive.index.tsx     (existing — replace mock imports)
-│   │   ├── executive.insights.tsx  (existing — replace mock imports)
-│   │   ├── operations.tsx          (existing — replace mock imports)
-│   │   ├── cases.$id.tsx           (existing — replace mock imports)
-│   │   ├── dark-stores.index.tsx   (existing — replace mock imports)
-│   │   ├── dark-stores.$id.index.tsx (existing — replace mock imports)
-│   │   ├── dark-stores.$id.pulse.tsx (existing — replace mock imports)
-│   │   ├── fraud.index.tsx         (existing — replace mock imports)
-│   │   ├── fraud.$id.tsx           (existing — replace mock imports)
-│   │   ├── customer.index.tsx      (existing — replace mock imports)
-│   │   ├── customer.support.tsx    (existing — replace mock imports)
+│   │   ├── __root.tsx              (existing - add auth guard)
+│   │   ├── index.tsx               (existing - redirect)
+│   │   ├── executive.index.tsx     (existing - replace mock imports)
+│   │   ├── executive.insights.tsx  (existing - replace mock imports)
+│   │   ├── operations.tsx          (existing - replace mock imports)
+│   │   ├── cases.$id.tsx           (existing - replace mock imports)
+│   │   ├── dark-stores.index.tsx   (existing - replace mock imports)
+│   │   ├── dark-stores.$id.index.tsx (existing - replace mock imports)
+│   │   ├── dark-stores.$id.pulse.tsx (existing - replace mock imports)
+│   │   ├── fraud.index.tsx         (existing - replace mock imports)
+│   │   ├── fraud.$id.tsx           (existing - replace mock imports)
+│   │   ├── customer.index.tsx      (existing - replace mock imports)
+│   │   ├── customer.support.tsx    (existing - replace mock imports)
 │   │   ├── login.tsx               (NEW)
-│   │   └── api/                    (NEW — Nitro API routes)
+│   │   └── api/                    (NEW - Nitro API routes)
 │   │       ├── v1/
 │   │       │   ├── me.ts
 │   │       │   ├── executive/
@@ -213,18 +213,18 @@ d:/Deloitte Capstone/DarkOps/
 │   │       │   │   └── [id]/read.ts
 │   │       │   └── audit.ts
 │   ├── lib/
-│   │   ├── mock/                   (existing — kept for dev/seed reference)
-│   │   ├── api-client.ts           (NEW — typed fetch wrapper)
+│   │   ├── mock/                   (existing - kept for dev/seed reference)
+│   │   ├── api-client.ts           (NEW - typed fetch wrapper)
 │   │   ├── supabase/
-│   │   │   ├── client.ts           (NEW — browser Supabase client, anon key)
-│   │   │   └── server.ts           (NEW — server Supabase client, service role)
-│   │   ├── auth.ts                 (NEW — auth helpers)
-│   │   ├── rbac.ts                 (NEW — role/permission definitions)
+│   │   │   ├── client.ts           (NEW - browser Supabase client, anon key)
+│   │   │   └── server.ts           (NEW - server Supabase client, service role)
+│   │   ├── auth.ts                 (NEW - auth helpers)
+│   │   ├── rbac.ts                 (NEW - role/permission definitions)
 │   │   └── utils.ts                (existing)
 │   ├── types/
-│   │   ├── api.ts                  (NEW — API request/response types)
-│   │   ├── domain.ts               (NEW — domain entity types)
-│   │   └── auth.ts                 (NEW — auth/RBAC types)
+│   │   ├── api.ts                  (NEW - API request/response types)
+│   │   ├── domain.ts               (NEW - domain entity types)
+│   │   └── auth.ts                 (NEW - auth/RBAC types)
 │   └── hooks/
 │       ├── use-mobile.tsx          (existing)
 │       ├── use-auth.ts             (NEW)
@@ -252,21 +252,21 @@ d:/Deloitte Capstone/DarkOps/
 │       └── seed.ts                 (deterministic seed script)
 └── docs/
     ├── ARCHITECTURE.md             (this file)
-    ├── IMPLEMENTATION_PLAN.md
     ├── DATA_MODEL.md
     ├── API_SPEC.md
-    ├── API.md
+    ├── PRODUCT_SPEC.md
+    ├── DEMO_GUIDE.md
     └── SECURITY.md
 ```
 
 ### Environment Variables
 
 ```
-# Frontend (Vite public — browser-safe)
+# Frontend (Vite public - browser-safe)
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 
-# Server-only (Nitro runtime — never in browser bundle)
+# Server-only (Nitro runtime - never in browser bundle)
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=           # optional, for executive insights LLM
 AI_PROVIDER=openai        # or "rule-engine" (deterministic fallback)

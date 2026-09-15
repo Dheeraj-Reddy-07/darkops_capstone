@@ -23,29 +23,44 @@ export function useCaseDetail(id: string) {
         orderId: row.order_id,
         orderValue: (row.order_value_paise || 0) / 100,
         refundAmount: (row.refund_amount_paise || 0) / 100,
-        partner: row.delivery_partner_name || "FastDash",
-        partnerId: row.delivery_partner_id || "P-94",
         type: row.type || "operational_investigation",
         category: row.category,
         urgency: row.priority === "P1" || row.priority === "P2" ? "High" : "Normal",
-        sentiment: "Negative",
-        classifierConfidence: row.classifier_confidence || 89,
-        qcScore: row.qc_score || 92,
+        sentiment: row.sentiment || null,
+        classifierConfidence: row.classifier_confidence ?? null,
+        qcScore: row.qc_score ?? null,
         priority: row.priority,
         status: row.status,
         summary: row.summary,
         detail: row.detail,
         ageMins,
-        sla: row.sla_state || "ok",
-        slaDueIST: row.sla_deadline
-          ? format(new Date(row.sla_deadline), "HH:mm")
+        // Normalize DB enum (on_track/at_risk) to the hyphenated form SlaIndicator expects.
+        sla:
+          row.sla_state === "breached"
+            ? "breached"
+            : row.sla_state === "at_risk"
+              ? "at-risk"
+              : "on-track",
+        slaDueIST: row.sla_due_at
+          ? format(new Date(row.sla_due_at), "HH:mm")
           : format(new Date(new Date(row.created_at).getTime() + 120 * 60000), "HH:mm"),
-        resolution: row.resolution || "Pending investigation",
+        resolution: row.resolution || null,
         agentId: row.assigned_agent_id,
-        agentName: row.agent_name || null,
-        agentHub: "Ops Hub",
+        agentName: row.assigned_agent?.full_name || null,
         fraudReview: row.fraud_review || null,
-        events: row.complaint_status_history || [],
+        // Real status-history events, shaped for the Timeline component.
+        events: (row.complaint_status_history || [])
+          .slice()
+          .sort(
+            (a: any, b: any) => new Date(a.changed_at).getTime() - new Date(b.changed_at).getTime(),
+          )
+          .map((e: any) => ({
+            label: e.to_status
+              ? `Status: ${String(e.to_status).replace(/_/g, " ")}`
+              : "Case update",
+            at: e.changed_at ? format(new Date(e.changed_at), "dd MMM, HH:mm") : "",
+            detail: e.note || undefined,
+          })),
       };
     },
   });
@@ -56,7 +71,7 @@ export function useAssignCase() {
     mutationFn: async ({ id, agentId }: { id: string; agentId: string }) => {
       return await fetchApi(`/cases/${id}/assign`, {
         method: "POST",
-        body: JSON.stringify({ agentId }),
+        body: JSON.stringify({ agent_id: agentId }),
       });
     },
     onSuccess: (_, variables) => {
@@ -68,10 +83,10 @@ export function useAssignCase() {
 
 export function useEscalateCase() {
   return useMutation({
-    mutationFn: async ({ id, level }: { id: string; level: string }) => {
+    mutationFn: async ({ id, note }: { id: string; note?: string }) => {
       return await fetchApi(`/cases/${id}/escalate`, {
         method: "POST",
-        body: JSON.stringify({ level }),
+        body: JSON.stringify(note ? { note } : {}),
       });
     },
     onSuccess: (_, variables) => {

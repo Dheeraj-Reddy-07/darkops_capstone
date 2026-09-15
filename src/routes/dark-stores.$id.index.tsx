@@ -10,13 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  AlertTriangle,
-  ArrowUpRight,
-  ChevronRight,
-  Settings,
-  Wrench,
-} from "lucide-react";
+import { AlertTriangle, ArrowUpRight, ChevronRight, Settings, Wrench } from "lucide-react";
 import { Breadcrumbs, PageHeader } from "@/components/layout/page-header";
 import {
   Chip,
@@ -26,11 +20,7 @@ import {
   PanelHeader,
   StatusBadge,
 } from "@/components/ops/primitives";
-import {
-  useStoreDetail,
-  useStoreWorkOrders,
-  useCreateWorkOrder,
-} from "@/hooks/useStoreDetail";
+import { useStoreDetail, useStoreWorkOrders, useCreateWorkOrder } from "@/hooks/useStoreDetail";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -135,9 +125,7 @@ function NewWorkOrderDialog({ storeId }: { storeId: string }) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create work order</DialogTitle>
-          <DialogDescription>
-            Raise a maintenance or repair task for {storeId}.
-          </DialogDescription>
+          <DialogDescription>Raise a maintenance or repair task for {storeId}.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div>
@@ -198,21 +186,16 @@ function StoreDetail() {
   const { data: workOrders = [] } = useStoreWorkOrders(id);
 
   if (isLoading) return <div className="p-8">Loading store dashboard...</div>;
-  if (error || !data)
-    return <div className="p-8 text-crit">Failed to load store data.</div>;
+  if (error || !data) return <div className="p-8 text-crit">Failed to load store data.</div>;
 
   const { store, series } = data;
 
-  const pulseColor =
-    store.pulse < 60 ? "crit" : store.pulse < 80 ? "warn" : "ok";
+  const pulseColor = store.pulse < 60 ? "crit" : store.pulse < 80 ? "warn" : "ok";
 
   return (
     <>
       <Breadcrumbs
-        items={[
-          { label: "Dark store network", to: "/dark-stores" },
-          { label: store.id },
-        ]}
+        items={[{ label: "Dark store network", to: "/dark-stores" }, { label: store.id }]}
       />
 
       <PageHeader
@@ -241,8 +224,8 @@ function StoreDetail() {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-crit/40 bg-crit-soft/25 px-4 py-3">
           <AlertTriangle className="size-4 text-crit" />
           <p className="text-[13px] font-medium">
-            This store is in critical condition — PulseScore below 60. Immediate
-            intervention required.
+            This store is in critical condition - PulseScore below 60. Immediate intervention
+            required.
           </p>
           <Link
             to="/dark-stores/$id/pulse"
@@ -275,29 +258,17 @@ function StoreDetail() {
           label="Refund rate"
           value={store.refundRate}
           unit="% GMV"
-          tone={
-            store.refundRate > 6 ? "crit" : store.refundRate > 4 ? "warn" : "ok"
-          }
+          tone={store.refundRate > 6 ? "crit" : store.refundRate > 4 ? "warn" : "ok"}
           footnote="target 4.0%"
         />
         <KpiCard
           label="Open issues"
           value={store.openIssues}
-          tone={
-            store.openIssues > 5 ? "crit" : store.openIssues > 2 ? "warn" : "ok"
-          }
+          tone={store.openIssues > 5 ? "crit" : store.openIssues > 2 ? "warn" : "ok"}
           footnote="active complaints"
         />
-        <KpiCard
-          label="Pickers on shift"
-          value={store.pickers}
-          footnote="currently active"
-        />
-        <KpiCard
-          label="Riders assigned"
-          value={store.riders}
-          footnote="on this store"
-        />
+        <KpiCard label="Pickers on shift" value={store.pickers} footnote="currently active" />
+        <KpiCard label="Riders assigned" value={store.riders} footnote="on this store" />
       </div>
 
       {/* Charts row */}
@@ -324,12 +295,7 @@ function StoreDetail() {
                   fill="var(--chart-4)"
                   maxBarSize={28}
                 />
-                <Bar
-                  dataKey="stockouts"
-                  name="Stockouts"
-                  fill="var(--chart-3)"
-                  maxBarSize={28}
-                />
+                <Bar dataKey="stockouts" name="Stockouts" fill="var(--chart-3)" maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -417,10 +383,7 @@ function StoreDetail() {
               label="Inventory issues"
               value={
                 <span
-                  className={cn(
-                    "num",
-                    store.inventoryIssues > 5 ? "text-warn" : "text-foreground",
-                  )}
+                  className={cn("num", store.inventoryIssues > 5 ? "text-warn" : "text-foreground")}
                 >
                   {store.inventoryIssues}
                 </span>
@@ -460,7 +423,10 @@ function StoreDetail() {
             <div className="max-h-64 overflow-y-auto">
               <ul>
                 {workOrders.map((wo: any) => (
-                  <li key={wo.id} className="flex items-start gap-3 border-b border-border/70 px-4 py-3 last:border-0">
+                  <li
+                    key={wo.id}
+                    className="flex items-start gap-3 border-b border-border/70 px-4 py-3 last:border-0"
+                  >
                     <span
                       className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
                         (wo.priority || wo.urgency) === "P1"
@@ -472,7 +438,9 @@ function StoreDetail() {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-2">
-                        <p className="truncate text-[13px] font-medium">{wo.asset_name || wo.assetName || "—"}</p>
+                        <p className="truncate text-[13px] font-medium">
+                          {wo.asset_name || wo.assetName || "-"}
+                        </p>
                         <span className="num text-[11px] text-muted-foreground">{wo.id}</span>
                       </div>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">

@@ -1,13 +1,11 @@
-// Automation Service for complaint processing and routing
-// Implements the full workflow: NLP analysis → routing → validation → auto-processing or escalation
+// Automation Service for DarkOps complaint processing and routing
+// Workflow: Intake → Classification → Requested Resolution → Eligibility Assessment → Decision → Execution Handoff or Agent Escalation
 
 import { createSupabaseServiceRoleClient } from "../lib/supabase";
-import {
-  analyzeComplaint,
-  calculatePriority,
-  calculateSLADeadline,
-} from "./nlp.service";
+import { analyzeComplaint, calculatePriority, calculateSLADeadline } from "./nlp.service";
 import { logAudit } from "./audit.service";
+import { evaluateResolutionEligibility, ResolutionResult } from "./resolution.service";
+import { createExecutionHandoff, dispatchHandoff } from "./handoff.service";
 
 export interface AutomationResult {
   success: boolean;
@@ -15,6 +13,7 @@ export interface AutomationResult {
   action_taken?: string;
   failed_automation_id?: string;
   support_ticket_id?: string;
+  execution_handoff_id?: string;
   error?: string;
 }
 
@@ -22,14 +21,14 @@ export async function processComplaint(complaintId: string): Promise<AutomationR
   const adminClient = createSupabaseServiceRoleClient();
 
   try {
-    // 1. Fetch complaint with related data
+    // 1. Fetch complaint with related order and customer history
     const { data: complaint, error: fetchError } = await adminClient
       .from("complaints")
       .select(
         `
         *,
-        orders (total_amount_paise, placed_at),
-        customers (prior_claims_90d)
+        orders (id, total_amount_paise, placed_at),
+        customers (id, prior_claims_90d)
       `,
       )
       .eq("id", complaintId)
@@ -39,10 +38,23 @@ export async function processComplaint(complaintId: string): Promise<AutomationR
       throw new Error(`Complaint not found: ${fetchError?.message}`);
     }
 
-    // 2. Run NLP analysis
+    // 2. Run deterministic NLP analysis
     const nlpAnalysis = analyzeComplaint(complaint.summary, complaint.detail);
+    const order = complaint.orders as any;
+    const customer = complaint.customers as any;
+    const requestedResolution = complaint.requested_resolution || "SUPPORT_REVIEW";
 
-    // 3. Update complaint with NLP results
+    // 3. Evaluate Resolution Eligibility using ResolutionDecisionService
+    const evalResult: ResolutionResult = evaluateResolutionEligibility(
+      complaint,
+      order,
+      customer,
+      nlpAnalysis,
+      requestedResolution,
+    );
+
+    // 4. Update complaint with NLP and Resolution Decision metadata
+    const nowIso = new Date().toISOString();
     await adminClient
       .from("complaints")
       .update({
@@ -51,42 +63,33 @@ export async function processComplaint(complaintId: string): Promise<AutomationR
         urgency_score: nlpAnalysis.urgency_score,
         sentiment: nlpAnalysis.sentiment,
         automated_routing: true,
-        automation_result: "NLP analysis completed",
+        resolution_decision: evalResult.resolution_type,
+        resolution_decision_reason: evalResult.decision_reason,
+        resolution_decided_at: evalResult.auto_eligible ? nowIso : null,
+        automation_result: evalResult.decision_reason,
       })
       .eq("id", complaintId);
 
-    // 4. Route based on complaint type
-    const order = complaint.orders as any;
-    const customer = complaint.customers as any;
-
-    switch (nlpAnalysis.type) {
-      case "refund":
-        return await processRefund(complaintId, complaint, order, customer, nlpAnalysis);
-
-      case "reorder":
-        return await processReorder(complaintId, complaint, order, customer, nlpAnalysis);
-
-      case "operational_investigation":
-        return await processOperational(complaintId, complaint, nlpAnalysis);
-
-      default:
-        // Fallback to manual review
-        return await escalateToAgentQueue(
-          complaintId,
-          complaint,
-          nlpAnalysis,
-          "Unknown complaint type – manual review required",
-        );
+    // 5. If auto-eligible and approved, execute automated resolution and handoff
+    if (evalResult.auto_eligible && evalResult.decision_status === "APPROVED") {
+      return await executeAutoApproval(complaintId, complaint, order, evalResult, nlpAnalysis);
+    } else {
+      // 6. Otherwise route to human Support Agent queue
+      return await escalateToAgentQueue(
+        complaintId,
+        complaint,
+        nlpAnalysis,
+        evalResult.decision_reason,
+      );
     }
   } catch (error) {
     console.error("[Automation] Error processing complaint:", error);
 
-    // Log failed automation
     await logFailedAutomation(
       complaintId,
       "processing_error",
       "General processing error",
-      50, // medium urgency
+      50,
       "neutral",
       error instanceof Error ? error.message : "Unknown error",
     );
@@ -98,242 +101,163 @@ export async function processComplaint(complaintId: string): Promise<AutomationR
   }
 }
 
-async function processRefund(
+/**
+ * Handles auto-approval workflow for eligible complaints:
+ * Updates status, creates durable signed execution handoff, closes ticket, notifies customer.
+ */
+async function executeAutoApproval(
   complaintId: string,
   complaint: any,
   order: any,
-  customer: any,
+  evalResult: ResolutionResult,
   nlpAnalysis: any,
 ): Promise<AutomationResult> {
   const adminClient = createSupabaseServiceRoleClient();
+  const resolutionText = `${evalResult.decision_reason}`;
 
+  // Update complaint to resolved
+  await adminClient
+    .from("complaints")
+    .update({
+      status: "resolved",
+      resolution: resolutionText,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", complaintId);
+
+  // Record status history
   try {
-    const orderAmountPaise = order?.total_amount_paise || 0;
-    const priorClaims = customer?.prior_claims_90d || 0;
-    const confidence = nlpAnalysis.confidence || 0;
+    await adminClient.from("complaint_status_history").insert({
+      complaint_id: complaintId,
+      from_status: "unassigned",
+      to_status: "resolved",
+      changed_by: null,
+      note: `Auto-resolved by DarkOps: ${evalResult.decision_reason}`,
+    });
+  } catch (err) {
+    console.error("[Automation] Status history error:", err);
+  }
 
-    // ── AUTO-RESOLUTION DECISION GATE (DarkOps final spec) ───────────────────
-    // Auto-resolve ONLY IF ALL THREE conditions pass:
-    //   1. History clean: prior_claims_90d <= 2
-    //   2. Amount <= threshold: order amount <= Rs 500 (50000 paise)
-    //   3. NLP confidence >= threshold: confidence >= 40
-    const historyClean = priorClaims <= 2;
-    const amountBelowThreshold = orderAmountPaise <= 50000; // Rs 500
-    const confidenceAboveThreshold = confidence >= 40;
-    const canAutoResolve = historyClean && amountBelowThreshold && confidenceAboveThreshold;
-
-    if (canAutoResolve) {
-      const resolution = `Refund auto-approved. Amount: Rs ${(orderAmountPaise / 100).toFixed(2)}. Your refund will be credited within 2-3 business days.`;
-
-      await adminClient
-        .from("complaints")
-        .update({
-          status: "resolved",
-          automation_result: "Auto-approved refund",
-          resolution,
-        })
-        .eq("id", complaintId);
-
-      // Status history
-      try {
-        await adminClient.from("complaint_status_history").insert({
-          complaint_id: complaintId,
-          from_status: "unassigned",
-          to_status: "resolved",
-          changed_by: null,
-          note: `Auto-resolved: refund approved (confidence: ${confidence}, prior_claims: ${priorClaims}, amount: Rs ${orderAmountPaise / 100})`,
-        });
-      } catch {}
-
-      // Close the existing support ticket (don't create a new one)
-      if (complaint.ticket_id) {
-        try {
-          await adminClient
-            .from("support_tickets")
-            .update({ status: "closed", priority: "P3" })
-            .eq("id", complaint.ticket_id);
-
-          await adminClient.from("ticket_activity").insert({
-            ticket_id: complaint.ticket_id,
-            event_type: "auto_resolved",
-            payload: { reason: "Refund auto-approved by automation engine", resolution },
-          });
-        } catch (err) {
-          console.error("[Automation] Error closing ticket:", err);
-        }
-      }
-
-      // Notify customer via profile lookup
-      if (complaint.customer_id) {
-        const { data: customerProfile } = await adminClient
-          .from("customers")
-          .select("profile_id")
-          .eq("id", complaint.customer_id)
-          .maybeSingle();
-
-        if (customerProfile?.profile_id) {
-          try {
-            await adminClient.from("notifications").insert({
-              recipient_id: customerProfile.profile_id,
-              title: "Your complaint has been resolved",
-              meta: JSON.stringify({ complaint_ref: complaint.complaint_ref, resolution: "Refund approved" }),
-              link_type: "complaint",
-              link_ref: complaintId,
-            });
-          } catch {}
-        }
-      }
-
-      // Update PulseScore for the store
-      if (complaint.store_id) {
-        await updateStorePulse(complaint.store_id, -2);
-      }
-
-      await logAudit({
-        actorId: "00000000-0000-0000-0000-000000000000",
-        actorRole: "automation",
-        action: "refund.auto_approve",
-        resourceType: "complaint",
-        resourceId: complaintId,
-        metadata: { amount_paise: orderAmountPaise, confidence, prior_claims: priorClaims },
+  // Create & Dispatch Execution Handoff if financial or replacement execution is required
+  let handoffId: string | undefined;
+  if (
+    evalResult.execution_required &&
+    (evalResult.resolution_type === "REFUND" || evalResult.resolution_type === "REPLACEMENT")
+  ) {
+    try {
+      const handoff = await createExecutionHandoff({
+        complaintId,
+        orderId: complaint.order_id,
+        resolutionType: evalResult.resolution_type,
+        reason: evalResult.decision_reason,
+        metadata: {
+          requested_resolution: complaint.requested_resolution,
+          order_value_paise: order?.total_amount_paise || 0,
+          confidence: nlpAnalysis.confidence,
+        },
       });
 
-      return {
-        success: true,
-        routed_to: "auto_approved",
-        action_taken: "Refund auto-approved",
-      };
-    } else {
-      // Build escalation reason for ops team visibility
-      const reason = !historyClean
-        ? `Customer has ${priorClaims} prior claims in 90 days (threshold: <=2)`
-        : !amountBelowThreshold
-          ? `Order amount Rs ${orderAmountPaise / 100} exceeds auto-approve threshold of Rs 500`
-          : `NLP confidence ${confidence} below threshold of 40`;
-
-      return await escalateToAgentQueue(complaintId, complaint, nlpAnalysis, reason);
+      // Dispatch simulated handoff to upstream commerce platform
+      const dispatched = await dispatchHandoff(handoff.id);
+      handoffId = dispatched.id;
+    } catch (err) {
+      console.error("[Automation] Execution handoff error:", err);
     }
-  } catch (error) {
-    return await logFailedAutomation(
-      complaintId,
-      "refund_validation",
-      "Refund validation error",
-      nlpAnalysis.urgency_score,
-      nlpAnalysis.sentiment,
-      error instanceof Error ? error.message : "Unknown error",
-    );
   }
-}
 
-async function processReorder(
-  complaintId: string,
-  complaint: any,
-  order: any,
-  customer: any,
-  nlpAnalysis: any,
-): Promise<AutomationResult> {
-  const adminClient = createSupabaseServiceRoleClient();
-
-  try {
-    // Calculate order age in hours
-    const orderAgeHours = order
-      ? (Date.now() - new Date(order.placed_at).getTime()) / (1000 * 60 * 60)
-      : 999;
-
-    // Validate reorder
-    const priorClaims = customer?.prior_claims_90d || 0;
-    const canAutoApprove = orderAgeHours <= 24 && priorClaims <= 5;
-
-    if (canAutoApprove) {
-      // Auto-approve reorder
+  // Close linked support ticket if present
+  if (complaint.ticket_id) {
+    try {
       await adminClient
-        .from("complaints")
-        .update({
-          status: "resolved",
-          automation_result: "Auto-approved reorder",
-          resolution: "Reorder request approved. A replacement order will be dispatched within 30 minutes.",
-        })
-        .eq("id", complaintId);
+        .from("support_tickets")
+        .update({ status: "closed", priority: "P3" })
+        .eq("id", complaint.ticket_id);
 
-      // Status history
-      try {
-        await adminClient.from("complaint_status_history").insert({
-          complaint_id: complaintId,
-          from_status: "unassigned",
-          to_status: "resolved",
-          changed_by: null,
-          note: `Auto-resolved: reorder approved (order age: ${orderAgeHours.toFixed(1)}h, prior_claims: ${priorClaims})`,
-        });
-      } catch {}
-
-      // Close the existing support ticket
-      if (complaint.ticket_id) {
-        try {
-          await adminClient
-            .from("support_tickets")
-            .update({ status: "closed" })
-            .eq("id", complaint.ticket_id);
-          await adminClient.from("ticket_activity").insert({
-            ticket_id: complaint.ticket_id,
-            event_type: "auto_resolved",
-            payload: { reason: "Reorder auto-approved by automation engine" },
-          });
-        } catch {}
-      }
-
-      await logAudit({
-        actorId: "00000000-0000-0000-0000-000000000000",
-        actorRole: "automation",
-        action: "reorder.auto_approve",
-        resourceType: "complaint",
-        resourceId: complaintId,
-        metadata: { original_order_id: complaint.order_id },
+      await adminClient.from("ticket_activity").insert({
+        ticket_id: complaint.ticket_id,
+        event_type: "auto_resolved",
+        payload: {
+          reason: evalResult.decision_reason,
+          resolution_type: evalResult.resolution_type,
+          handoff_id: handoffId,
+        },
       });
-
-      return {
-        success: true,
-        routed_to: "auto_approved",
-        action_taken: "Reorder auto-approved",
-      };
-    } else {
-      const reason = orderAgeHours > 24
-        ? `Reorder window expired (order is ${orderAgeHours.toFixed(0)}h old, limit is 24h)`
-        : `Customer has ${priorClaims} prior claims (threshold: <=5)`;
-
-      return await escalateToAgentQueue(complaintId, complaint, nlpAnalysis, reason);
+    } catch (err) {
+      console.error("[Automation] Error closing ticket:", err);
     }
-  } catch (error) {
-    return await logFailedAutomation(
-      complaintId,
-      "reorder_validation",
-      "Reorder validation error",
-      nlpAnalysis.urgency_score,
-      nlpAnalysis.sentiment,
-      error instanceof Error ? error.message : "Unknown error",
-    );
   }
-}
 
-async function processOperational(
-  complaintId: string,
-  complaint: any,
-  nlpAnalysis: any,
-): Promise<AutomationResult> {
-  // Operational complaints always go to agent queue for investigation
-  // (we cannot auto-resolve operational issues like late delivery / wrong item)
-  return await escalateToAgentQueue(
-    complaintId,
-    complaint,
-    nlpAnalysis,
-    "Operational complaint requires agent investigation",
-  );
+  // Notify customer
+  if (complaint.customer_id) {
+    const { data: customerProfile } = await adminClient
+      .from("customers")
+      .select("profile_id")
+      .eq("id", complaint.customer_id)
+      .maybeSingle();
+
+    if (customerProfile?.profile_id) {
+      try {
+        const title =
+          evalResult.resolution_type === "REFUND"
+            ? "Refund approved by DarkOps"
+            : evalResult.resolution_type === "REPLACEMENT"
+              ? "Replacement approved by DarkOps"
+              : "Your issue has been resolved";
+
+        await adminClient.from("notifications").insert({
+          recipient_id: customerProfile.profile_id,
+          title,
+          meta: JSON.stringify({
+            complaint_ref: complaint.complaint_ref,
+            resolution_type: evalResult.resolution_type,
+            status: "APPROVED",
+          }),
+          link_type: "complaint",
+          link_ref: complaintId,
+        });
+      } catch (err) {
+        console.error("[Automation] Notification error:", err);
+      }
+    }
+  }
+
+  // Update store pulse score
+  if (complaint.store_id) {
+    await updateStorePulse(complaint.store_id, -2);
+  }
+
+  const auditActionMap: Record<string, any> = {
+    REFUND: "resolution.auto_approved_refund",
+    REPLACEMENT: "resolution.auto_approved_replacement",
+    SUPPORT_REVIEW: "resolution.auto_approved_support_review",
+    NO_ACTION: "resolution.auto_approved_no_action",
+  };
+  const actionName =
+    auditActionMap[evalResult.resolution_type] || "resolution.auto_approved_refund";
+
+  await logAudit({
+    actorId: "00000000-0000-0000-0000-000000000000",
+    actorRole: "automation",
+    action: actionName,
+    resourceType: "complaint",
+    resourceId: complaintId,
+    metadata: {
+      resolution_type: evalResult.resolution_type,
+      requested_resolution: complaint.requested_resolution,
+      handoff_id: handoffId,
+    },
+  });
+
+  return {
+    success: true,
+    routed_to: "auto_approved",
+    action_taken: `Auto-approved decision: ${evalResult.resolution_type}`,
+    execution_handoff_id: handoffId,
+  };
 }
 
 /**
- * Escalate to the agent queue:
- * - Updates the complaint status to "assigned"
- * - Updates (not creates) the existing support ticket with proper priority, queue, and SLA
- * - Logs automation decision
+ * Escalates complaint to agent queue when automation criteria are not met.
  */
 async function escalateToAgentQueue(
   complaintId: string,
@@ -344,21 +268,19 @@ async function escalateToAgentQueue(
   const adminClient = createSupabaseServiceRoleClient();
 
   try {
-    // Calculate priority and SLA
     const priority = calculatePriority(nlpAnalysis.urgency_score, nlpAnalysis.sentiment);
     const slaDeadline = calculateSLADeadline(priority, new Date());
 
-    // Determine queue based on complaint type
     let queue = "general";
-    if (complaint.type === "refund") queue = "refunds";
-    else if (complaint.type === "reorder") queue = "reorders";
+    if (complaint.type === "refund" || complaint.requested_resolution === "REFUND")
+      queue = "refunds";
+    else if (complaint.type === "reorder" || complaint.requested_resolution === "REPLACEMENT")
+      queue = "reorders";
     else if (complaint.category === "late_delivery" || complaint.category === "quality_issue")
       queue = "operational";
 
-    // Auto-assign to available support agent
     const assignedTo = await autoAssignSupportAgent(queue);
 
-    // Update complaint status + store SLA deadline on the complaint (sla_due_at is the schema column)
     await adminClient
       .from("complaints")
       .update({
@@ -369,7 +291,6 @@ async function escalateToAgentQueue(
       })
       .eq("id", complaintId);
 
-    // Status history entry
     try {
       await adminClient.from("complaint_status_history").insert({
         complaint_id: complaintId,
@@ -378,12 +299,13 @@ async function escalateToAgentQueue(
         changed_by: null,
         note: reason,
       });
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     let ticketId = complaint.ticket_id || null;
 
     if (ticketId) {
-      // UPDATE existing ticket with correct priority, queue, SLA, and agent assignment
       try {
         await adminClient
           .from("support_tickets")
@@ -402,25 +324,28 @@ async function escalateToAgentQueue(
           payload: { reason, priority, queue, assigned_to: assignedTo },
         });
       } catch (err) {
-        console.error("[Automation] Error updating existing ticket:", err);
-        ticketId = null; // Fall through to create new one if update failed
+        console.error("[Automation] Ticket update error:", err);
+        ticketId = null;
       }
     }
 
     if (!ticketId) {
-      // Fallback: create a ticket if one doesn't exist yet
       const fallbackTicketNumber = `TKT-${Date.now()}-FA`;
       try {
-        const { data: fallbackTicket } = await adminClient.from("support_tickets").insert({
-          ticket_number: fallbackTicketNumber,
-          complaint_id: complaintId,
-          title: complaint.summary,
-          assigned_to: assignedTo,
-          status: "open",
-          priority,
-          queue,
-          sla_deadline: slaDeadline.toISOString(),
-        }).select("id").single();
+        const { data: fallbackTicket } = await adminClient
+          .from("support_tickets")
+          .insert({
+            ticket_number: fallbackTicketNumber,
+            complaint_id: complaintId,
+            title: complaint.summary,
+            assigned_to: assignedTo,
+            status: "open",
+            priority,
+            queue,
+            sla_deadline: slaDeadline.toISOString(),
+          })
+          .select("id")
+          .single();
         if (fallbackTicket?.id) {
           await adminClient.from("ticket_activity").insert({
             ticket_id: fallbackTicket.id,
@@ -430,11 +355,10 @@ async function escalateToAgentQueue(
           ticketId = fallbackTicket.id;
         }
       } catch (err) {
-        console.error("[Automation] Error creating fallback ticket:", err);
+        console.error("[Automation] Fallback ticket error:", err);
       }
     }
 
-    // Notify assigned agent
     if (assignedTo) {
       try {
         await adminClient.from("notifications").insert({
@@ -444,7 +368,9 @@ async function escalateToAgentQueue(
           link_type: "support_ticket",
           link_ref: ticketId,
         });
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
 
     await logAudit({
@@ -463,7 +389,7 @@ async function escalateToAgentQueue(
       support_ticket_id: ticketId,
     };
   } catch (error) {
-    console.error("[Automation] Error escalating to agent queue:", error);
+    console.error("[Automation] Escalation error:", error);
 
     await logFailedAutomation(
       complaintId,
@@ -481,29 +407,34 @@ async function escalateToAgentQueue(
   }
 }
 
-async function autoAssignSupportAgent(queue: string): Promise<string | null> {
+/**
+ * Load-balanced auto-assignment: returns the active support agent with the
+ * fewest active (non-resolved/closed) tickets. Shared by the automation
+ * escalation path and manual ticket creation so every new ticket lands with the
+ * least-busy agent. `queue` is accepted for future queue-aware routing but is
+ * not required for the workload calculation today.
+ */
+export async function autoAssignSupportAgent(_queue?: string): Promise<string | null> {
   const adminClient = createSupabaseServiceRoleClient();
 
   try {
-    // Find available support agents with lowest workload
     const { data: agents } = await adminClient
       .from("profiles")
       .select("id")
       .eq("role", "CUSTOMER_SUPPORT")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      // Exclude the legacy fraud "Risk Analyst" account from auto-assignment.
+      .neq("email", "fraud@darkops.com");
 
-    if (!agents || agents.length === 0) {
-      return null; // No available agents
-    }
+    if (!agents || agents.length === 0) return null;
 
-    // Count open tickets for each agent
     const agentWorkloads = await Promise.all(
-      agents.map(async (agent) => {
+      agents.map(async (agent: any) => {
         const { count } = await adminClient
           .from("support_tickets")
           .select("*", { count: "exact", head: true })
           .eq("assigned_to", agent.id)
-          .in("status", ["open", "in_progress"]);
+          .not("status", "in", '("resolved","closed")');
 
         return {
           agentId: agent.id,
@@ -512,12 +443,11 @@ async function autoAssignSupportAgent(queue: string): Promise<string | null> {
       }),
     );
 
-    // Sort by workload and pick the least busy agent
-    agentWorkloads.sort((a, b) => a.workload - b.workload);
-
+    // Least busy first; stable tie-break by id keeps distribution deterministic.
+    agentWorkloads.sort((a, b) => a.workload - b.workload || a.agentId.localeCompare(b.agentId));
     return agentWorkloads[0]?.agentId || null;
   } catch (error) {
-    console.error("[Automation] Error auto-assigning agent:", error);
+    console.error("[Automation] Auto-assign agent error:", error);
     return null;
   }
 }
@@ -563,7 +493,6 @@ async function updateStorePulse(storeId: string, adjustment: number): Promise<vo
   const adminClient = createSupabaseServiceRoleClient();
 
   try {
-    // Get current pulse score
     const { data: pulse } = await adminClient
       .from("pulse_scores")
       .select("score")
@@ -572,7 +501,6 @@ async function updateStorePulse(storeId: string, adjustment: number): Promise<vo
 
     if (pulse) {
       const newScore = Math.max(0, Math.min(100, pulse.score + adjustment));
-
       await adminClient.from("pulse_scores").update({ score: newScore }).eq("store_id", storeId);
     }
   } catch (error) {

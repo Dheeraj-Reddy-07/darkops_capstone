@@ -34,12 +34,79 @@ export const Route = createFileRoute("/customer/complaints_/$id")({
   component: ComplaintDetail,
 });
 
+function SlaCountdownPanel({
+  slaDueIso,
+  onUnlockLiveCall,
+}: {
+  slaDueIso?: string;
+  onUnlockLiveCall: () => void;
+}) {
+  const [timeLeft, setTimeLeft] = useState<{ mins: number; secs: number; expired: boolean }>({
+    mins: 15,
+    secs: 0,
+    expired: false,
+  });
+
+  useEffect(() => {
+    if (!slaDueIso) return;
+    const targetMs = new Date(slaDueIso).getTime();
+
+    const updateTimer = () => {
+      const diffMs = targetMs - Date.now();
+      if (diffMs <= 0) {
+        setTimeLeft({ mins: 0, secs: 0, expired: true });
+        onUnlockLiveCall();
+      } else {
+        const totalSecs = Math.floor(diffMs / 1000);
+        const mins = Math.floor(totalSecs / 60);
+        const secs = totalSecs % 60;
+        setTimeLeft({ mins, secs, expired: false });
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [slaDueIso, onUnlockLiveCall]);
+
+  if (timeLeft.expired) return null;
+
+  const formatDigits = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    <Panel className="border-primary/30 bg-primary/5">
+      <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+            <Clock className="size-4 text-primary animate-pulse" />
+            <span>SLA Response Window Active</span>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-md">
+            Our support team is currently investigating your issue within the guaranteed SLA window.
+            If unresolved when the timer reaches 00:00, direct live agent voice support will
+            automatically unlock.
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-primary/20 bg-background/80 px-4 py-2.5 shrink-0">
+          <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-0.5">
+            Live Support Unlocks In
+          </span>
+          <div className="font-mono text-xl font-bold tracking-widest text-primary">
+            {formatDigits(timeLeft.mins)}:{formatDigits(timeLeft.secs)}
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function ComplaintDetail() {
   const { id } = useParams({ from: "/customer/complaints_/$id" });
   const { data: complaint, isLoading, error } = useCustomerComplaintById(id);
 
   const [showCallOverlay, setShowCallOverlay] = useState(false);
   const [callStatus, setCallStatus] = useState<string | null>(null);
+  const [unlockedLiveCall, setUnlockedLiveCall] = useState(false);
 
   const handleCallClose = (status: string) => {
     setShowCallOverlay(false);
@@ -131,7 +198,11 @@ function ComplaintDetail() {
         <PanelHeader
           title={complaint.summary}
           subtitle={`Order ${complaint.orderId} · ${complaint.storeName || "Store order"}`}
-          right={<StatusBadge status={getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)} />}
+          right={
+            <StatusBadge
+              status={getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)}
+            />
+          }
         />
         <div className="p-4 space-y-4">
           <div>
@@ -165,6 +236,17 @@ function ComplaintDetail() {
                 </p>
               </div>
             </div>
+            {complaint.requestedResolution && (
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="size-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-[13px]">Requested Outcome</p>
+                  <p className="num text-xs text-muted-foreground font-semibold">
+                    {complaint.requestedResolution}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {complaint.resolution && (
@@ -204,49 +286,71 @@ function ComplaintDetail() {
       <Panel>
         <PanelHeader title="Status timeline" subtitle="Track your issue resolution" />
         <ol className="p-4">
-          {complaint.statusHistory && complaint.statusHistory.length > 0 ? (
-            complaint.statusHistory.map((history, index) => (
-              <li key={index} className="flex gap-3 pb-4 last:pb-0">
+          {(() => {
+            const isResolved = complaint.status === "resolved" || complaint.status === "closed";
+            const isInProgress =
+              complaint.status === "in_progress" || complaint.status === "assigned";
+
+            const steps = [
+              {
+                label: "Complaint received",
+                done: true,
+                time: complaint.createdAt,
+              },
+              {
+                label: "Under review by support team",
+                done: isInProgress || isResolved,
+                time:
+                  isInProgress || isResolved
+                    ? complaint.statusHistory?.[1]?.changedAt || complaint.createdAt
+                    : complaint.slaDueAt
+                      ? `Expected by ${complaint.slaDueAt}`
+                      : "Pending review",
+              },
+              {
+                label: isResolved ? "Resolved" : "Resolution decision",
+                done: isResolved,
+                time: isResolved
+                  ? complaint.statusHistory?.[complaint.statusHistory.length - 1]?.changedAt ||
+                    complaint.createdAt
+                  : complaint.slaDueAt
+                    ? `Expected by ${complaint.slaDueAt}`
+                    : "Pending",
+              },
+            ];
+
+            return steps.map((step, i) => (
+              <li key={step.label} className="flex gap-3 pb-4 last:pb-0">
                 <div className="flex flex-col items-center">
                   <div
                     className={cn(
                       "flex size-8 items-center justify-center rounded-full",
-                      index === 0 ? "bg-ok/10" : "bg-surface-2",
+                      step.done ? "bg-ok/10" : "bg-surface-2",
                     )}
                   >
-                    {index === 0 ? (
+                    {step.done ? (
                       <CheckCircle2 className="size-4 text-ok" />
                     ) : (
                       <Circle className="size-4 text-muted-foreground" />
                     )}
                   </div>
-                  {index < complaint.statusHistory!.length - 1 && (
-                    <span className="mt-2 w-px flex-1 bg-border" />
+                  {i < steps.length - 1 && (
+                    <span
+                      className={cn("mt-2 w-px flex-1", step.done ? "bg-ok/50" : "bg-border")}
+                    />
                   )}
                 </div>
                 <div className="-mt-1">
-                  <p className="text-[13px] font-medium">
-                    {getCustomerFriendlyStatus(history.toStatus, undefined)}
+                  <p
+                    className={cn("text-[13px] font-medium", !step.done && "text-muted-foreground")}
+                  >
+                    {step.label}
                   </p>
-                  <p className="num text-xs text-muted-foreground">{history.changedAt}</p>
+                  <p className="num text-xs text-muted-foreground">{step.time}</p>
                 </div>
               </li>
-            ))
-          ) : (
-            <li className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <div className="flex size-8 items-center justify-center rounded-full bg-surface-2">
-                  <Circle className="size-4 text-muted-foreground" />
-                </div>
-              </div>
-              <div className="-mt-1">
-                <p className="text-[13px] font-medium">
-                  {getCustomerFriendlyStatus(complaint.status, complaint.customerStatusLabel)}
-                </p>
-                <p className="num text-xs text-muted-foreground">{complaint.createdAt}</p>
-              </div>
-            </li>
-          )}
+            ));
+          })()}
         </ol>
       </Panel>
 
@@ -275,11 +379,14 @@ function ComplaintDetail() {
               </p>
               {/* Show backend-computed detail text if available */}
               {complaint.customerStatusDetail && (
-                <p className="mt-1 text-xs text-muted-foreground">{complaint.customerStatusDetail}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {complaint.customerStatusDetail}
+                </p>
               )}
               {complaint.status === "awaiting_customer" && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  We need a bit more information to resolve your issue. Please check your email or messages.
+                  We need a bit more information to resolve your issue. Please check your email or
+                  messages.
                 </p>
               )}
             </div>
@@ -287,9 +394,15 @@ function ComplaintDetail() {
         </div>
       </Panel>
 
-      {/* Live Agent SLA Escalation Section */}
-      {complaint.isLiveCallEligible && (
-        <Panel className={cn(callStatus === "completed" ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5")}>
+      {/* Live Agent SLA Escalation / SLA Countdown Section */}
+      {complaint.isLiveCallEligible || unlockedLiveCall ? (
+        <Panel
+          className={cn(
+            callStatus === "completed"
+              ? "border-emerald-500/30 bg-emerald-500/5"
+              : "border-amber-500/30 bg-amber-500/5",
+          )}
+        >
           <div className="p-4 space-y-3">
             {callStatus === "completed" ? (
               <div className="space-y-2">
@@ -298,26 +411,38 @@ function ComplaintDetail() {
                   <span>Support Call Completed</span>
                 </div>
                 <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 p-3 rounded-md border border-emerald-500/20">
-                  You have completed a support call with our agent. Your issue has been updated.
+                  You have completed a support call with our agent. Your issue will be updated soon.
                 </p>
               </div>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-amber-500">
                   <ShieldAlert className="size-5" />
-                  <p className="text-sm font-semibold">Response window exceeded · Live support available</p>
+                  <p className="text-sm font-semibold">
+                    Response window exceeded · Live support available
+                  </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Our team is taking longer than usual to resolve your issue. You are now eligible to speak directly with an agent via live voice support.
+                  Our team is taking longer than usual to resolve your issue. You are now eligible
+                  to speak directly with an agent via live voice support.
                 </p>
-                <Button onClick={() => setShowCallOverlay(true)} disabled={showCallOverlay} className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white">
+                <Button
+                  onClick={() => setShowCallOverlay(true)}
+                  disabled={showCallOverlay}
+                  className="w-full gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                >
                   <PhoneCall className="size-4" /> Connect with live support
                 </Button>
               </>
             )}
           </div>
         </Panel>
-      )}
+      ) : complaint.status !== "resolved" && complaint.status !== "closed" ? (
+        <SlaCountdownPanel
+          slaDueIso={complaint.slaDueIso}
+          onUnlockLiveCall={() => setUnlockedLiveCall(true)}
+        />
+      ) : null}
 
       {showCallOverlay && (
         <LiveSupportCallOverlay

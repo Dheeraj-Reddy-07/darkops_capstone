@@ -10,7 +10,11 @@ interface LiveSupportCallOverlayProps {
   onClose: (status: string) => void;
 }
 
-export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveSupportCallOverlayProps) {
+export function LiveSupportCallOverlay({
+  complaintRef,
+  orderId,
+  onClose,
+}: LiveSupportCallOverlayProps) {
   const [callState, setCallState] = useState<CallState>("calling");
   const [timer, setTimer] = useState(0);
   const [agentMessage, setAgentMessage] = useState("");
@@ -68,7 +72,9 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
           oscillatorRef.current?.stop();
           oscillatorRef.current?.disconnect();
           audioCtxRef.current?.close();
-        } catch (e) {}
+        } catch {
+          /* ignore audio context close error */
+        }
       }, 150);
     }
   }, []);
@@ -155,7 +161,9 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
               <div className="space-y-1">
                 <div className="flex items-center justify-center gap-2 text-primary mb-2">
                   <PhoneCall className="size-4 animate-pulse" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">DarkOps Care</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider">
+                    DarkOps Care
+                  </span>
                 </div>
                 <h3 className="text-lg font-semibold tracking-tight">Calling Live Support...</h3>
                 <p className="text-xs text-muted-foreground">Connecting issue {complaintRef}</p>
@@ -227,7 +235,9 @@ export function LiveSupportCallOverlay({ complaintRef, orderId, onClose }: LiveS
                 <PhoneOff className="size-5 text-muted-foreground" />
               </div>
               <h3 className="text-base font-medium">Call ended</h3>
-              {timer > 0 && <p className="text-xs text-muted-foreground">Duration {formatTimer(timer)}</p>}
+              {timer > 0 && (
+                <p className="text-xs text-muted-foreground">Duration {formatTimer(timer)}</p>
+              )}
             </div>
           )}
         </div>

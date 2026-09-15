@@ -97,7 +97,7 @@ The platform helps organizations:
 
 ## Role Model (5 Roles)
 
-### ROLE 1 — PLATFORM_ADMIN
+### ROLE 1 - PLATFORM_ADMIN
 
 **System-level administrator**
 
@@ -118,7 +118,7 @@ The platform helps organizations:
 - Stores
 - Audit logs
 
-### ROLE 2 — EXECUTIVE
+### ROLE 2 - EXECUTIVE
 
 **Strategic oversight**
 
@@ -146,7 +146,7 @@ The platform helps organizations:
 - Notifications
 - Profile
 
-### ROLE 3 — OPERATIONS
+### ROLE 3 - OPERATIONS
 
 **Combines operational management and frontline support**
 
@@ -178,7 +178,7 @@ The platform helps organizations:
 - Notifications
 - Profile
 
-### ROLE 4 — STORE_MANAGER
+### ROLE 4 - STORE_MANAGER
 
 **Store-specific operational management**
 
@@ -208,7 +208,7 @@ The platform helps organizations:
 - Notifications
 - Profile
 
-### ROLE 5 — FRAUD_ANALYST
+### ROLE 5 - FRAUD_ANALYST
 
 **Fraud/risk investigation**
 

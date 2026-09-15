@@ -14,10 +14,6 @@ router.post(
 
 // Webhook test endpoint - verifies HMAC signature and connectivity
 // GET /api/v1/intake/test
-router.get(
-  "/test",
-  rateLimit(5, 60000),
-  intakeWebhookTest,
-);
+router.get("/test", rateLimit(5, 60000), intakeWebhookTest);
 
 export default router;

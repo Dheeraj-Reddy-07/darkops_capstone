@@ -1,10 +1,5 @@
 export type AppRole =
-  | "PLATFORM_ADMIN"
-  | "EXECUTIVE"
-  | "OPERATIONS"
-  | "STORE_MANAGER"
-  | "CUSTOMER_SUPPORT"
-  | "CUSTOMER";
+  "PLATFORM_ADMIN" | "EXECUTIVE" | "OPERATIONS" | "STORE_MANAGER" | "CUSTOMER_SUPPORT" | "CUSTOMER";
 
 export type AppPermission =
   // Cases

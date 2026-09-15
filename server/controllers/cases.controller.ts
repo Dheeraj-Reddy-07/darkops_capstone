@@ -14,7 +14,7 @@ export const getOperationsMetrics = async (req: Request, res: Response, next: Ne
     console.log("[getOperationsMetrics] User role:", userRole);
 
     // Build base query with role-based filtering
-    let complaintsQuery = adminClient.from("complaints").select("*");
+    const complaintsQuery = adminClient.from("complaints").select("*");
 
     // For demo purposes, show all complaints
     const { data: complaints, error } = await complaintsQuery;
@@ -23,12 +23,12 @@ export const getOperationsMetrics = async (req: Request, res: Response, next: Ne
     console.log("[getOperationsMetrics] Error:", error);
 
     // Calculate metrics
-    const queueSize = complaints?.filter((c) => c.status !== "resolved").length || 0;
-    const slaAtRisk = complaints?.filter((c) => c.sla_state === "at_risk").length || 0;
-    const slaBreached = complaints?.filter((c) => c.sla_state === "breached").length || 0;
+    const queueSize = complaints?.filter((c: any) => c.status !== "resolved").length || 0;
+    const slaAtRisk = complaints?.filter((c: any) => c.sla_state === "at_risk").length || 0;
+    const slaBreached = complaints?.filter((c: any) => c.sla_state === "breached").length || 0;
     const p1Cases =
-      complaints?.filter((c) => c.priority === "P1" && c.status !== "resolved").length || 0;
-    const escalated = complaints?.filter((c) => c.status === "escalated_l2").length || 0;
+      complaints?.filter((c: any) => c.priority === "P1" && c.status !== "resolved").length || 0;
+    const escalated = complaints?.filter((c: any) => c.status === "escalated_l2").length || 0;
 
     console.log("[getOperationsMetrics] Metrics:", {
       queueSize,
@@ -47,7 +47,7 @@ export const getOperationsMetrics = async (req: Request, res: Response, next: Ne
         .eq("role", "OPERATIONS");
 
       agentWorkload = await Promise.all(
-        (agents || []).map(async (agent) => {
+        (agents || []).map(async (agent: any) => {
           const { count } = await adminClient
             .from("complaints")
             .select("*", { count: "exact", head: true })
@@ -63,7 +63,7 @@ export const getOperationsMetrics = async (req: Request, res: Response, next: Ne
     }
 
     // Get category breakdown
-    const categoryBreakdown = complaints?.reduce((acc: any, c) => {
+    const categoryBreakdown = complaints?.reduce((acc: any, c: any) => {
       acc[c.category] = (acc[c.category] || 0) + 1;
       return acc;
     }, {});
@@ -93,28 +93,24 @@ export const getCases = async (req: Request, res: Response, next: NextFunction) 
 
     let dbQuery = adminClient
       .from("complaints")
-      .select("*, customers!inner(full_name), stores!inner(name, city)", { count: "exact" });
+      .select(
+        "*, customers!inner(full_name), stores!inner(name, city), assigned_agent:profiles!assigned_agent_id(full_name)",
+        { count: "exact" },
+      );
 
     // Apply filters
     if (query.status) dbQuery = dbQuery.eq("status", query.status);
     if (query.priority) dbQuery = dbQuery.eq("priority", query.priority);
     if (query.category) dbQuery = dbQuery.eq("category", query.category);
 
-    // For demo purposes, show all cases without role filtering
     const limit = parseInt(query.limit) || 100;
     const page = parseInt(query.page) || 1;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    console.log("[getCases] Pagination:", { page, limit, from, to });
-
     dbQuery = dbQuery.range(from, to).order("created_at", { ascending: false });
 
     const { data, error, count } = await dbQuery;
-
-    console.log("[getCases] Cases count:", data?.length);
-    console.log("[getCases] Error:", error);
-    console.log("[getCases] Total count:", count);
 
     if (error) {
       throw new HTTPError(500, "DATABASE_ERROR", `Database error: ${error.message}`);
@@ -276,7 +272,7 @@ export const getAgents = async (req: Request, res: Response, next: NextFunction)
 
     // Get workload counts for each agent
     const agentsWithLoad = await Promise.all(
-      (data || []).map(async (agent) => {
+      (data || []).map(async (agent: any) => {
         const { count } = await supabase
           .from("complaints")
           .select("*", { count: "exact", head: true })

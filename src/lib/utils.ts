@@ -53,3 +53,67 @@ export function agoLabel(mins: number) {
   if (h < 24) return `${h}h ${mins % 60}m ago`;
   return `${Math.floor(h / 24)}d ago`;
 }
+
+// ─── Date / time formatting ───────────────────────────────────────────────────
+// One consistent, timezone-aware formatter for every admin surface. Any null,
+// undefined, or unparseable value returns an intentional fallback so the UI
+// never renders "Invalid Date".
+
+const IST = "Asia/Kolkata";
+const DATE_FALLBACK = "Not available";
+
+function toValidDate(value: string | number | Date | null | undefined): Date | null {
+  if (value === null || value === undefined || value === "") return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Full date + time in IST (e.g. "15 Sep 2026, 14:30"). */
+export function formatDateTime(
+  value: string | number | Date | null | undefined,
+  fallback = DATE_FALLBACK,
+): string {
+  const d = toValidDate(value);
+  if (!d) return fallback;
+  return d.toLocaleString("en-IN", {
+    timeZone: IST,
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+/** Date only in IST (e.g. "15 Sep 2026"). */
+export function formatDate(
+  value: string | number | Date | null | undefined,
+  fallback = DATE_FALLBACK,
+): string {
+  const d = toValidDate(value);
+  if (!d) return fallback;
+  return d.toLocaleDateString("en-IN", {
+    timeZone: IST,
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
+}
+
+/** Compact date + time for dense tables (e.g. "15 Sep, 14:30"). */
+export function formatShortDateTime(
+  value: string | number | Date | null | undefined,
+  fallback = DATE_FALLBACK,
+): string {
+  const d = toValidDate(value);
+  if (!d) return fallback;
+  return d.toLocaleString("en-IN", {
+    timeZone: IST,
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}

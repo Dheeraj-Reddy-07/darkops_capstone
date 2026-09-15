@@ -12,10 +12,11 @@ import {
   Lock,
 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ops/primitives";
-import { useCustomerOrders, useCustomerComplaints } from "@/hooks/useCustomer";
+import { useCustomerOrders, useCustomerComplaints, useCustomerProfile } from "@/hooks/useCustomer";
 import { inr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { CustomerNotificationPreferences } from "@/components/settings/customer-notification-preferences";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/customer/profile")({
@@ -40,8 +41,8 @@ function getCustomerFriendlyStatus(c: any) {
   if (c.customerStatusLabel) return c.customerStatusLabel;
   const rawStatus = (c.status || "").toLowerCase();
   const statusMap: Record<string, string> = {
-    received: "Received — being processed",
-    unassigned: "Received — being processed",
+    received: "Received: being processed",
+    unassigned: "Received: being processed",
     agent_queue: "Under review",
     assigned: "Under review by support team",
     in_progress: "Under review by support team",
@@ -57,26 +58,7 @@ function getCustomerFriendlyStatus(c: any) {
 function Profile() {
   const { data: orders } = useCustomerOrders();
   const { data: complaints } = useCustomerComplaints();
-
-  // Fetch customer profile data from authenticated customer's real DB record
-  const { data: profile } = useQuery({
-    queryKey: ["customer-profile-details"],
-    queryFn: async () => {
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return null;
-
-      const { data } = await supabase
-        .from("customers")
-        .select("*")
-        .eq("profile_id", user.id)
-        .maybeSingle();
-
-      return data as any;
-    },
-  });
+  const { data: profile, isLoading: profileLoading } = useCustomerProfile();
 
   const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();
@@ -95,47 +77,45 @@ function Profile() {
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Your account</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Account Settings</h1>
           <p className="text-xs text-muted-foreground">
-            Manage your account details, view issue history, and understand how your data is handled.
+            Manage your account and issue updates, view your history, and understand how your data
+            is handled.
           </p>
         </div>
       </div>
 
-      {/* Account Details */}
+      {/* Account Identity */}
       <Panel>
-        <PanelHeader title="Account details" />
+        <PanelHeader
+          title="Customer Identity"
+          subtitle="Identity details synchronized from upstream commerce platform"
+        />
         <div className="grid gap-4 p-4 sm:grid-cols-2">
           <div className="flex items-start gap-3">
             <User className="size-4 shrink-0 text-muted-foreground mt-0.5" />
             <div>
-              <p className="text-[13px] font-medium">Name</p>
-              <p className="mt-0.5 text-sm text-foreground">{profile?.full_name || "Valued Customer"}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Phone className="size-4 shrink-0 text-muted-foreground mt-0.5" />
-            <div>
-              <p className="text-[13px] font-medium">Phone</p>
-              <p className="mt-0.5 text-sm text-foreground">{profile?.phone || "Not set"}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <MapPin className="size-4 shrink-0 text-muted-foreground mt-0.5" />
-            <div>
-              <p className="text-[13px] font-medium">City</p>
-              <p className="mt-0.5 text-sm text-foreground">{profile?.city || "Not set"}</p>
+              <p className="text-[13px] font-medium text-foreground">Customer Name</p>
+              <p className="mt-0.5 text-sm text-foreground font-semibold">
+                {profileLoading ? "Loading..." : profile?.full_name || profile?.email || "—"}
+              </p>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <Calendar className="size-4 shrink-0 text-muted-foreground mt-0.5" />
             <div>
-              <p className="text-[13px] font-medium">Member since</p>
-              <p className="mt-0.5 text-sm text-foreground">
-                {profile?.created_at ? format(new Date(profile.created_at), "MMM yyyy") : "Recent"}
+              <p className="text-[13px] font-medium text-foreground">Account Created</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {profile?.created_at ? format(new Date(profile.created_at), "MMM yyyy") : "—"}
               </p>
             </div>
           </div>
+        </div>
+        <div className="border-t border-border/70 bg-surface-2/30 px-4 py-2.5 text-xs text-muted-foreground flex items-center justify-between">
+          <span>
+            Customer registration and profile details are owned by the upstream commerce platform.
+          </span>
+          <span className="text-[11px] font-medium text-primary">Read-only Identity</span>
         </div>
       </Panel>
 
@@ -153,7 +133,8 @@ function Profile() {
           </div>
           <div className="text-center p-3 rounded-md bg-surface-2/40">
             <p className="text-2xl font-semibold text-warn">
-              {complaints?.filter((c: any) => c.status !== "resolved" && c.status !== "closed").length || 0}
+              {complaints?.filter((c: any) => c.status !== "resolved" && c.status !== "closed")
+                .length || 0}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">Active issues</p>
           </div>
@@ -232,9 +213,14 @@ function Profile() {
             ))}
           </ul>
         ) : (
-          <div className="p-4 text-xs text-muted-foreground text-center">No reported issues found.</div>
+          <div className="p-4 text-xs text-muted-foreground text-center">
+            No reported issues found.
+          </div>
         )}
       </Panel>
+
+      {/* Notification Preferences */}
+      <CustomerNotificationPreferences />
 
       {/* Privacy & Data */}
       <Panel>
@@ -252,7 +238,8 @@ function Profile() {
               <Lock className="size-3.5 text-primary" /> Your data
             </h3>
             <p className="mt-1 text-xs text-foreground/90 font-medium">
-              DarkOps stores information needed to process your orders, reported issues, and support requests.
+              DarkOps stores information needed to process your orders, reported issues, and support
+              requests.
             </p>
           </div>
 
@@ -287,7 +274,9 @@ function Profile() {
           <div className="flex items-start gap-2.5 rounded-md border border-primary/20 bg-primary/5 p-3 text-foreground">
             <CheckCircle2 className="size-4 text-primary shrink-0 mt-0.5" />
             <p className="text-xs">
-              <span className="font-semibold">Data Protection Boundary:</span> Customer information is restricted to your authenticated account and authorized systems/personnel involved in processing your relevant support and operational workflow.
+              <span className="font-semibold">Data Protection Boundary:</span> Customer information
+              is restricted to your authenticated account and authorized systems/personnel involved
+              in processing your relevant support and operational workflow.
             </p>
           </div>
         </div>
@@ -296,7 +285,11 @@ function Profile() {
       {/* Logout */}
       <Panel>
         <div className="p-4">
-          <Button onClick={handleLogout} variant="outline" className="w-full text-crit hover:bg-crit/10 hover:text-crit border-crit/30">
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            className="w-full text-crit hover:bg-crit/10 hover:text-crit border-crit/30"
+          >
             <LogOut className="mr-2 size-4" />
             Sign out
           </Button>

@@ -7,10 +7,13 @@ export type AuditAction =
   | "AUTH_LOGIN_SUCCESS"
   | "AUTH_LOGIN_FAILURE"
   | "AUTH_LOGOUT"
+  | "AUTH_HANDOFF_ATTEMPT"
   | "ACCESS_DENIED"
   | "RATE_LIMIT_TRIGGERED"
   | "IDOR_ATTEMPT"
   | "PRIVILEGE_ESCALATION_ATTEMPT"
+  | "SUSPICIOUS_QUERY_BLOCKED"
+  | "CHATBOT_FEEDBACK_SUBMITTED"
   | "COMPLAINT_CREATED"
   | "COMPLAINT_UPDATED"
   | "COMPLAINT_ESCALATED"
@@ -23,6 +26,12 @@ export type AuditAction =
   | "FRAUD_REVIEW_UPDATED"
   | "FRAUD_DECISION_MADE"
   | "ROLE_CHANGED"
+  | "USER_ROLE_CHANGED"
+  | "USER_DEACTIVATED"
+  | "USER_REACTIVATED"
+  | "PROFILE_UPDATED"
+  | "SETTINGS_UPDATED"
+  | "STORE_UPDATED"
   | "PERMISSION_DENIED"
   | "SECURITY_SETTING_CHANGED"
   | "USER_CREATED"
@@ -38,6 +47,13 @@ export type AuditAction =
   | "failed_automation.resolve"
   | "refund.auto_approve"
   | "reorder.auto_approve"
+  | "resolution.auto_approved_refund"
+  | "resolution.auto_approved_replacement"
+  | "resolution.auto_approved_support_review"
+  | "resolution.auto_approved_no_action"
+  | "execution_handoff.created"
+  | "execution_handoff.acknowledged"
+  | "integration.resolution_acknowledged"
   | "complaint.route_to_store_manager"
   | "complaint.escalate_to_support"
   | "complaint.escalate_to_agent_queue";
@@ -62,8 +78,11 @@ export async function logAudit(params: {
       ? params.resourceId.join(",")
       : params.resourceId;
 
-    const isValidUUID = (id: string | undefined | null) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id || "");
-    
+    const isValidUUID = (id: string | undefined | null) =>
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+        id || "",
+      );
+
     const { error } = await adminClient.from("audit_logs").insert({
       actor_id: isValidUUID(params.actorId) ? params.actorId : null,
       actor_role: params.actorRole,
@@ -124,7 +143,10 @@ export async function logSecurityEvent(params: {
         : params.resourceId
       : "N/A";
 
-    const isValidUUID = (id: string | undefined | null) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id || "");
+    const isValidUUID = (id: string | undefined | null) =>
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+        id || "",
+      );
 
     const { error } = await adminClient.from("audit_logs").insert({
       actor_id: isValidUUID(params.actorId) ? params.actorId : null,

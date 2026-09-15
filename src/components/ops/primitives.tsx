@@ -82,6 +82,7 @@ export function KpiCard({
   footnote,
   emphasis,
   alert,
+  loading,
   children,
   className,
 }: {
@@ -94,6 +95,8 @@ export function KpiCard({
   footnote?: ReactNode;
   emphasis?: boolean;
   alert?: boolean;
+  /** Render a subtle skeleton in place of the value while data is loading. */
+  loading?: boolean;
   children?: ReactNode;
   className?: string;
 }) {
@@ -110,14 +113,17 @@ export function KpiCard({
         {alert ? <AlertTriangle className="size-3.5 text-crit" /> : null}
         <span className={cn("label-caps", alert && "text-crit")}>{label}</span>
       </div>
-      {children ?? (
-        <div className="mt-2 flex items-baseline gap-1.5">
-          <span className={cn("num text-[28px] leading-none font-semibold", toneText[tone])}>
-            {value}
-          </span>
-          {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
-        </div>
-      )}
+      {children ??
+        (loading ? (
+          <div className="mt-2.5 h-7 w-16 animate-pulse rounded bg-surface-3" />
+        ) : (
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className={cn("num text-[28px] leading-none font-semibold", toneText[tone])}>
+              {value}
+            </span>
+            {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
+          </div>
+        ))}
       {(delta || footnote) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {delta ? (

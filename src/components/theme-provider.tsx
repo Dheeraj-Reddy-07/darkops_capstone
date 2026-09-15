@@ -2,7 +2,7 @@ import { ThemeProvider as NextThemesProvider } from "next-themes";
 import type { ReactNode } from "react";
 
 /**
- * DarkOps ThemeProvider — wraps `next-themes` to provide:
+ * DarkOps ThemeProvider - wraps `next-themes` to provide:
  * - Dark (default) and Light modes
  * - Persistent preference in localStorage
  * - No flash of incorrect theme (SSR-safe via attribute strategy)

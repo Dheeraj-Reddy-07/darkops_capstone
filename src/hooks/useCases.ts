@@ -11,10 +11,12 @@ export interface Case {
   customerName: string;
   status: string;
   priority: string;
+  category: string;
   summary: string;
   ageMins: number;
   sla: "ok" | "at-risk" | "breached";
   agentId: string | null;
+  agentName: string | null;
 }
 
 function calculateSla(priority: string, ageMins: number): "ok" | "at-risk" | "breached" {
@@ -27,6 +29,16 @@ function calculateSla(priority: string, ageMins: number): "ok" | "at-risk" | "br
   return "ok";
 }
 
+const CATEGORY_LABEL_MAP: Record<string, string> = {
+  missing_item: "Missing items",
+  late_delivery: "Delivery delays",
+  wrong_item: "Wrong items",
+  damaged_item: "Damaged items",
+  quality_issue: "Quality issues",
+  payment_issue: "Payment issues",
+  other: "Other issues",
+};
+
 export function useOperationsMetrics() {
   return useQuery({
     queryKey: ["operations-metrics"],
@@ -37,9 +49,10 @@ export function useOperationsMetrics() {
   });
 }
 
-export function useCases() {
+export function useCases(autoRefresh: boolean = false) {
   return useQuery({
     queryKey: ["cases"],
+    refetchInterval: autoRefresh ? 30000 : false,
     queryFn: async () => {
       const response = await fetchApi("/cases?limit=100"); // fetch up to 100 cases
       const cases: Case[] = response.data.map((row: any) => {
@@ -53,6 +66,7 @@ export function useCases() {
           customerName: row.customers?.full_name || "Unknown Customer",
           status: row.status,
           priority: row.priority,
+          category: row.category || "other",
           summary: row.summary || row.detail || "No description",
           ageMins,
           sla:
@@ -62,20 +76,38 @@ export function useCases() {
                 ? "at-risk"
                 : "ok",
           agentId: row.assigned_agent_id,
+          agentName: row.assigned_agent?.full_name || null,
         };
       });
 
       // Compute KPIs from data
-      const pending = cases.filter((c) => c.status !== "resolved").length;
+      const pendingCases = cases.filter((c) => c.status !== "resolved");
+      const pending = pendingCases.length;
       const escalated = cases.filter((c) => c.status === "escalated_l2").length;
       const slaBreaches = cases.filter((c) => c.sla === "breached").length;
       const awaitingAssignment = cases.filter((c) => c.status === "unassigned").length;
 
       const pMix = [
-        { name: "P1 Critical", value: cases.filter((c) => c.priority === "P1").length, key: "P1" },
-        { name: "P2 High", value: cases.filter((c) => c.priority === "P2").length, key: "P2" },
-        { name: "P3 Medium", value: cases.filter((c) => c.priority === "P3").length, key: "P3" },
-        { name: "P4 Low", value: cases.filter((c) => c.priority === "P4").length, key: "P4" },
+        {
+          name: "P1 Critical",
+          value: pendingCases.filter((c) => c.priority === "P1").length,
+          key: "P1",
+        },
+        {
+          name: "P2 High",
+          value: pendingCases.filter((c) => c.priority === "P2").length,
+          key: "P2",
+        },
+        {
+          name: "P3 Medium",
+          value: pendingCases.filter((c) => c.priority === "P3").length,
+          key: "P3",
+        },
+        {
+          name: "P4 Low",
+          value: pendingCases.filter((c) => c.priority === "P4").length,
+          key: "P4",
+        },
       ];
 
       const sMix = [
@@ -84,6 +116,27 @@ export function useCases() {
         { name: "In progress", value: cases.filter((c) => c.status === "in_progress").length },
       ];
 
+      // Compute top exception drivers dynamically from DB complaint categories
+      const categoryCounts: Record<string, number> = {};
+      pendingCases.forEach((c) => {
+        const cat = c.category || "other";
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+      });
+
+      const maxCount = Math.max(1, ...Object.values(categoryCounts));
+
+      const exceptionDrivers = Object.entries(categoryCounts)
+        .map(([catKey, count]) => ({
+          key: catKey,
+          label:
+            CATEGORY_LABEL_MAP[catKey] ||
+            catKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+          count,
+          percentage: Math.round((count / maxCount) * 100),
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
       return {
         cases,
         kpis: {
@@ -91,12 +144,7 @@ export function useCases() {
           escalated,
           slaBreaches,
           awaitingAssignment,
-          agentsOnShift: cases.filter((c) => c.agentId).length, // Count unique assigned agents
-          agentsAvailable: Math.max(
-            0,
-            cases.filter((c) => c.agentId).length -
-              cases.filter((c) => c.status === "in_progress").length,
-          ),
+          inProgress: cases.filter((c) => c.status === "in_progress").length,
           oldestWaitingMins: Math.max(
             0,
             ...cases.filter((c) => c.status === "unassigned").map((c) => c.ageMins),
@@ -104,6 +152,7 @@ export function useCases() {
         },
         priorityMix: pMix,
         statusMix: sMix,
+        exceptionDrivers,
       };
     },
   });

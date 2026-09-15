@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5001;
 
 // Security and utility middleware
 app.use(
@@ -102,6 +102,7 @@ import supportRoutes from "./routes/support.routes";
 import publicRoutes from "./routes/public.routes";
 import securityRoutes from "./routes/security.routes";
 import intakeRoutes from "./routes/intake.routes";
+import integrationRoutes from "./routes/integration.routes";
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/cases", casesRoutes);
@@ -117,6 +118,7 @@ app.use("/api/v1/support", supportRoutes);
 app.use("/api/v1/public", publicRoutes);
 app.use("/api/v1/security", securityRoutes);
 app.use("/api/v1/intake", intakeRoutes); // External intake API (HMAC auth)
+app.use("/api/v1/integration", integrationRoutes); // Upstream commerce simulation callback
 
 // Centralized error handler with enhanced security
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -159,8 +161,9 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`DarkOps Express server running on port ${PORT}`);
+app.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`DarkOps Express server running on port ${PORT} (0.0.0.0)`);
   console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
 });
+// Trigger server reload

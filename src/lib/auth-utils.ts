@@ -49,11 +49,16 @@ export function getLandingRoute(role: string | null | undefined): string | null 
 /**
  * Check if a route is public (doesn't require auth)
  */
-export const PUBLIC_ROUTES = ["/", "/login"] as const;
+export const PUBLIC_ROUTES = [
+  "/",
+  "/login",
+  "/simulated-upstream/order-confirmation",
+] as const;
 
 /**
  * Check if a pathname is a public route
  */
 export function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.includes(pathname as any);
+  if (pathname.startsWith("/simulated-upstream")) return true;
+  return (PUBLIC_ROUTES as readonly string[]).includes(pathname);
 }

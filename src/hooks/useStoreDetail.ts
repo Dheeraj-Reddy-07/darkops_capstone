@@ -21,6 +21,13 @@ export function useStoreDetail(id: string) {
         inventory: pulseData.inventory_pts || 0,
       };
 
+      // Real week-ago PulseScore from the 31-day history (not a fabricated delta).
+      const fullHistory = row.pulseHistory || [];
+      const weekAgoPulse =
+        fullHistory.length >= 8
+          ? fullHistory[fullHistory.length - 8].score
+          : (fullHistory[0]?.score ?? pulse);
+
       const store = {
         id: row.id,
         name: row.name,
@@ -28,7 +35,7 @@ export function useStoreDetail(id: string) {
         zone: row.zone,
         manager: row.manager_name || "Manager",
         pulse,
-        prevPulse: row.metrics?.prev_pulse || pulse - 5,
+        prevPulse: weekAgoPulse,
         sla: row.metrics?.sla_pct || 0,
         refundRate: row.metrics?.refund_rate_pct || 0,
         avgResolutionMins: row.metrics?.avg_resolution_mins || 0,
@@ -46,22 +53,22 @@ export function useStoreDetail(id: string) {
       const history = row.pulseHistory || [];
       const recentHistory = history.slice(-14);
 
+      // Daily equipment/inventory pressure derived directly from that day's real
+      // PulseScore deduction points (no synthetic sin/cos fluctuation).
       const series = recentHistory.map((p: any) => {
         const date = new Date(p.calculated_at);
-        // Use the equipment_pts from pulse history, but scale it to realistic failure counts
-        // equipment_pts represents deduction points, so we convert to approximate daily failures
-        const failures = Math.max(0, Math.round(p.equipment_pts / 2)); // Reduced divisor for more visible values
-        const stockouts = Math.max(0, Math.round(p.inventory_pts / 1.5)); // Reduced divisor for more visible values
-
+        const failures = Math.round((p.equipment_pts || 0) / 2);
+        const stockouts = Math.round((p.inventory_pts || 0) / 1.5);
         return {
           day: `${date.getDate()} ${date.toLocaleString("default", { month: "short" })}`,
           failures,
-          downtime: Math.round(failures * 1.5 + Math.random() * 2),
+          downtime: Number((failures * 1.2).toFixed(1)),
           stockouts,
-          mismatches: Math.round(stockouts * 0.3 + Math.random()),
+          mismatches: Math.round(stockouts * 0.4),
         };
       });
 
+      // 30-day PulseScore trend straight from the real per-day scores.
       const trend = history.map((p: any) => {
         const date = new Date(p.calculated_at);
         return {

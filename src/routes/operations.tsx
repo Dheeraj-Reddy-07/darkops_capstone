@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -13,7 +13,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Search, Phone, PhoneCall, PhoneOff } from "lucide-react";
+import { Search, ArrowUpRight } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   Chip,
@@ -34,6 +35,13 @@ import { ageLabel, num } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/operations")({
   head: () => ({
@@ -58,124 +66,73 @@ const TABS = ["All", "P1", "P2", "P3", "P4", "Escalated", "My queue"] as const;
 const PIE_COLORS = ["var(--crit)", "var(--warn)", "var(--chart-1)", "var(--chart-5)"];
 
 const axis = {
-  stroke: "var(--muted-foreground)",
   fontSize: 11,
-  tickLine: false,
-  axisLine: false,
+  fill: "var(--muted-foreground)",
 };
 const tooltipStyle = {
   backgroundColor: "var(--popover)",
-  border: "1px solid var(--border)",
+  borderColor: "var(--border)",
   borderRadius: 6,
   fontSize: 12,
   color: "var(--popover-foreground)",
 };
 
-function LiveCallPanel() {
-  const [callState, setCallState] = useState<"idle" | "dialing" | "connected" | "ended">("idle");
-  const [timer, setTimer] = useState<number>(0);
-  const [timerId, setTimerId] = useState<any>(null);
+function ExceptionDriversCard({
+  drivers,
+}: {
+  drivers: Array<{ key: string; label: string; count: number; percentage: number }>;
+}) {
+  const [animated, setAnimated] = useState(false);
 
-  const startCall = () => {
-    setCallState("dialing");
-    setTimeout(() => {
-      setCallState("connected");
-      setTimer(0);
-      const interval = setInterval(() => {
-        setTimer((t) => t + 1);
-      }, 1000);
-      setTimerId(interval);
-    }, 1500);
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimated(true), 60);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const endCall = () => {
-    if (timerId) clearInterval(timerId);
-    setCallState("ended");
-  };
-
-  const resetCall = () => {
-    setCallState("idle");
-    setTimer(0);
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
+  const maxCount = Math.max(1, ...(drivers?.map((d) => d.count) || [1]));
 
   return (
-    <Panel>
-      <PanelHeader title="Agent Live VoIP Call" subtitle="Escalation stream & interactive voice agent" />
-      <div className="p-4 space-y-3">
-        {callState === "idle" && (
-          <div className="text-center py-3 space-y-2">
-            <div className="inline-flex items-center justify-center size-10 rounded-full bg-primary/10 text-primary">
-              <Phone className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Simulate Customer Call</p>
-              <p className="text-[11px] text-muted-foreground">Direct L2 escalation VoIP bridge</p>
-            </div>
-            <Button onClick={startCall} size="sm" className="w-full gap-2 text-xs">
-              <PhoneCall className="size-3.5" /> Call Customer
-            </Button>
+    <Panel className="flex flex-col justify-between">
+      <PanelHeader title="Exception Drivers" subtitle="Top issues driving operational workload" />
+      <div className="p-4 space-y-2.5 flex-1">
+        {!drivers || drivers.length === 0 ? (
+          <div className="text-xs text-muted-foreground py-4 text-center">
+            No active exception drivers recorded
           </div>
-        )}
-
-        {callState === "dialing" && (
-          <div className="text-center py-3 space-y-2">
-            <div className="inline-flex items-center justify-center size-10 rounded-full bg-amber-500/10 text-amber-500 animate-pulse">
-              <PhoneCall className="size-5 animate-bounce" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Connecting to customer...</p>
-              <p className="text-[11px] text-muted-foreground">Establishing secure RTP stream</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={endCall} className="w-full text-xs text-crit">
-              Cancel Call
-            </Button>
-          </div>
-        )}
-
-        {callState === "connected" && (
-          <div className="space-y-3 py-1">
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <div className="flex items-center gap-2">
-                <span className="relative flex size-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
-                </span>
-                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Live Call</span>
+        ) : (
+          drivers.map((driver, idx) => {
+            const barWidthPercent = Math.max(8, Math.round((driver.count / maxCount) * 100));
+            return (
+              <div key={driver.key} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-foreground truncate max-w-[150px]">
+                    {driver.label}
+                  </span>
+                  <span className="num font-semibold text-foreground">{driver.count}</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted/60 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700 ease-out"
+                    style={{
+                      width: animated ? `${barWidthPercent}%` : "0%",
+                      transitionDelay: `${idx * 90}ms`,
+                      backgroundColor:
+                        idx === 0 ? "var(--crit)" : idx === 1 ? "var(--warn)" : "var(--chart-1)",
+                    }}
+                  />
+                </div>
               </div>
-              <span className="num text-xs font-bold text-foreground">{formatTimer(timer)}</span>
-            </div>
-
-            <div className="p-2.5 bg-muted/40 rounded text-[11px] space-y-1">
-              <p className="text-muted-foreground font-medium">Real-time NLP sentiment transcript:</p>
-              <p className="text-foreground italic">"Customer confirmed missing items. Escalation resolution approved."</p>
-            </div>
-
-            <Button variant="destructive" size="sm" onClick={endCall} className="w-full gap-2 text-xs">
-              <PhoneOff className="size-3.5" /> End Call
-            </Button>
-          </div>
+            );
+          })
         )}
-
-        {callState === "ended" && (
-          <div className="text-center py-3 space-y-2">
-            <div className="inline-flex items-center justify-center size-10 rounded-full bg-muted text-muted-foreground">
-              <PhoneOff className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Call Completed ({formatTimer(timer)})</p>
-              <p className="text-[11px] text-muted-foreground">Audio recording & transcript saved</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={resetCall} className="w-full text-xs">
-              Reset Call Simulator
-            </Button>
-          </div>
-        )}
+      </div>
+      <div className="border-t border-border px-4 py-2 text-[11px]">
+        <Link
+          to="/dark-stores"
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+        >
+          View dark store trends <ArrowUpRight className="size-3" />
+        </Link>
       </div>
     </Panel>
   );
@@ -184,21 +141,29 @@ function LiveCallPanel() {
 function OperationsQueue() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("All");
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"sla" | "age" | "priority" | "store">("sla");
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useCases();
-
-  // Get current user ID for "My queue" filtering
+  // Current user profile drives the "My queue" filter and the auto-refresh preference.
   const { data: currentUser } = useQuery({
-    queryKey: ["current-user-auth"],
+    queryKey: ["current-user"],
     queryFn: async () => {
       const supabase = createSupabaseBrowserClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      return user;
+      if (!user) return null;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      return { ...profile, id: user.id } as any;
     },
   });
+
+  const autoRefresh = !!currentUser?.preferences?.autoRefresh;
+  const { data, isLoading, error } = useCases(autoRefresh);
 
   const rows = useMemo(() => {
     if (!data?.cases) return [];
@@ -219,20 +184,28 @@ function OperationsQueue() {
         }
         return true;
       })
-      .sort((a, b) => b.ageMins - a.ageMins);
-  }, [tab, query, currentUser?.id, data?.cases]);
+      .sort((a, b) => {
+        if (sortBy === "age") return b.ageMins - a.ageMins;
+        if (sortBy === "priority") return a.priority.localeCompare(b.priority);
+        if (sortBy === "store") return a.storeName.localeCompare(b.storeName);
+        const slaOrder = { breached: 0, "at-risk": 1, ok: 2 };
+        const diff = slaOrder[a.sla] - slaOrder[b.sla];
+        if (diff !== 0) return diff;
+        return b.ageMins - a.ageMins;
+      });
+  }, [tab, query, currentUser?.id, data?.cases, sortBy]);
 
   if (isLoading) return <div className="p-8">Loading live queue...</div>;
   if (error || !data) return <div className="p-8 text-crit">Failed to load operations queue.</div>;
 
-  const { kpis, priorityMix, statusMix } = data;
+  const { kpis, priorityMix, statusMix, exceptionDrivers } = data;
 
   return (
     <>
       <PageHeader
         title="Operations queue"
-        subtitle={`Shift 2 (14:00–22:00 IST) · ${kpis.agentsOnShift} agents on roster`}
-        right={<LiveTag seconds={11} />}
+        subtitle={`Live case queue · ${num(kpis.pending)} pending across all hubs`}
+        right={<LiveTag seconds={15} />}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-5">
@@ -251,10 +224,10 @@ function OperationsQueue() {
           footnote="past 2h response SLA"
         />
         <KpiCard
-          label="Agents available"
-          value={num(kpis.agentsAvailable)}
-          unit={`of ${kpis.agentsOnShift} on shift`}
-          footnote="idle or under 60% load"
+          label="In progress"
+          value={num(kpis.inProgress)}
+          tone="info"
+          footnote="actively being worked"
         />
         <KpiCard
           label="Awaiting assignment"
@@ -265,7 +238,7 @@ function OperationsQueue() {
       </div>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <LiveCallPanel />
+        <ExceptionDriversCard drivers={exceptionDrivers} />
         <Panel>
           <PanelHeader
             title="Complaint priority mix"
@@ -364,6 +337,17 @@ function OperationsQueue() {
                 className="w-56 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
               />
             </div>
+            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+              <SelectTrigger className="h-7 w-44 text-xs bg-surface-2 border-border">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sla">Sort: SLA Risk First</SelectItem>
+                <SelectItem value="age">Sort: Oldest Waiting</SelectItem>
+                <SelectItem value="priority">Sort: Priority (P1 → P4)</SelectItem>
+                <SelectItem value="store">Sort: Store Name (A → Z)</SelectItem>
+              </SelectContent>
+            </Select>
             <span className="num text-xs text-muted-foreground">{rows.length} shown</span>
           </div>
         </div>
@@ -416,7 +400,9 @@ function OperationsQueue() {
                     </Td>
                     <Td className="text-[13px]">
                       {c.agentId ? (
-                        <span className="num text-muted-foreground">{c.agentId}</span>
+                        <span className="text-muted-foreground">
+                          {c.agentName || "Assigned agent"}
+                        </span>
                       ) : (
                         <span className="text-warn">Unassigned</span>
                       )}

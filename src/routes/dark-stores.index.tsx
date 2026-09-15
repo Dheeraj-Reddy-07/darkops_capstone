@@ -50,12 +50,26 @@ const PULSE_BANDS = [
   { key: "ok", label: "80 and above" },
 ];
 
+const SORT_OPTIONS = [
+  { key: "pulse_asc", label: "PulseScore: Low → High (Critical First)" },
+  { key: "pulse_desc", label: "PulseScore: High → Low (Best First)" },
+  { key: "name_asc", label: "Store Name: A → Z" },
+  { key: "name_desc", label: "Store Name: Z → A" },
+  { key: "city_asc", label: "City: A → Z" },
+  { key: "issues_desc", label: "Open Issues: Most → Least" },
+  { key: "sla_asc", label: "SLA Compliance: Lowest First" },
+  { key: "sla_desc", label: "SLA Compliance: Highest First" },
+  { key: "refund_desc", label: "Refund Rate: Highest First" },
+  { key: "refund_asc", label: "Refund Rate: Lowest First" },
+] as const;
+
 function StoreNetwork() {
   const navigate = useNavigate();
   const [city, setCity] = useState("all");
   const [zone, setZone] = useState("all");
   const [status, setStatus] = useState("all");
   const [band, setBand] = useState("all");
+  const [sortBy, setSortBy] = useState("pulse_asc");
   const [query, setQuery] = useState("");
 
   const { data, isLoading, error } = useStores();
@@ -96,14 +110,27 @@ function StoreNetwork() {
         }
         return true;
       })
-      .sort((a, b) => a.pulse - b.pulse);
-  }, [data, city, zone, status, band, query]);
+      .sort((a, b) => {
+        if (sortBy === "pulse_asc") return a.pulse - b.pulse;
+        if (sortBy === "pulse_desc") return b.pulse - a.pulse;
+        if (sortBy === "name_asc") return a.name.localeCompare(b.name);
+        if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+        if (sortBy === "city_asc") return a.city.localeCompare(b.city);
+        if (sortBy === "issues_desc") return b.openIssues - a.openIssues;
+        if (sortBy === "sla_asc") return a.sla - b.sla;
+        if (sortBy === "sla_desc") return b.sla - a.sla;
+        if (sortBy === "refund_desc") return b.refundRate - a.refundRate;
+        if (sortBy === "refund_asc") return a.refundRate - b.refundRate;
+        return a.pulse - b.pulse;
+      });
+  }, [data, city, zone, status, band, query, sortBy]);
 
   const reset = () => {
     setCity("all");
     setZone("all");
     setStatus("all");
     setBand("all");
+    setSortBy("pulse_asc");
     setQuery("");
   };
 
@@ -218,9 +245,25 @@ function StoreNetwork() {
             </SelectContent>
           </Select>
 
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-[11px] font-medium text-muted-foreground">Sort by:</span>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-8 w-56 text-xs bg-surface-2 border-border">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((s) => (
+                  <SelectItem key={s.key} value={s.key}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <button
             onClick={reset}
-            className="ml-auto rounded-sm border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+            className="rounded-sm border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
             Reset filters
           </button>
@@ -235,14 +278,48 @@ function StoreNetwork() {
           <TableShell>
             <thead>
               <tr>
-                <Th>Store</Th>
+                <Th
+                  className="cursor-pointer select-none hover:text-foreground"
+                  onClick={() => setSortBy(sortBy === "name_asc" ? "name_desc" : "name_asc")}
+                >
+                  Store {sortBy.startsWith("name") ? (sortBy === "name_asc" ? "↑" : "↓") : ""}
+                </Th>
                 <Th>Store ID</Th>
-                <Th>City</Th>
+                <Th
+                  className="cursor-pointer select-none hover:text-foreground"
+                  onClick={() => setSortBy("city_asc")}
+                >
+                  City {sortBy === "city_asc" ? "↑" : ""}
+                </Th>
                 <Th>Manager</Th>
-                <Th align="right">PulseScore</Th>
-                <Th align="right">Open issues</Th>
-                <Th align="right">SLA</Th>
-                <Th align="right">Refund rate</Th>
+                <Th
+                  align="right"
+                  className="cursor-pointer select-none hover:text-foreground"
+                  onClick={() => setSortBy(sortBy === "pulse_asc" ? "pulse_desc" : "pulse_asc")}
+                >
+                  PulseScore {sortBy.startsWith("pulse") ? (sortBy === "pulse_asc" ? "↑" : "↓") : ""}
+                </Th>
+                <Th
+                  align="right"
+                  className="cursor-pointer select-none hover:text-foreground"
+                  onClick={() => setSortBy(sortBy === "issues_desc" ? "pulse_asc" : "issues_desc")}
+                >
+                  Open issues {sortBy === "issues_desc" ? "↓" : ""}
+                </Th>
+                <Th
+                  align="right"
+                  className="cursor-pointer select-none hover:text-foreground"
+                  onClick={() => setSortBy(sortBy === "sla_asc" ? "sla_desc" : "sla_asc")}
+                >
+                  SLA {sortBy.startsWith("sla") ? (sortBy === "sla_asc" ? "↑" : "↓") : ""}
+                </Th>
+                <Th
+                  align="right"
+                  className="cursor-pointer select-none hover:text-foreground"
+                  onClick={() => setSortBy(sortBy === "refund_desc" ? "refund_asc" : "refund_desc")}
+                >
+                  Refund rate {sortBy.startsWith("refund") ? (sortBy === "refund_desc" ? "↓" : "↑") : ""}
+                </Th>
                 <Th>Status</Th>
               </tr>
             </thead>

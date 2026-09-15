@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowUpRight, ShieldAlert, Phone, PhoneCall, PhoneOff } from "lucide-react";
+import { ArrowUpRight, ShieldAlert } from "lucide-react";
 import { Breadcrumbs, PageHeader } from "@/components/layout/page-header";
 import {
   Chip,
@@ -66,116 +66,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function LiveCallPanel({ customerName }: { customerName: string }) {
-  const [callState, setCallState] = useState<"idle" | "dialing" | "connected" | "ended">("idle");
-  const [timer, setTimer] = useState<number>(0);
-  const [timerId, setTimerId] = useState<any>(null);
-
-  const startCall = () => {
-    setCallState("dialing");
-    setTimeout(() => {
-      setCallState("connected");
-      setTimer(0);
-      const interval = setInterval(() => {
-        setTimer((t) => t + 1);
-      }, 1000);
-      setTimerId(interval);
-    }, 1500);
-  };
-
-  const endCall = () => {
-    if (timerId) clearInterval(timerId);
-    setCallState("ended");
-  };
-
-  const resetCall = () => {
-    setCallState("idle");
-    setTimer(0);
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  return (
-    <Panel>
-      <PanelHeader title="Agent Live VoIP Call" subtitle="Escalation stream & interactive voice agent" />
-      <div className="p-4 space-y-3">
-        {callState === "idle" && (
-          <div className="text-center py-3 space-y-2">
-            <div className="inline-flex items-center justify-center size-10 rounded-full bg-primary/10 text-primary">
-              <Phone className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Simulate Customer Call</p>
-              <p className="text-[11px] text-muted-foreground">Direct L2 escalation VoIP bridge</p>
-            </div>
-            <Button onClick={startCall} size="sm" className="w-full gap-2 text-xs">
-              <PhoneCall className="size-3.5" /> Call {customerName}
-            </Button>
-          </div>
-        )}
-
-        {callState === "dialing" && (
-          <div className="text-center py-3 space-y-2">
-            <div className="inline-flex items-center justify-center size-10 rounded-full bg-amber-500/10 text-amber-500 animate-pulse">
-              <PhoneCall className="size-5 animate-bounce" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Connecting to {customerName}...</p>
-              <p className="text-[11px] text-muted-foreground">Establishing secure RTP stream</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={endCall} className="w-full text-xs text-crit">
-              Cancel Call
-            </Button>
-          </div>
-        )}
-
-        {callState === "connected" && (
-          <div className="space-y-3 py-1">
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-              <div className="flex items-center gap-2">
-                <span className="relative flex size-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
-                </span>
-                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Live Call</span>
-              </div>
-              <span className="num text-xs font-bold text-foreground">{formatTimer(timer)}</span>
-            </div>
-
-            <div className="p-2.5 bg-muted/40 rounded text-[11px] space-y-1">
-              <p className="text-muted-foreground font-medium">Real-time NLP sentiment transcript:</p>
-              <p className="text-foreground italic">"Customer confirmed missing items. Escalation resolution approved."</p>
-            </div>
-
-            <Button variant="destructive" size="sm" onClick={endCall} className="w-full gap-2 text-xs">
-              <PhoneOff className="size-3.5" /> End Call
-            </Button>
-          </div>
-        )}
-
-        {callState === "ended" && (
-          <div className="text-center py-3 space-y-2">
-            <div className="inline-flex items-center justify-center size-10 rounded-full bg-muted text-muted-foreground">
-              <PhoneOff className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">Call Completed ({formatTimer(timer)})</p>
-              <p className="text-[11px] text-muted-foreground">Audio recording & transcript saved</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={resetCall} className="w-full text-xs">
-              Reset Call Simulator
-            </Button>
-          </div>
-        )}
-      </div>
-    </Panel>
-  );
-}
-
 function CaseDetail() {
   const { id } = Route.useParams();
   const { data: record, isLoading, error } = useCaseDetail(id);
@@ -184,25 +74,18 @@ function CaseDetail() {
   const assign = useAssignCase();
   const escalate = useEscalateCase();
   const resolve = useResolveCase();
+  const [resolveNote, setResolveNote] = useState("");
 
   if (isLoading) return <div className="p-8">Loading case...</div>;
   if (error || !record) return <div className="p-8 text-crit">Failed to load case.</div>;
 
   const status = record.status;
-  // Agent info is now embedded in the record from the API
   const agent =
-    record.agentId && record.agentName
-      ? { id: record.agentId, name: record.agentName, hub: record.agentHub || "Unassigned" }
-      : null;
-  // Fraud link comes from the API response
+    record.agentId && record.agentName ? { id: record.agentId, name: record.agentName } : null;
   const fraud = record.fraudReview || null;
 
-  // Transform events for timeline
-  const events = record.events.map((e: any) => ({
-    time: "IST",
-    actor: e.actor_label,
-    action: e.action,
-  }));
+  // Real status-history events (already shaped for the Timeline in the hook).
+  const events = record.events;
 
   return (
     <>
@@ -275,28 +158,28 @@ function CaseDetail() {
                   </Link>
                 }
               />
-              <Field
-                label="Delivery partner"
-                value={
-                  <span>
-                    {record.partner}{" "}
-                    <span className="num text-muted-foreground">({record.partnerId})</span>
-                  </span>
-                }
-              />
+              <Field label="City" value={record.city} />
             </div>
           </Panel>
 
           <Panel>
             <PanelHeader
               title="Classification"
-              subtitle={`Automated classification · confidence ${record.classifierConfidence}% · QC score ${record.qcScore}/100`}
+              subtitle={[
+                "Automated classification",
+                record.classifierConfidence != null
+                  ? `confidence ${record.classifierConfidence}%`
+                  : null,
+                record.qcScore != null ? `QC score ${record.qcScore}/100` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             />
             <div className="grid sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Type" value={record.type} />
               <Field label="Category" value={record.category} />
               <Field label="Urgency" value={record.urgency} />
-              <Field label="Sentiment" value={record.sentiment} />
+              <Field label="Sentiment" value={record.sentiment || "—"} />
             </div>
           </Panel>
 
@@ -347,18 +230,14 @@ function CaseDetail() {
                 )
               }
             />
-            <Field label="Resolution status" value={record.resolution} />
+            <Field
+              label="Resolution status"
+              value={record.resolution || <span className="text-muted-foreground">Pending</span>}
+            />
             <Field
               label="Assigned agent"
               value={
-                agent ? (
-                  <span>
-                    {agent.name} <span className="num text-muted-foreground">({agent.id})</span> ·{" "}
-                    {agent.hub}
-                  </span>
-                ) : (
-                  <span className="text-warn">Unassigned</span>
-                )
+                agent ? <span>{agent.name}</span> : <span className="text-warn">Unassigned</span>
               }
             />
           </Panel>
@@ -376,12 +255,18 @@ function CaseDetail() {
                   {agents.map((a) => (
                     <DropdownMenuItem
                       key={a.id}
-                      onSelect={() => {
-                        assign.mutate({ id: record.id, agentId: a.id });
-                        toast.success(`${record.id} assigned to ${a.name}`, {
-                          description: `${a.hub} hub · ${a.load}/${a.capacity} load`,
-                        });
-                      }}
+                      onSelect={() =>
+                        assign.mutate(
+                          { id: record.id, agentId: a.id },
+                          {
+                            onSuccess: () =>
+                              toast.success(`${record.id} assigned to ${a.name}`, {
+                                description: `${a.hub} hub · ${a.load}/${a.capacity} load`,
+                              }),
+                            onError: (e: any) => toast.error(e?.message || "Assignment failed"),
+                          },
+                        )
+                      }
                     >
                       {a.name}
                       <span className="num ml-auto text-xs text-muted-foreground">{a.id}</span>
@@ -400,19 +285,25 @@ function CaseDetail() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Escalate {record.id} to L2?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      The regional manager for {record.city} will be paged and the SLA clock resets
-                      to a 60-minute response window.
+                      This moves the case to the L2 (escalated) queue for {record.city} and records
+                      the change on the case timeline.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => {
-                        escalate.mutate({ id: record.id, level: "L2" });
-                        toast.warning(`${record.id} escalated to L2`, {
-                          description: `Regional manager · ${record.city}`,
-                        });
-                      }}
+                      onClick={() =>
+                        escalate.mutate(
+                          { id: record.id },
+                          {
+                            onSuccess: () =>
+                              toast.warning(`${record.id} escalated to L2`, {
+                                description: `${record.city}`,
+                              }),
+                            onError: (e: any) => toast.error(e?.message || "Escalation failed"),
+                          },
+                        )
+                      }
                     >
                       Escalate
                     </AlertDialogAction>
@@ -433,14 +324,32 @@ function CaseDetail() {
                       This cannot be undone from the console.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+                  <div className="space-y-1.5">
+                    <label className="label-caps text-muted-foreground">Resolution note</label>
+                    <textarea
+                      value={resolveNote}
+                      onChange={(e) => setResolveNote(e.target.value)}
+                      placeholder="How was this case resolved?"
+                      className="h-20 w-full resize-none rounded-md border border-border bg-surface-2 p-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => {
-                        resolve.mutate({ id: record.id });
-                        toast.success(`${record.id} resolved`, {
-                          description: record.resolution,
-                        });
+                        const resolution =
+                          resolveNote.trim() || "Resolved after operations review.";
+                        resolve.mutate(
+                          { id: record.id, resolution },
+                          {
+                            onSuccess: () => {
+                              toast.success(`${record.id} resolved`, { description: resolution });
+                              setResolveNote("");
+                            },
+                            onError: (e: any) =>
+                              toast.error(e?.message || "Could not resolve case"),
+                          },
+                        );
                       }}
                     >
                       Resolve
@@ -460,8 +369,6 @@ function CaseDetail() {
               ) : null}
             </div>
           </Panel>
-
-          <LiveCallPanel customerName={record.customerName} />
         </aside>
       </div>
     </>

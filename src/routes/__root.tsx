@@ -87,9 +87,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isCustomer = pathname.startsWith("/customer");
-  const isAdmin = pathname.startsWith("/admin");
-  const isSupport = pathname.startsWith("/support");
   const navigate = useRouter().navigate;
 
   const { loading, session } = useAuthGuard();
@@ -115,13 +112,35 @@ function RootComponent() {
   const normalizedRole = normalizeRole(userProfile?.role);
   const userRole = normalizedRole || userProfile?.role;
 
+  // The shared /settings route renders inside each persona's own shell. Resolve
+  // which shell it belongs to from the authenticated role (source of truth),
+  // never from the URL.
+  const isSettings = pathname === "/settings";
+  const settingsRole = isSettings ? userRole : null;
+  const isCustomer =
+    pathname.startsWith("/customer") || pathname === "/report-issue" || settingsRole === "CUSTOMER";
+  const isAdmin = pathname.startsWith("/admin") || settingsRole === "PLATFORM_ADMIN";
+  const isSupport = pathname.startsWith("/support") || settingsRole === "CUSTOMER_SUPPORT";
+
   // PLATFORM_ADMIN should use AdminShell for /dark-stores as well for consistent admin console
   const useAdminShell =
     isAdmin || (userRole === "PLATFORM_ADMIN" && pathname.startsWith("/dark-stores"));
 
+  const isUpstreamDemo = pathname.startsWith("/simulated-upstream");
+
+  const hasHandoffParam =
+    pathname === "/report-issue" &&
+    typeof window !== "undefined" &&
+    window.location.search.includes("handoff=");
+
   // Navigation & RBAC side effects
   useEffect(() => {
     if (loading || profileLoading) return;
+
+    if (isUpstreamDemo) {
+      // Don't redirect away from upstream demo screen even if logged in to DarkOps
+      return;
+    }
 
     if (isPublicRoute(pathname)) {
       if (session && userProfile) {
@@ -130,6 +149,9 @@ function RootComponent() {
           navigate({ to: landingRoute, replace: true });
         }
       }
+    } else if (hasHandoffParam && !session) {
+      // Allow report-issue page to process handoff verification before redirecting
+      return;
     } else {
       if (!session) {
         navigate({ to: "/login", replace: true });
@@ -142,7 +164,27 @@ function RootComponent() {
         }
       }
     }
-  }, [pathname, userRole, session, userProfile, loading, profileLoading, navigate]);
+  }, [
+    pathname,
+    userRole,
+    session,
+    userProfile,
+    loading,
+    profileLoading,
+    navigate,
+    hasHandoffParam,
+    isUpstreamDemo,
+  ]);
+
+  // Handle upstream demo screen (10MinMart independent platform)
+  if (isUpstreamDemo) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+        <Toaster position="bottom-right" />
+      </QueryClientProvider>
+    );
+  }
 
   // Handle public routes
   if (isPublicRoute(pathname)) {
@@ -165,6 +207,18 @@ function RootComponent() {
     return (
       <QueryClientProvider client={queryClient}>
         <Outlet />
+        <Toaster position="bottom-right" />
+      </QueryClientProvider>
+    );
+  }
+
+  // Allow report-issue to render when processing handoff token
+  if (!session && hasHandoffParam) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <CustomerShell>
+          <Outlet />
+        </CustomerShell>
         <Toaster position="bottom-right" />
       </QueryClientProvider>
     );

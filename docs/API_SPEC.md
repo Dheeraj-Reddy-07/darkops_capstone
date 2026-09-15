@@ -1,4 +1,4 @@
-# DarkOps — API Specification
+# DarkOps - API Specification
 
 The backend uses TanStack Start API routes (Nitro runtime) served from `/api/v1/`.
 

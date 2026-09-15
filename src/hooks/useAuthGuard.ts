@@ -13,11 +13,16 @@ export function useAuthGuard() {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
+    const hasHandoffParam =
+      pathname === "/report-issue" &&
+      typeof window !== "undefined" &&
+      window.location.search.includes("handoff=");
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       setSession(session);
       setLoading(false);
-      if (!session && !isPublicRoute(pathname)) {
+      if (!session && !isPublicRoute(pathname) && !hasHandoffParam) {
         navigate({ to: "/login" });
       }
     });
@@ -25,9 +30,9 @@ export function useAuthGuard() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setSession(session);
-      if (!session && !isPublicRoute(pathname)) {
+      if (!session && !isPublicRoute(pathname) && !hasHandoffParam) {
         navigate({ to: "/login" });
       }
     });

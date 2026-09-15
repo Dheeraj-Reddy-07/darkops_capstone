@@ -31,7 +31,7 @@ export const Route = createFileRoute("/fraud/")({
       {
         name: "description",
         content:
-          "AI-flagged complaints and refund claims with confidence scores, risk factors and analyst decisions.",
+          "Flagged complaints and refund claims with risk indicators, factors and support review decisions.",
       },
       { property: "og:title", content: "Fraud & risk review - DarkOps" },
       {
@@ -47,6 +47,7 @@ function FraudQueue() {
   const navigate = useNavigate();
   const [decision, setDecision] = useState("all");
   const [band, setBand] = useState("all");
+  const [sortBy, setSortBy] = useState("confidence_desc");
   const [query, setQuery] = useState("");
 
   const { data, isLoading, error } = useFraudCases();
@@ -70,8 +71,14 @@ function FraudQueue() {
         }
         return true;
       })
-      .sort((a, b) => b.confidence - a.confidence);
-  }, [data, decision, band, query]);
+      .sort((a, b) => {
+        if (sortBy === "confidence_desc") return b.confidence - a.confidence;
+        if (sortBy === "confidence_asc") return a.confidence - b.confidence;
+        if (sortBy === "refund_desc") return b.refundAmount - a.refundAmount;
+        if (sortBy === "customer_asc") return a.customerName.localeCompare(b.customerName);
+        return b.confidence - a.confidence;
+      });
+  }, [data, decision, band, query, sortBy]);
 
   if (isLoading) return <div className="p-8">Loading fraud queue...</div>;
   if (error || !data) return <div className="p-8 text-crit">Failed to load fraud queue.</div>;
@@ -100,9 +107,9 @@ function FraudQueue() {
           footnote="in pending queue"
         />
         <KpiCard
-          label="Avg confidence"
+          label="Avg risk score"
           value={`${kpis.avgConfidence}%`}
-          footnote="classifier score"
+          footnote="heuristic score"
         />
         <KpiCard
           label="Repeat offenders"
@@ -114,8 +121,8 @@ function FraudQueue() {
 
       <Panel className="mt-3">
         <PanelHeader
-          title="AI-flagged complaints"
-          subtitle="Sorted by risk confidence. Open a row to see factors, evidence and customer history."
+          title="Flagged complaints"
+          subtitle="Sorted by risk score. Open a row to see factors, evidence and customer history."
           right={<Chip tone="neutral">{rows.length} in queue</Chip>}
         />
 
@@ -154,6 +161,21 @@ function FraudQueue() {
               <SelectItem value="low">Below 70%</SelectItem>
             </SelectContent>
           </Select>
+
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-[11px] font-medium text-muted-foreground">Sort by:</span>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-8 w-52 text-xs bg-surface-2 border-border">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="confidence_desc">Risk Confidence: Highest First</SelectItem>
+                <SelectItem value="confidence_asc">Risk Confidence: Lowest First</SelectItem>
+                <SelectItem value="refund_desc">Refund Amount: Highest First</SelectItem>
+                <SelectItem value="customer_asc">Customer Name: A → Z</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {rows.length === 0 ? (

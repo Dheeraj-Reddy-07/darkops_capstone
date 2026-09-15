@@ -1,11 +1,11 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: 'com.darkops.app',
-  appName: 'DarkOps',
-  webDir: 'dist',
+  appId: "com.darkops.app",
+  appName: "DarkOps",
+  webDir: "dist",
   server: {
-    androidScheme: 'https',
+    androidScheme: "https",
     cleartext: true,
   },
 };

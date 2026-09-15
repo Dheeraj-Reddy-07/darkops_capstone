@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Settings, Shield, Users, FileText, Store } from "lucide-react";
+import { LogOut, Settings, Shield, Users, FileText, Store, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,11 +17,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const ADMIN_NAV = [
-  { label: "Overview", to: "/admin", icon: Shield },
+  { label: "Overview", to: "/admin", icon: LayoutDashboard },
   { label: "Security Center", to: "/admin/security", icon: Shield },
   { label: "Users", to: "/admin/users", icon: Users },
-  { label: "Stores", to: "/dark-stores", icon: Store },
+  { label: "Stores", to: "/admin/stores", icon: Store },
   { label: "Audit Logs", to: "/admin/audit-logs", icon: FileText },
+  { label: "Settings", to: "/settings", icon: Settings },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -46,6 +49,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
+    queryClient.clear();
     navigate({ to: "/login" });
   };
 
@@ -96,6 +100,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
