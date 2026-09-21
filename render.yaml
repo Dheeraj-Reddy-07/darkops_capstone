@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: darkops-api
+    runtime: node
+    buildCommand: npm ci && npm run build:server
+    startCommand: node dist-server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Set these in the Render dashboard (keep secrets out of Git):
+      # - SUPABASE_SERVICE_ROLE_KEY
+      # - VITE_SUPABASE_URL
+      # - ALLOWED_ORIGINS  (your Netlify URL)

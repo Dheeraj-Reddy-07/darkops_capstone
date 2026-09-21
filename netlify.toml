@@ -1,0 +1,10 @@
+[build]
+  command   = "npm run build:client"
+  publish   = "dist"
+
+# Required for TanStack Router client-side routing
+# Without this, any page refresh on a non-root route returns 404
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
