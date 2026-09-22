@@ -2157,6 +2157,10 @@ function createMockServiceRoleClient() {
           return { data: { user: null }, error: null };
         },
       },
+      async getUser(token?: string) {
+        if (!token) return { data: { user: null }, error: new Error("Auth session missing") };
+        return { data: { user: { id: "mock-user", email: "mock@darkops.com" } }, error: null };
+      },
     },
   } as any;
 }
