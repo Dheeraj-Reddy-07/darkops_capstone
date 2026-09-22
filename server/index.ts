@@ -41,7 +41,16 @@ const allowedOrigins = (
   process.env.ALLOWED_ORIGINS ||
   process.env.VITE_FRONTEND_URL ||
   "http://localhost:5173,http://localhost:5174"
-).split(",");
+)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Always allow the production Netlify frontend
+const PRODUCTION_ORIGINS = ["https://darkops.netlify.app"];
+PRODUCTION_ORIGINS.forEach((o) => {
+  if (!allowedOrigins.includes(o)) allowedOrigins.push(o);
+});
 
 app.use(
   cors({
