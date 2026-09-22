@@ -325,11 +325,11 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     );
 
     next();
-  } catch (error) {
+  } catch (error: any) {
     // Don't expose internal error details to client
     if (!(error instanceof HTTPError)) {
       console.error("[AUTH_ERROR] Unexpected error:", error);
-      next(new HTTPError(500, "INTERNAL_ERROR", "Authentication failed."));
+      next(new HTTPError(500, "INTERNAL_ERROR", `Authentication failed: ${error?.message || String(error)}`));
     } else {
       next(error);
     }

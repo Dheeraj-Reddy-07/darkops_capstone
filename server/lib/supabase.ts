@@ -16,7 +16,7 @@ export function createSupabaseServerClient(req: Request, res: Response) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          res.appendHeader("Set-Cookie", serializeCookieHeader(name, value, options));
+          res.append("Set-Cookie", serializeCookieHeader(name, value, options));
         });
       },
     },
