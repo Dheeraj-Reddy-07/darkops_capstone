@@ -52,19 +52,25 @@ describe("NLP Classification Service", () => {
   it("I. Ambiguous", () => {
     // A single weak/generic signal (wrong) creates low confidence due to lack of strong specifics
     const result = analyzeComplaint("Issue", "Something is wrong with my order");
-    expect(result.confidence).toBeLessThanOrEqual(60); 
+    expect(result.confidence).toBeLessThanOrEqual(60);
   });
 
   it("J. Mixed evidence (Conflict penalty)", () => {
-    const result = analyzeComplaint("Messed up order", "The milk is missing and the replacement was also wrong");
+    const result = analyzeComplaint(
+      "Messed up order",
+      "The milk is missing and the replacement was also wrong",
+    );
     // "missing" (3) vs "wrong" (3) + "replacement" (2)
     // There is a tight margin here, which should trigger a penalty.
-    expect(result.confidence).toBeLessThan(100); 
+    expect(result.confidence).toBeLessThan(100);
     // It shouldn't be a perfect 100 because of the competing 'missing_item' signal vs 'wrong_item' signal
   });
-  
+
   it("K. Highly negative sentiment", () => {
-    const result = analyzeComplaint("Terrible service", "I am furious, this is the worst experience ever. Never again!");
+    const result = analyzeComplaint(
+      "Terrible service",
+      "I am furious, this is the worst experience ever. Never again!",
+    );
     expect(result.sentiment).toBe("highly_negative");
   });
 });

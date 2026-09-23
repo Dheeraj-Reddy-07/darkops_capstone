@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getCustomerProfile,
   getCustomerOrders,
   getCustomerComplaints,
   getCustomerOrderById,
@@ -8,7 +9,7 @@ import {
   requestHumanSupport,
   getUploadUrl,
 } from "../controllers/customers.controller";
-import { handleCustomerChat } from "../controllers/chatbot.controller";
+import { handleCustomerChat, handleChatbotFeedback } from "../controllers/chatbot.controller";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { validateBody, validateQuery } from "../middleware/validation";
 import { rateLimit } from "../middleware/rateLimit";
@@ -25,6 +26,12 @@ const router = Router();
 router.use(requireAuth);
 
 // Customer-specific routes - the controller handles customer resolution
+router.get(
+  "/me/profile",
+  rateLimit(50, 60000),
+  requirePermission("customers.read.own"),
+  getCustomerProfile,
+);
 router.get(
   "/me/orders",
   rateLimit(50, 60000),
@@ -76,6 +83,12 @@ router.post(
   requirePermission("customers.read.own"),
   validateBody(ChatbotMessagesSchema),
   handleCustomerChat,
+);
+router.post(
+  "/me/chat/feedback",
+  rateLimit(30, 60000),
+  requirePermission("customers.read.own"),
+  handleChatbotFeedback,
 );
 
 export default router;

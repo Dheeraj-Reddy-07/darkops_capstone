@@ -12,10 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OperationsRouteImport } from './routes/operations'
+import { Route as ReportIssueRouteImport } from './routes/report-issue'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAuditLogsRouteImport } from './routes/admin.audit-logs'
 import { Route as AdminSecurityRouteImport } from './routes/admin.security'
+import { Route as AdminStoresRouteImport } from './routes/admin.stores'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as CasesIdRouteImport } from './routes/cases.$id'
 import { Route as CustomerIndexRouteImport } from './routes/customer.index'
@@ -26,7 +28,9 @@ import { Route as DarkStoresIndexRouteImport } from './routes/dark-stores.index'
 import { Route as ExecutiveIndexRouteImport } from './routes/executive.index'
 import { Route as FraudIndexRouteImport } from './routes/fraud.index'
 import { Route as FraudIdRouteImport } from './routes/fraud.$id'
+import { Route as SimulatedUpstreamOrderConfirmationRouteImport } from './routes/simulated-upstream.order-confirmation'
 import { Route as SupportIndexRouteImport } from './routes/support.index'
+import { Route as SupportPerformanceRouteImport } from './routes/support.performance'
 import { Route as AdminSecurityEventsRouteImport } from './routes/admin.security.events'
 import { Route as AdminSecurityUserActivityRouteImport } from './routes/admin.security.user-activity'
 import { Route as CustomerComplaintsIndexRouteImport } from './routes/customer.complaints.index'
@@ -52,6 +56,11 @@ const OperationsRoute = OperationsRouteImport.update({
   path: '/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportIssueRoute = ReportIssueRouteImport.update({
+  id: '/report-issue',
+  path: '/report-issue',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -70,6 +79,11 @@ const AdminAuditLogsRoute = AdminAuditLogsRouteImport.update({
 const AdminSecurityRoute = AdminSecurityRouteImport.update({
   id: '/admin/security',
   path: '/admin/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminStoresRoute = AdminStoresRouteImport.update({
+  id: '/admin/stores',
+  path: '/admin/stores',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
@@ -122,9 +136,20 @@ const FraudIdRoute = FraudIdRouteImport.update({
   path: '/fraud/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SimulatedUpstreamOrderConfirmationRoute =
+  SimulatedUpstreamOrderConfirmationRouteImport.update({
+    id: '/simulated-upstream/order-confirmation',
+    path: '/simulated-upstream/order-confirmation',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SupportIndexRoute = SupportIndexRouteImport.update({
   id: '/support/',
   path: '/support/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportPerformanceRoute = SupportPerformanceRouteImport.update({
+  id: '/support/performance',
+  path: '/support/performance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminSecurityEventsRoute = AdminSecurityEventsRouteImport.update({
@@ -178,15 +203,19 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/operations': typeof OperationsRoute
+  '/report-issue': typeof ReportIssueRoute
   '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/security': typeof AdminSecurityRouteWithChildren
+  '/admin/stores': typeof AdminStoresRoute
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
   '/customer/chat': typeof CustomerChatRoute
   '/customer/profile': typeof CustomerProfileRoute
   '/customer/support': typeof CustomerSupportRoute
   '/fraud/$id': typeof FraudIdRoute
+  '/simulated-upstream/order-confirmation': typeof SimulatedUpstreamOrderConfirmationRoute
+  '/support/performance': typeof SupportPerformanceRoute
   '/admin/': typeof AdminIndexRoute
   '/customer/': typeof CustomerIndexRoute
   '/dark-stores/': typeof DarkStoresIndexRoute
@@ -207,15 +236,19 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/operations': typeof OperationsRoute
+  '/report-issue': typeof ReportIssueRoute
   '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/security': typeof AdminSecurityRouteWithChildren
+  '/admin/stores': typeof AdminStoresRoute
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
   '/customer/chat': typeof CustomerChatRoute
   '/customer/profile': typeof CustomerProfileRoute
   '/customer/support': typeof CustomerSupportRoute
   '/fraud/$id': typeof FraudIdRoute
+  '/simulated-upstream/order-confirmation': typeof SimulatedUpstreamOrderConfirmationRoute
+  '/support/performance': typeof SupportPerformanceRoute
   '/admin': typeof AdminIndexRoute
   '/customer': typeof CustomerIndexRoute
   '/dark-stores': typeof DarkStoresIndexRoute
@@ -237,15 +270,19 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/operations': typeof OperationsRoute
+  '/report-issue': typeof ReportIssueRoute
   '/settings': typeof SettingsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/security': typeof AdminSecurityRouteWithChildren
+  '/admin/stores': typeof AdminStoresRoute
   '/admin/users': typeof AdminUsersRoute
   '/cases/$id': typeof CasesIdRoute
   '/customer/chat': typeof CustomerChatRoute
   '/customer/profile': typeof CustomerProfileRoute
   '/customer/support': typeof CustomerSupportRoute
   '/fraud/$id': typeof FraudIdRoute
+  '/simulated-upstream/order-confirmation': typeof SimulatedUpstreamOrderConfirmationRoute
+  '/support/performance': typeof SupportPerformanceRoute
   '/admin/': typeof AdminIndexRoute
   '/customer/': typeof CustomerIndexRoute
   '/dark-stores/': typeof DarkStoresIndexRoute
@@ -268,15 +305,19 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/operations'
+    | '/report-issue'
     | '/settings'
     | '/admin/audit-logs'
     | '/admin/security'
+    | '/admin/stores'
     | '/admin/users'
     | '/cases/$id'
     | '/customer/chat'
     | '/customer/profile'
     | '/customer/support'
     | '/fraud/$id'
+    | '/simulated-upstream/order-confirmation'
+    | '/support/performance'
     | '/admin/'
     | '/customer/'
     | '/dark-stores/'
@@ -297,15 +338,19 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/operations'
+    | '/report-issue'
     | '/settings'
     | '/admin/audit-logs'
     | '/admin/security'
+    | '/admin/stores'
     | '/admin/users'
     | '/cases/$id'
     | '/customer/chat'
     | '/customer/profile'
     | '/customer/support'
     | '/fraud/$id'
+    | '/simulated-upstream/order-confirmation'
+    | '/support/performance'
     | '/admin'
     | '/customer'
     | '/dark-stores'
@@ -326,15 +371,19 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/operations'
+    | '/report-issue'
     | '/settings'
     | '/admin/audit-logs'
     | '/admin/security'
+    | '/admin/stores'
     | '/admin/users'
     | '/cases/$id'
     | '/customer/chat'
     | '/customer/profile'
     | '/customer/support'
     | '/fraud/$id'
+    | '/simulated-upstream/order-confirmation'
+    | '/support/performance'
     | '/admin/'
     | '/customer/'
     | '/dark-stores/'
@@ -356,15 +405,19 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   OperationsRoute: typeof OperationsRoute
+  ReportIssueRoute: typeof ReportIssueRoute
   SettingsRoute: typeof SettingsRoute
   AdminAuditLogsRoute: typeof AdminAuditLogsRoute
   AdminSecurityRoute: typeof AdminSecurityRouteWithChildren
+  AdminStoresRoute: typeof AdminStoresRoute
   AdminUsersRoute: typeof AdminUsersRoute
   CasesIdRoute: typeof CasesIdRoute
   CustomerChatRoute: typeof CustomerChatRoute
   CustomerProfileRoute: typeof CustomerProfileRoute
   CustomerSupportRoute: typeof CustomerSupportRoute
   FraudIdRoute: typeof FraudIdRoute
+  SimulatedUpstreamOrderConfirmationRoute: typeof SimulatedUpstreamOrderConfirmationRoute
+  SupportPerformanceRoute: typeof SupportPerformanceRoute
   AdminIndexRoute: typeof AdminIndexRoute
   CustomerIndexRoute: typeof CustomerIndexRoute
   DarkStoresIndexRoute: typeof DarkStoresIndexRoute
@@ -403,6 +456,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/report-issue': {
+      id: '/report-issue'
+      path: '/report-issue'
+      fullPath: '/report-issue'
+      preLoaderRoute: typeof ReportIssueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -429,6 +489,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/security'
       fullPath: '/admin/security'
       preLoaderRoute: typeof AdminSecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/stores': {
+      id: '/admin/stores'
+      path: '/admin/stores'
+      fullPath: '/admin/stores'
+      preLoaderRoute: typeof AdminStoresRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/users': {
@@ -501,11 +568,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FraudIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/simulated-upstream/order-confirmation': {
+      id: '/simulated-upstream/order-confirmation'
+      path: '/simulated-upstream/order-confirmation'
+      fullPath: '/simulated-upstream/order-confirmation'
+      preLoaderRoute: typeof SimulatedUpstreamOrderConfirmationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support/': {
       id: '/support/'
       path: '/support'
       fullPath: '/support/'
       preLoaderRoute: typeof SupportIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support/performance': {
+      id: '/support/performance'
+      path: '/support/performance'
+      fullPath: '/support/performance'
+      preLoaderRoute: typeof SupportPerformanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/security/events': {
@@ -592,15 +673,20 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   OperationsRoute: OperationsRoute,
+  ReportIssueRoute: ReportIssueRoute,
   SettingsRoute: SettingsRoute,
   AdminAuditLogsRoute: AdminAuditLogsRoute,
   AdminSecurityRoute: AdminSecurityRouteWithChildren,
+  AdminStoresRoute: AdminStoresRoute,
   AdminUsersRoute: AdminUsersRoute,
   CasesIdRoute: CasesIdRoute,
   CustomerChatRoute: CustomerChatRoute,
   CustomerProfileRoute: CustomerProfileRoute,
   CustomerSupportRoute: CustomerSupportRoute,
   FraudIdRoute: FraudIdRoute,
+  SimulatedUpstreamOrderConfirmationRoute:
+    SimulatedUpstreamOrderConfirmationRoute,
+  SupportPerformanceRoute: SupportPerformanceRoute,
   AdminIndexRoute: AdminIndexRoute,
   CustomerIndexRoute: CustomerIndexRoute,
   DarkStoresIndexRoute: DarkStoresIndexRoute,

@@ -17,7 +17,10 @@ async function runTests() {
   }
 
   // Fetch existing orders to act as our test bases
-  const { data: orders } = await adminClient.from("orders").select("id, customer_id, store_id").limit(2);
+  const { data: orders } = await adminClient
+    .from("orders")
+    .select("id, customer_id, store_id")
+    .limit(2);
   const lowOrder = orders?.[0]?.id;
   const highOrder = orders?.[1]?.id;
   const cleanCustomerId = orders?.[0]?.customer_id;
@@ -47,7 +50,7 @@ async function runTests() {
       category: "damaged_item",
       summary: "Damaged item",
       detail: "The bottle arrived completely broken and leaking everywhere",
-      expectedRoute: "auto_approved"
+      expectedRoute: "auto_approved",
     },
     {
       name: "2. Clean customer + low-value order + low-confidence/ambiguous complaint (EXPECTED: agent queue)",
@@ -56,7 +59,7 @@ async function runTests() {
       category: "damaged_item",
       summary: "Damaged item",
       detail: "Something is wrong with my order",
-      expectedRoute: "agent_queue"
+      expectedRoute: "agent_queue",
     },
     {
       name: "3. Customer with prior claims + valid complaint (EXPECTED: agent queue)",
@@ -65,7 +68,7 @@ async function runTests() {
       category: "damaged_item",
       summary: "Damaged item",
       detail: "The bottle arrived completely broken and leaking everywhere",
-      expectedRoute: "agent_queue"
+      expectedRoute: "agent_queue",
     },
     {
       name: "4. High-value order + valid complaint (EXPECTED: agent queue)",
@@ -74,14 +77,14 @@ async function runTests() {
       category: "damaged_item",
       summary: "Damaged item",
       detail: "The bottle arrived completely broken and leaking everywhere",
-      expectedRoute: "agent_queue"
-    }
+      expectedRoute: "agent_queue",
+    },
   ];
 
   let passed = 0;
   for (const t of tests) {
     const compId = `CMP-TEST-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
+
     // Insert ticket first to simulate controller
     const ticketUUID = `TKT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     await adminClient.from("support_tickets").insert({
@@ -103,14 +106,14 @@ async function runTests() {
       category: t.category,
       summary: t.summary,
       detail: t.detail,
-      type: "refund", 
+      type: "refund",
       status: "unassigned",
       priority: "P3",
-      order_value_paise: 10000
+      order_value_paise: 10000,
     });
     if (insertErr) {
-        console.error("Failed to insert complaint:", insertErr);
-        continue;
+      console.error("Failed to insert complaint:", insertErr);
+      continue;
     }
 
     const res = await processComplaint(compId);

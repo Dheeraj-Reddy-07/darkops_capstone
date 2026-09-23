@@ -47,7 +47,12 @@ export function useStores(enabled: boolean = true) {
       const response = await fetchApi("/stores?limit=200");
 
       const stores: DarkStore[] = response.data.map((row: any) => {
-        const pulse = row.pulse || 0;
+        const pulse =
+          typeof row.pulse === "number"
+            ? row.pulse
+            : typeof row.pulse_scores?.score === "number"
+              ? row.pulse_scores.score
+              : 80;
         const pulseData = row.pulse_scores || {};
 
         const breakdown: PulseBreakdown = {

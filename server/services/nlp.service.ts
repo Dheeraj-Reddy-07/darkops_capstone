@@ -193,14 +193,17 @@ function normalizeText(text: string): string {
  * Scans text against a dictionary of weighted keywords.
  * Uses word boundaries to avoid partial matches (e.g., "late" matching "plate").
  */
-function scoreDictionary(text: string, dictionary: Record<string, WeightedKeyword[]>): Record<string, number> {
+function scoreDictionary(
+  text: string,
+  dictionary: Record<string, WeightedKeyword[]>,
+): Record<string, number> {
   const scores: Record<string, number> = {};
-  
+
   for (const [key, keywords] of Object.entries(dictionary)) {
     scores[key] = 0;
     for (const kw of keywords) {
       // Create a regex for whole word or phrase matching
-      const regex = new RegExp(`\\b${kw.word}\\b`, 'g');
+      const regex = new RegExp(`\\b${kw.word}\\b`, "g");
       const matches = text.match(regex);
       if (matches) {
         // Add weight for each occurrence
@@ -217,10 +220,11 @@ export function analyzeComplaint(summary: string, detail: string): NLPAnalysis {
 
   // 1. CLASSIFICATION & CONFIDENCE
   const categoryScores = scoreDictionary(text, CATEGORY_SIGNALS);
-  
+
   // Sort categories by score descending
-  const sortedCategories = Object.entries(categoryScores)
-    .sort(([, scoreA], [, scoreB]) => scoreB - scoreA);
+  const sortedCategories = Object.entries(categoryScores).sort(
+    ([, scoreA], [, scoreB]) => scoreB - scoreA,
+  );
 
   const [topCategory, topScore] = sortedCategories[0];
   const [, runnerUpScore] = sortedCategories[1];
@@ -234,15 +238,15 @@ export function analyzeComplaint(summary: string, detail: string): NLPAnalysis {
     confidence = 10; // Very low confidence, forces agent review
   } else {
     category = topCategory;
-    
+
     // Calculate base confidence from signal strength (e.g., score 3 = 60%, score 6 = 100%)
     let baseConfidence = Math.min(100, topScore * 20);
-    
+
     // Penalize if there are competing signals (margin of victory logic)
     // E.g., Top = 6 (wrong item), RunnerUp = 3 (missing item) -> Margin = 3
     // If margin is small, confidence drops due to mixed evidence.
     const margin = topScore - runnerUpScore;
-    
+
     if (runnerUpScore > 0) {
       if (margin === 0) {
         // Tied evidence: highly ambiguous classification
@@ -266,27 +270,31 @@ export function analyzeComplaint(summary: string, detail: string): NLPAnalysis {
     type = "refund";
   } else if (typeScores.reorder > typeScores.refund && typeScores.reorder > 0) {
     type = "reorder";
-  } else if (category === "damaged_item" || category === "quality_issue" || category === "payment_issue") {
+  } else if (
+    category === "damaged_item" ||
+    category === "quality_issue" ||
+    category === "payment_issue"
+  ) {
     // Fallback logic based on category severity
     type = "refund";
   }
 
   // 3. URGENCY
   let urgencyScore = 50; // Neutral baseline
-  
+
   // Apply explicit escalators and mitigators
   for (const kw of URGENCY_SIGNALS.escalators) {
-    if (text.match(new RegExp(`\\b${kw.word}\\b`, 'g'))) urgencyScore += kw.weight;
+    if (text.match(new RegExp(`\\b${kw.word}\\b`, "g"))) urgencyScore += kw.weight;
   }
   for (const kw of URGENCY_SIGNALS.mitigators) {
-    if (text.match(new RegExp(`\\b${kw.word}\\b`, 'g'))) urgencyScore += kw.weight;
+    if (text.match(new RegExp(`\\b${kw.word}\\b`, "g"))) urgencyScore += kw.weight;
   }
 
   // Contextual baseline adjustments based on resolved category
   if (category === "payment_issue") urgencyScore += 15; // Payment issues cause high anxiety
-  if (category === "late_delivery") urgencyScore += 10; 
+  if (category === "late_delivery") urgencyScore += 10;
   if (category === "quality_issue") urgencyScore += 10; // Potential health risk
-  
+
   urgencyScore = Math.max(0, Math.min(100, urgencyScore));
 
   // 4. SENTIMENT
@@ -295,17 +303,17 @@ export function analyzeComplaint(summary: string, detail: string): NLPAnalysis {
   let highlyNegativeScore = 0;
 
   for (const kw of SENTIMENT_SIGNALS.positive) {
-    if (text.match(new RegExp(`\\b${kw.word}\\b`, 'g'))) positiveScore += kw.weight;
+    if (text.match(new RegExp(`\\b${kw.word}\\b`, "g"))) positiveScore += kw.weight;
   }
   for (const kw of SENTIMENT_SIGNALS.negative) {
-    if (text.match(new RegExp(`\\b${kw.word}\\b`, 'g'))) negativeScore += kw.weight;
+    if (text.match(new RegExp(`\\b${kw.word}\\b`, "g"))) negativeScore += kw.weight;
   }
   for (const kw of SENTIMENT_SIGNALS.highly_negative) {
-    if (text.match(new RegExp(`\\b${kw.word}\\b`, 'g'))) highlyNegativeScore += kw.weight;
+    if (text.match(new RegExp(`\\b${kw.word}\\b`, "g"))) highlyNegativeScore += kw.weight;
   }
 
   let sentiment: "positive" | "neutral" | "negative" | "highly_negative" = "neutral";
-  
+
   if (highlyNegativeScore > 0 && highlyNegativeScore >= positiveScore) {
     sentiment = "highly_negative";
   } else if (negativeScore > positiveScore) {
@@ -344,7 +352,7 @@ export function validateRefund(
     return {
       can_auto_approve: false,
       reason: "High-value refund requires manual review",
-      max_refund_amount: 50000, 
+      max_refund_amount: 50000,
     };
   }
 

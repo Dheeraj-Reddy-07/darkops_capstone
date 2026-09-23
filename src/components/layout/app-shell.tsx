@@ -1,6 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, LogOut, User, Settings, X } from "lucide-react";
+import {
+  Bell,
+  LogOut,
+  User,
+  Settings,
+  X,
+  LayoutDashboard,
+  Layers,
+  Store,
+  ShieldAlert,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
@@ -20,9 +30,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ExecutiveSettingsForm } from "@/components/settings/executive-settings-form";
+import { RoleSettingsForm } from "@/components/settings/role-settings-form";
+import { getSettingsConfig } from "@/lib/settings-config";
 
-const NAV_BY_ROLE: Record<string, Array<{ label: string; to: string; match?: string; exact?: boolean }>> = {
+const NAV_BY_ROLE: Record<
+  string,
+  Array<{ label: string; to: string; match?: string; exact?: boolean }>
+> = {
   PLATFORM_ADMIN: [
     { label: "Overview", to: "/admin", exact: true },
     { label: "Users", to: "/admin/users" },
@@ -115,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     "CUSTOMER_SUPPORT",
     "FRAUD_ANALYST",
   ].includes(userRole || "");
-const handleLogout = async () => {
+  const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
     // Clear React Query cache to prevent stale data after logout
@@ -232,6 +246,13 @@ const handleLogout = async () => {
                               to: "/support/tickets/$id",
                               params: { id: notification.link_ref },
                             });
+                          } else if (notification.link_type === "store") {
+                            navigate({
+                              to: "/dark-stores/$id",
+                              params: { id: notification.link_ref },
+                            });
+                          } else if (notification.link_type === "fraud") {
+                            navigate({ to: "/fraud/$id", params: { id: notification.link_ref } });
                           }
                         }}
                       >
@@ -251,9 +272,6 @@ const handleLogout = async () => {
                             {notification.title}
                           </span>
                         </div>
-                        <span className="text-[11px] text-muted-foreground ml-4 line-clamp-2">
-                          {notification.meta}
-                        </span>
                       </DropdownMenuItem>
                     ))}
                   </div>
@@ -299,7 +317,54 @@ const handleLogout = async () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-5 py-5">{children}</main>
+      <main className="mx-auto max-w-[1600px] px-5 py-5 pb-20 md:pb-5">{children}</main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur md:hidden pb-[env(safe-area-inset-bottom)] shadow-lg">
+        <div className="flex h-14 items-center justify-around px-2">
+          {navItems.map((item) => {
+            const l = item.label.toLowerCase();
+            const Icon =
+              l.includes("exec") || l.includes("overview")
+                ? LayoutDashboard
+                : l.includes("oper") || l.includes("case")
+                  ? Layers
+                  : l.includes("store")
+                    ? Store
+                    : l.includes("fraud") || l.includes("audit")
+                      ? ShieldAlert
+                      : LayoutDashboard;
+
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 px-2 py-1 text-[10px] transition-colors",
+                  isActive(item)
+                    ? "font-semibold text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "size-4",
+                    isActive(item) ? "text-primary" : "text-muted-foreground",
+                  )}
+                />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <button
+            onClick={handleSettingsOpen}
+            className="flex flex-col items-center justify-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Settings className="size-4" />
+            <span>Settings</span>
+          </button>
+        </div>
+      </nav>
 
       {/* Settings Modal */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -307,11 +372,17 @@ const handleLogout = async () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="size-4 text-primary" />
-              Executive Settings
+              {userRole
+                ? getSettingsConfig(userRole as any, {
+                    isLead:
+                      userProfile?.email === "support@darkops.com" ||
+                      userProfile?.id === "usr-supp-001",
+                  }).title
+                : "Settings"}
             </DialogTitle>
           </DialogHeader>
           <div className="py-2">
-            <ExecutiveSettingsForm
+            <RoleSettingsForm
               isModal
               onSaved={() => setSettingsOpen(false)}
               onCancel={() => setSettingsOpen(false)}

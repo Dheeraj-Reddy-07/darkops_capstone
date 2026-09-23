@@ -61,52 +61,83 @@ export class ExecutiveAssistantService {
     context?: any,
     dashboardContext?: { timeFilter?: string },
   ): Promise<AssistantResponse> {
-    const parsed = this.parseQuestion(question, context, dashboardContext);
+    try {
+      const parsed = this.parseQuestion(question, context, dashboardContext);
 
-    switch (parsed.intent) {
-      case "NETWORK_SUMMARY":
-        return this.getNetworkSummary(parsed);
-      case "PULSE_OVERVIEW":
-        return this.getPulseOverview(parsed);
-      case "CRITICAL_BOTTLENECKS":
-        return this.getCriticalBottlenecks(parsed);
-      case "EXECUTIVE_METRICS":
-        return this.getExecutiveMetrics(parsed);
-      case "COMPLAINT_TRENDS":
-        return this.getComplaintTrends(parsed);
-      case "COMPLAINT_CATEGORIES":
-        return this.getComplaintCategories(parsed);
-      case "STORE_PERFORMANCE":
-        return this.getStorePerformance(parsed);
-      case "STORE_DETAIL":
-        return this.getStoreDetail(parsed);
-      case "STORE_ROOT_CAUSE":
-        return this.getStoreRootCause(parsed);
-      case "STORE_COMPARISON":
-        return this.getStoreComparison(parsed);
-      case "STORE_RECOMMENDATION":
-        return this.getStoreRecommendation(parsed);
-      case "CITY_PERFORMANCE":
-        return this.getCityPerformance(parsed);
-      case "CITY_COMPARISON":
-        return this.getCityComparison(parsed);
-      case "SLA_PERFORMANCE":
-        return this.getSlaPerformance(parsed);
-      case "AUTOMATION_PERFORMANCE":
-        return this.getAutomationPerformance(parsed);
-      case "RISK_SUMMARY":
-        return this.getRiskSummary(parsed);
-      case "ANOMALIES_ALERTS":
-        return this.getAnomaliesAndAlerts(parsed);
-      case "PERIOD_COMPARISON":
-        return this.getPeriodComparison(parsed);
-      case "GENERAL_DARKOPS_KNOWLEDGE":
-        return this.getDarkOpsKnowledge(question);
-      case "HELP":
-        return this.getHelpResponse();
-      default:
-        return this.getUnsupportedResponse();
+      switch (parsed.intent) {
+        case "GREETING":
+          return this.getGreetingResponse();
+        case "HOW_ARE_YOU":
+          return this.getHowAreYouResponse();
+        case "THANKS":
+          return this.getThanksResponse();
+        case "ACKNOWLEDGEMENT":
+          return this.getAcknowledgementResponse();
+        case "GOODBYE":
+          return this.getGoodbyeResponse();
+        case "NETWORK_SUMMARY":
+          return await this.getNetworkSummary(parsed);
+        case "PULSE_OVERVIEW":
+          return await this.getPulseOverview(parsed);
+        case "CRITICAL_BOTTLENECKS":
+          return await this.getCriticalBottlenecks(parsed);
+        case "EXECUTIVE_METRICS":
+          return await this.getExecutiveMetrics(parsed);
+        case "COMPLAINT_TRENDS":
+          return await this.getComplaintTrends(parsed);
+        case "COMPLAINT_CATEGORIES":
+          return await this.getComplaintCategories(parsed);
+        case "STORE_PERFORMANCE":
+          return await this.getStorePerformance(parsed);
+        case "STORE_DETAIL":
+          return await this.getStoreDetail(parsed);
+        case "STORE_ROOT_CAUSE":
+          return await this.getStoreRootCause(parsed);
+        case "STORE_COMPARISON":
+          return await this.getStoreComparison(parsed);
+        case "STORE_RECOMMENDATION":
+          return await this.getStoreRecommendation(parsed);
+        case "CITY_PERFORMANCE":
+          return await this.getCityPerformance(parsed);
+        case "CITY_COMPARISON":
+          return await this.getCityComparison(parsed);
+        case "SLA_PERFORMANCE":
+          return await this.getSlaPerformance(parsed);
+        case "AUTOMATION_PERFORMANCE":
+          return await this.getAutomationPerformance(parsed);
+        case "RISK_SUMMARY":
+          return await this.getRiskSummary(parsed);
+        case "ANOMALIES_ALERTS":
+          return await this.getAnomaliesAndAlerts(parsed);
+        case "PERIOD_COMPARISON":
+          return await this.getPeriodComparison(parsed);
+        case "GENERAL_DARKOPS_KNOWLEDGE":
+          return this.getDarkOpsKnowledge(question);
+        case "HELP":
+          return this.getHelpResponse();
+        default:
+          return this.getUnsupportedResponse();
+      }
+    } catch (error) {
+      console.error("[ExecutiveAssistantService] Query processing error:", error);
+      return this.getFallbackErrorResponse();
     }
+  }
+
+  private getFallbackErrorResponse(): AssistantResponse {
+    return {
+      intent: "ERROR_FALLBACK",
+      answer:
+        "I couldn't retrieve the operational data right now. Please try asking about network status, PulseScore, or complaints.",
+      summary: "Operational telemetry temporarily unavailable.",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [
+        "What is happening across the network?",
+        "What is our pulse score?",
+        "Which stores have the most complaints?",
+      ],
+    };
   }
 
   /**
@@ -127,21 +158,89 @@ export class ExecutiveAssistantService {
     context?: any,
     dashboardContext?: { timeFilter?: string },
   ): ParsedQuery {
-    const q = question.toLowerCase().trim();
-    const tokens = this.tokenize(q);
+    const rawLower = question.toLowerCase().trim();
+    const qClean = rawLower
+      .replace(/[?!.,;:]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    // 1. Explicit out of scope check
-    if (this.isOutOfScope(q)) {
+    // 1. Conversational intents (checked BEFORE preamble stripping)
+    if (this.isGreeting(qClean)) {
+      return {
+        intent: "GREETING",
+        timeRange: this.getTimeRange(qClean, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.99,
+      };
+    }
+
+    if (this.isHowAreYou(qClean)) {
+      return {
+        intent: "HOW_ARE_YOU",
+        timeRange: this.getTimeRange(qClean, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.99,
+      };
+    }
+
+    if (this.isThanks(qClean)) {
+      return {
+        intent: "THANKS",
+        timeRange: this.getTimeRange(qClean, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.99,
+      };
+    }
+
+    if (this.isAcknowledgement(qClean)) {
+      return {
+        intent: "ACKNOWLEDGEMENT",
+        timeRange: this.getTimeRange(qClean, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.99,
+      };
+    }
+
+    if (this.isGoodbye(qClean)) {
+      return {
+        intent: "GOODBYE",
+        timeRange: this.getTimeRange(qClean, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.99,
+      };
+    }
+
+    if (this.isHelpOrCapabilities(qClean)) {
+      return {
+        intent: "HELP",
+        timeRange: this.getTimeRange(qClean, dashboardContext),
+        parameters: {},
+        entities: [],
+        confidence: 0.99,
+      };
+    }
+
+    if (this.isExplicitOutOfScope(qClean)) {
       return {
         intent: "UNSUPPORTED",
-        timeRange: this.getTimeRange(q, dashboardContext),
+        timeRange: this.getTimeRange(qClean, dashboardContext),
         parameters: {},
         entities: [],
         confidence: 0,
       };
     }
 
-    // 2. Knowledge queries
+    // 2. Strip conversational preambles (e.g. "Hey, what is our pulse score?")
+    const opQuery = this.stripGreetingPreamble(qClean);
+    const q = opQuery || qClean;
+    const tokens = this.tokenize(q);
+
+    // 3. Knowledge queries
     if (
       q.includes("what is darkops") ||
       q.includes("how does auto-resolution work") ||
@@ -165,34 +264,14 @@ export class ExecutiveAssistantService {
       };
     }
 
-    // 3. Help query
-    if (
-      q === "help" ||
-      q === "what can you do" ||
-      q === "what can you do?" ||
-      q.includes("what questions can i ask") ||
-      q.includes("what are your capabilities") ||
-      q === "?" ||
-      q.includes("how do i use this") ||
-      q.includes("what can i ask")
-    ) {
-      return {
-        intent: "HELP",
-        timeRange: this.getTimeRange(q, dashboardContext),
-        parameters: {},
-        entities: [],
-        confidence: 0.95,
-      };
-    }
-
     // 4. Follow-up detection using conversation context
     if (context) {
       const followUp = this.detectFollowUp(q, tokens, context, dashboardContext);
       if (followUp) return followUp;
     }
 
-    // 5. City-to-city comparison (e.g. "compare mumbai vs delhi")
-    const cityMatch = this.detectCityComparison(q);
+    // 5. City-to-city comparison (e.g. "compare mumbai vs delhi" or "compare it with bengaluru")
+    const cityMatch = this.detectCityComparison(q, context);
     if (cityMatch) {
       return {
         intent: "CITY_COMPARISON",
@@ -206,7 +285,14 @@ export class ExecutiveAssistantService {
     // 6. Direct entity matches (e.g. DS-1462)
     const storeId = this.extractStoreId(q);
     if (storeId) {
-      if (q.includes("why") || q.includes("struggling") || q.includes("problem") || q.includes("drop") || q.includes("root cause") || q.includes("wrong")) {
+      if (
+        q.includes("why") ||
+        q.includes("struggling") ||
+        q.includes("problem") ||
+        q.includes("drop") ||
+        q.includes("root cause") ||
+        q.includes("wrong")
+      ) {
         return {
           intent: "STORE_ROOT_CAUSE",
           timeRange: this.getTimeRange(q, dashboardContext),
@@ -227,7 +313,12 @@ export class ExecutiveAssistantService {
           confidence: 0.95,
         };
       }
-      if (q.includes("fix") || q.includes("investigate") || q.includes("action") || q.includes("recommend")) {
+      if (
+        q.includes("fix") ||
+        q.includes("investigate") ||
+        q.includes("action") ||
+        q.includes("recommend")
+      ) {
         return {
           intent: "STORE_RECOMMENDATION",
           timeRange: this.getTimeRange(q, dashboardContext),
@@ -248,7 +339,11 @@ export class ExecutiveAssistantService {
     // 7. General Period Comparison (e.g. "compare complaints this week with last week")
     if (
       q.includes("compare") &&
-      (q.includes("last week") || q.includes("last month") || q.includes("yesterday") || q.includes("previous period") || q.includes("previous week"))
+      (q.includes("last week") ||
+        q.includes("last month") ||
+        q.includes("yesterday") ||
+        q.includes("previous period") ||
+        q.includes("previous week"))
     ) {
       const timeRange = this.getTimeRange(q, dashboardContext);
       const comparisonRange = this.getComparisonRange(q, timeRange);
@@ -268,7 +363,7 @@ export class ExecutiveAssistantService {
       const city = this.extractCity(q);
       const baseParams: Record<string, any> = {};
       if (city) baseParams.city = city;
-      
+
       // Build intent-specific parameters
       switch (scored.intent) {
         case "SLA_PERFORMANCE":
@@ -719,14 +814,37 @@ export class ExecutiveAssistantService {
    */
   private soundsOperational(q: string): { isOperational: boolean; intent?: string } {
     const coreWords = [
-      "store", "stores", "complaint", "complaints", "sla", "pulse", "fraud",
-      "breach", "refund", "dark store", "dark stores", "picker", "rider",
-      "chiller", "freezer", "ticket", "tickets", "work order", "inventory"
+      "store",
+      "stores",
+      "complaint",
+      "complaints",
+      "sla",
+      "pulse",
+      "fraud",
+      "breach",
+      "refund",
+      "dark store",
+      "dark stores",
+      "picker",
+      "rider",
+      "chiller",
+      "freezer",
+      "ticket",
+      "tickets",
+      "work order",
+      "inventory",
     ];
     const hasCore = coreWords.some((w) => q.includes(w));
     if (!hasCore) return { isOperational: false };
 
-    if (q.includes("wrong") || q.includes("bad") || q.includes("fix") || q.includes("problem") || q.includes("critical") || q.includes("bottleneck")) {
+    if (
+      q.includes("wrong") ||
+      q.includes("bad") ||
+      q.includes("fix") ||
+      q.includes("problem") ||
+      q.includes("critical") ||
+      q.includes("bottleneck")
+    ) {
       return { isOperational: true, intent: "CRITICAL_BOTTLENECKS" };
     }
     if (q.includes("pulse") || q.includes("health")) {
@@ -775,7 +893,11 @@ export class ExecutiveAssistantService {
       q.includes("which stores are driving") ||
       q.includes("which stores are responsible") ||
       (q.includes("which stores") &&
-        (context.lastIntent === "NETWORK_SUMMARY" || context.lastIntent === "CRITICAL_BOTTLENECKS" || context.lastIntent === "PULSE_OVERVIEW" || context.lastIntent === "EXECUTIVE_METRICS" || context.lastIntent === "COMPLAINT_CATEGORIES"))
+        (context.lastIntent === "NETWORK_SUMMARY" ||
+          context.lastIntent === "CRITICAL_BOTTLENECKS" ||
+          context.lastIntent === "PULSE_OVERVIEW" ||
+          context.lastIntent === "EXECUTIVE_METRICS" ||
+          context.lastIntent === "COMPLAINT_CATEGORIES"))
     ) {
       return {
         intent: "STORE_PERFORMANCE",
@@ -787,7 +909,10 @@ export class ExecutiveAssistantService {
     }
 
     // Follow-up: "Why is the first one high?" / "Why is it high?" -> Root cause analysis!
-    if ((isFirstRef || isSecondRef || isItRef || isThereRef) && (q.includes("why") || q.includes("high") || q.includes("struggling"))) {
+    if (
+      (isFirstRef || isSecondRef || isItRef || isThereRef) &&
+      (q.includes("why") || q.includes("high") || q.includes("struggling"))
+    ) {
       if (targetStoreId) {
         return {
           intent: "STORE_ROOT_CAUSE",
@@ -800,7 +925,13 @@ export class ExecutiveAssistantService {
     }
 
     // Follow-up: "Compare it with last week" -> Store comparison!
-    if ((isItRef || isThereRef || q.includes("compare")) && (q.includes("last week") || q.includes("yesterday") || q.includes("vs") || q.includes("last month"))) {
+    if (
+      (isItRef || isThereRef || q.includes("compare")) &&
+      (q.includes("last week") ||
+        q.includes("yesterday") ||
+        q.includes("vs") ||
+        q.includes("last month"))
+    ) {
       if (targetStoreId) {
         const timeRange = this.getTimeRange(q, dashboardContext);
         const compRange = this.getComparisonRange(q, timeRange);
@@ -872,7 +1003,11 @@ export class ExecutiveAssistantService {
       headline = `Executive Operational Briefing (${timeLabel})`;
     } else if (raw.includes("today") || timeLabel.includes("today")) {
       headline = `Today's Real-Time Operations Status`;
-    } else if (raw.includes("how are things") || raw.includes("how are we doing") || raw.includes("how is everything")) {
+    } else if (
+      raw.includes("how are things") ||
+      raw.includes("how are we doing") ||
+      raw.includes("how is everything")
+    ) {
       headline = `Operational Health & Status Report`;
     }
 
@@ -890,17 +1025,38 @@ export class ExecutiveAssistantService {
       answer,
       summary: `Network summary: ${kpis.totalComplaints} complaints, ${kpis.activeCases} active, ${kpis.slaBreached} breached, ${kpis.criticalStores} critical stores.`,
       metrics: [
-        { label: "Active cases", value: `${kpis.activeCases}`, tone: kpis.activeCases > 50 ? "warn" : "ok" },
-        { label: "SLA breached", value: `${kpis.slaBreached}`, tone: kpis.slaBreached > 0 ? "crit" : "ok" },
-        { label: "Network Pulse", value: `${kpis.avgPulse}/100`, tone: kpis.avgPulse < 60 ? "crit" : kpis.avgPulse < 80 ? "warn" : "ok" },
-        { label: "Critical stores", value: `${kpis.criticalStores}`, tone: kpis.criticalStores > 0 ? "crit" : "ok" },
+        {
+          label: "Active cases",
+          value: `${kpis.activeCases}`,
+          tone: kpis.activeCases > 50 ? "warn" : "ok",
+        },
+        {
+          label: "SLA breached",
+          value: `${kpis.slaBreached}`,
+          tone: kpis.slaBreached > 0 ? "crit" : "ok",
+        },
+        {
+          label: "Network Pulse",
+          value: `${kpis.avgPulse}/100`,
+          tone: kpis.avgPulse < 60 ? "crit" : kpis.avgPulse < 80 ? "warn" : "ok",
+        },
+        {
+          label: "Critical stores",
+          value: `${kpis.criticalStores}`,
+          tone: kpis.criticalStores > 0 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Time period", value: parsed.timeRange.label },
         { label: "Total issues", value: `${kpis.totalComplaints}` },
         { label: "Active support cases", value: `${kpis.activeCases}` },
         { label: "SLA breaches", value: `${kpis.slaBreached}` },
-        { label: "Top category", value: kpis.topCategory ? CATEGORY_LABEL_MAP[kpis.topCategory.category] || kpis.topCategory.category : "N/A" },
+        {
+          label: "Top category",
+          value: kpis.topCategory
+            ? CATEGORY_LABEL_MAP[kpis.topCategory.category] || kpis.topCategory.category
+            : "N/A",
+        },
       ],
       suggestedQuestions: [
         "Which stores have the most complaints?",
@@ -930,11 +1086,17 @@ export class ExecutiveAssistantService {
     const worstStores = await this.tools.getStoreRankings("pulse_asc", 3);
 
     const worstList = worstStores
-      .map((s, i) => `${i + 1}. **${s.name}** (\`${s.id}\`, ${s.city}) - Pulse **${s.pulse}/100**, ${s.openComplaints} open complaints`)
+      .map(
+        (s, i) =>
+          `${i + 1}. **${s.name}** (\`${s.id}\`, ${s.city}) - Pulse **${s.pulse}/100**, ${s.openComplaints} open complaints`,
+      )
       .join("\n");
 
     const worstStore = worstStores[0];
-    const synthesis = `**Executive Synthesis:** 73.5% of dark stores (${kpis.criticalStores} of ${kpis.storeCount}) are running below the critical 60-point threshold. Score deductions are primarily triggered by unresolved SLA breaches and unaddressed chiller equipment breakdowns.`;
+    const criticalPct = kpis.storeCount
+      ? Math.round((kpis.criticalStores / kpis.storeCount) * 1000) / 10
+      : 0;
+    const synthesis = `**Executive Synthesis:** ${criticalPct}% of dark stores (${kpis.criticalStores} of ${kpis.storeCount}) are running below the critical 60-point threshold. Score deductions are primarily triggered by unresolved SLA breaches and equipment breakdowns.`;
     const recommendation = `**Recommended Action:** Dispatch emergency maintenance technicians to inspect refrigeration units at ${worstStore ? `\`${worstStore.id}\` (${worstStore.name})` : "low-scoring stores"} to mitigate inventory spoilage.`;
 
     const answer = `### PulseScore Fleet Health & Distribution\n\n• **Fleet Average:** ${kpis.avgPulse}/100 across ${kpis.storeCount} dark stores in ${kpis.cityCount} cities.\n• **Health Breakdown:** ${kpis.criticalStores} stores in critical status (<60), ${kpis.atRiskStores} at risk (60-79), and ${kpis.healthyStores} healthy (80+).\n• **Lowest Scoring Dark Stores:**\n${worstList || "• None recorded"}\n• **Score Penalty Drivers:** Deductions are predominantly caused by ${kpis.activeCriticalAlerts} active equipment faults and ${kpis.slaBreached} SLA breaches in open support tickets.\n\n${synthesis}\n\n${recommendation}`;
@@ -944,7 +1106,11 @@ export class ExecutiveAssistantService {
       answer,
       summary: `Network PulseScore is ${kpis.avgPulse}/100 with ${kpis.criticalStores} stores in critical health (<60).`,
       metrics: [
-        { label: "Network Pulse", value: `${kpis.avgPulse}/100`, tone: kpis.avgPulse < 60 ? "crit" : kpis.avgPulse < 80 ? "warn" : "ok" },
+        {
+          label: "Network Pulse",
+          value: `${kpis.avgPulse}/100`,
+          tone: kpis.avgPulse < 60 ? "crit" : kpis.avgPulse < 80 ? "warn" : "ok",
+        },
         { label: "Critical Stores (<60)", value: `${kpis.criticalStores}`, tone: "crit" },
         { label: "At Risk (60-79)", value: `${kpis.atRiskStores}`, tone: "warn" },
         { label: "Healthy (80+)", value: `${kpis.healthyStores}`, tone: "ok" },
@@ -952,10 +1118,15 @@ export class ExecutiveAssistantService {
       evidence: [
         { label: "Fleet size", value: `${kpis.storeCount} dark stores` },
         { label: "Average PulseScore", value: `${kpis.avgPulse}/100` },
-        { label: "Worst store", value: worstStore ? `${worstStore.id} (${worstStore.pulse}/100)` : "N/A" },
+        {
+          label: "Worst store",
+          value: worstStore ? `${worstStore.id} (${worstStore.pulse}/100)` : "N/A",
+        },
       ],
       suggestedQuestions: [
-        worstStore ? `Why is ${worstStore.id} struggling?` : "Which stores have the most complaints?",
+        worstStore
+          ? `Why is ${worstStore.id} struggling?`
+          : "Which stores have the most complaints?",
         "Which stores have the lowest pulse?",
         "What equipment breakdowns are recorded?",
       ],
@@ -987,19 +1158,32 @@ export class ExecutiveAssistantService {
 
     const issues: string[] = [];
     if (sla.breached > 0) {
-      issues.push(`1. **SLA Violations:** ${sla.breached} active tickets are past due (${sla.p1Breaches} are critical P1 emergencies)`);
+      issues.push(
+        `1. **SLA Violations:** ${sla.breached} active tickets are past due (${sla.p1Breaches} are critical P1 emergencies)`,
+      );
     }
     if (anomalies.length > 0) {
-      issues.push(`2. **Hardware Red Alerts:** ${anomalies.slice(0, 2).map((a) => `${a.title} at ${a.entityName || a.entityId}`).join("; ")}`);
+      issues.push(
+        `2. **Hardware Red Alerts:** ${anomalies
+          .slice(0, 2)
+          .map((a) => `${a.title} at ${a.entityName || a.entityId}`)
+          .join("; ")}`,
+      );
     }
     if (topStore) {
-      issues.push(`3. **Fulfillment Bottleneck:** ${topStore.name} (${topStore.city}) leads the network with ${topStore.complaints} complaints`);
+      issues.push(
+        `3. **Fulfillment Bottleneck:** ${topStore.name} (${topStore.city}) leads the network with ${topStore.complaints} complaints`,
+      );
     }
     if (topCat) {
-      issues.push(`4. **Customer Driver:** ${CATEGORY_LABEL_MAP[topCat.category] || topCat.category} represents the single largest failure mode (${topCat.count} complaints)`);
+      issues.push(
+        `4. **Customer Driver:** ${CATEGORY_LABEL_MAP[topCat.category] || topCat.category} represents the single largest failure mode (${topCat.count} complaints)`,
+      );
     }
     if (kpis.pendingFraud > 0) {
-      issues.push(`5. **Financial Risk:** ${kpis.pendingFraud} transactions flagged for potential fraud review`);
+      issues.push(
+        `5. **Financial Risk:** ${kpis.pendingFraud} transactions flagged for potential fraud review`,
+      );
     }
 
     const raw = (parsed.rawQuestion || "").toLowerCase();
@@ -1012,11 +1196,15 @@ export class ExecutiveAssistantService {
       headline = "Prioritized Operational Fixes Needed Across Dark Stores";
     } else if (raw.includes("going wrong") || raw.includes("wrong")) {
       headline = "Top Operational Bottlenecks & Exceptions Detected";
-    } else if (raw.includes("critical issue") || raw.includes("critical") || raw.includes("urgent")) {
+    } else if (
+      raw.includes("critical issue") ||
+      raw.includes("critical") ||
+      raw.includes("urgent")
+    ) {
       headline = "Active Critical Incidents & High-Severity Exceptions";
     }
 
-    const synthesis = `**Executive Synthesis:** Operational risk is centered on customer resolution velocity (${sla.breachRate}% breach rate) and chiller temperature failures at key stores like Kolkata Central DS.`;
+    const synthesis = `**Executive Synthesis:** Operational risk is centered on customer resolution velocity (${sla.breachRate}% breach rate) and equipment failures at the lowest-scoring stores.`;
     const recommendation = `**Recommended Action:** Clear the ${sla.p1Breaches} overdue P1 cases in the Operations Queue immediately and dispatch refrigeration technicians to address critical equipment alarms.`;
 
     const answer = `### ${headline}\n\n${issues.join("\n")}\n\n${synthesis}\n\n${recommendation}`;
@@ -1028,13 +1216,20 @@ export class ExecutiveAssistantService {
       metrics: [
         { label: "SLA Breaches", value: `${sla.breached}`, tone: "crit" },
         { label: "P1 Critical Breaches", value: `${sla.p1Breaches}`, tone: "crit" },
-        { label: "Active Hardware Alerts", value: `${anomalies.length}`, tone: anomalies.length > 0 ? "crit" : "ok" },
+        {
+          label: "Active Hardware Alerts",
+          value: `${anomalies.length}`,
+          tone: anomalies.length > 0 ? "crit" : "ok",
+        },
         { label: "Critical Health Stores", value: `${kpis.criticalStores}`, tone: "crit" },
       ],
       evidence: [
         { label: "Active queue", value: `${kpis.activeCases} cases` },
         { label: "SLA breach rate", value: `${sla.breachRate}%` },
-        { label: "Top problem store", value: topStore ? `${topStore.id} (${topStore.name})` : "N/A" },
+        {
+          label: "Top problem store",
+          value: topStore ? `${topStore.id} (${topStore.name})` : "N/A",
+        },
       ],
       suggestedQuestions: [
         "What should I investigate first?",
@@ -1068,7 +1263,7 @@ export class ExecutiveAssistantService {
     const synthesis = `**Executive Synthesis:** Support throughput is lagging volume with a ${sla.breachRate}% breach rate, while the automation engine autonomously shields support by resolving ${auto.autoResolutionRate}% of disputes.`;
     const recommendation = `**Recommended Action:** Shift support capacity to clear ${sla.breached} overdue tickets while monitoring ₹${refundInRupees} in automated refunds.`;
 
-    const answer = `### Executive Numbers Snapshot (${parsed.timeRange.label})\n\n• **Customer Issues:** ${kpis.totalComplaints} total complaints logged (${kpis.activeCases} active in queue, ${auto.autoResolvedCount} auto-resolved).\n• **SLA Compliance:** ${sla.breached} breached cases (${sla.breachRate}% breach rate), including ${sla.p1Breaches} critical P1 breaches.\n• **Store Fleet:** 200 dark stores across ${kpis.cityCount} cities, average PulseScore **${kpis.avgPulse}/100** (${kpis.criticalStores} stores in critical band).\n• **Financials & Automation:** ₹${refundInRupees} in auto-approved refunds, ${kpis.pendingFraud} pending fraud reviews, and ${kpis.activeCriticalAlerts} active critical equipment alarms.\n\n${synthesis}\n\n${recommendation}`;
+    const answer = `### Executive Numbers Snapshot (${parsed.timeRange.label})\n\n• **Customer Issues:** ${kpis.totalComplaints} total complaints logged (${kpis.activeCases} active in queue, ${auto.autoResolvedCount} auto-resolved).\n• **SLA Compliance:** ${sla.breached} breached cases (${sla.breachRate}% breach rate), including ${sla.p1Breaches} critical P1 breaches.\n• **Store Fleet:** ${kpis.storeCount} dark stores across ${kpis.cityCount} cities, average PulseScore **${kpis.avgPulse}/100** (${kpis.criticalStores} stores in critical band).\n• **Financials & Automation:** ₹${refundInRupees} in auto-approved refunds, ${kpis.pendingFraud} pending fraud reviews, and ${kpis.activeCriticalAlerts} active critical equipment alarms.\n\n${synthesis}\n\n${recommendation}`;
 
     return {
       intent: "EXECUTIVE_METRICS",
@@ -1076,9 +1271,21 @@ export class ExecutiveAssistantService {
       summary: `${kpis.totalComplaints} complaints, ${sla.breached} SLA breaches, Pulse ${kpis.avgPulse}/100, ${kpis.criticalStores} critical stores.`,
       metrics: [
         { label: "Total Complaints", value: `${kpis.totalComplaints}`, tone: "neutral" },
-        { label: "SLA Breaches", value: `${sla.breached} (${sla.breachRate}%)`, tone: sla.breached > 0 ? "crit" : "ok" },
-        { label: "Network Pulse", value: `${kpis.avgPulse}/100`, tone: kpis.avgPulse < 60 ? "crit" : "warn" },
-        { label: "Critical Alerts", value: `${kpis.activeCriticalAlerts}`, tone: kpis.activeCriticalAlerts > 0 ? "crit" : "ok" },
+        {
+          label: "SLA Breaches",
+          value: `${sla.breached} (${sla.breachRate}%)`,
+          tone: sla.breached > 0 ? "crit" : "ok",
+        },
+        {
+          label: "Network Pulse",
+          value: `${kpis.avgPulse}/100`,
+          tone: kpis.avgPulse < 60 ? "crit" : "warn",
+        },
+        {
+          label: "Critical Alerts",
+          value: `${kpis.activeCriticalAlerts}`,
+          tone: kpis.activeCriticalAlerts > 0 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Time period", value: parsed.timeRange.label },
@@ -1131,7 +1338,11 @@ export class ExecutiveAssistantService {
         { label: "Current volume", value: `${curAnalytics.total}`, tone: "neutral" },
         { label: "Prior volume", value: `${priorAnalytics.total}`, tone: "neutral" },
         { label: "Period delta", value: deltaSign, tone: deltaPct > 0 ? "crit" : "ok" },
-        { label: "SLA breach rate", value: `${curAnalytics.slaBreachRate}%`, tone: curAnalytics.slaBreachRate > 20 ? "crit" : "ok" },
+        {
+          label: "SLA breach rate",
+          value: `${curAnalytics.slaBreachRate}%`,
+          tone: curAnalytics.slaBreachRate > 20 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Current period", value: `${curAnalytics.total} cases (${currentRange.label})` },
@@ -1292,7 +1503,10 @@ export class ExecutiveAssistantService {
       ? `Active critical alerts: ${detail.activeAlerts.map((a) => a.title).join("; ")}.`
       : "";
 
-    const deltaSign = (detail.complaintsDeltaPct || 0) >= 0 ? `+${detail.complaintsDeltaPct}%` : `${detail.complaintsDeltaPct}%`;
+    const deltaSign =
+      (detail.complaintsDeltaPct || 0) >= 0
+        ? `+${detail.complaintsDeltaPct}%`
+        : `${detail.complaintsDeltaPct}%`;
 
     const synthesis = `**Executive Synthesis:** The critical operational drag at \`${detail.id}\` is driven by ${detail.topCategories[0] ? CATEGORY_LABEL_MAP[detail.topCategories[0].category] : "picking exceptions"} coupled with ${detail.workOrders.length} active equipment breakdown orders.`;
     const recommendation = `**Recommended Action:** Immediately triage the ${detail.slaBreaches} breached SLA tickets and dispatch maintenance engineers to clear equipment work orders.`;
@@ -1304,14 +1518,31 @@ export class ExecutiveAssistantService {
       answer,
       summary: `Root cause for ${detail.id}: driven by ${detail.topCategories[0] ? CATEGORY_LABEL_MAP[detail.topCategories[0].category] : "complaints"}, ${detail.slaBreaches} SLA breaches, and ${detail.workOrders.length} work orders.`,
       metrics: [
-        { label: "PulseScore", value: `${detail.currentPulse}/100`, tone: detail.currentPulse < 60 ? "crit" : "warn" },
+        {
+          label: "PulseScore",
+          value: `${detail.currentPulse}/100`,
+          tone: detail.currentPulse < 60 ? "crit" : "warn",
+        },
         { label: "Total complaints", value: `${detail.complaintsCount}`, tone: "crit" },
-        { label: "SLA breaches", value: `${detail.slaBreaches}`, tone: detail.slaBreaches > 0 ? "crit" : "ok" },
-        { label: "Open work orders", value: `${detail.workOrders.length}`, tone: detail.workOrders.length > 0 ? "warn" : "ok" },
+        {
+          label: "SLA breaches",
+          value: `${detail.slaBreaches}`,
+          tone: detail.slaBreaches > 0 ? "crit" : "ok",
+        },
+        {
+          label: "Open work orders",
+          value: `${detail.workOrders.length}`,
+          tone: detail.workOrders.length > 0 ? "warn" : "ok",
+        },
       ],
       evidence: [
         { label: "Store", value: `${detail.id} (${detail.name})` },
-        { label: "Dominant issue", value: detail.topCategories[0] ? CATEGORY_LABEL_MAP[detail.topCategories[0].category] : "N/A" },
+        {
+          label: "Dominant issue",
+          value: detail.topCategories[0]
+            ? CATEGORY_LABEL_MAP[detail.topCategories[0].category]
+            : "N/A",
+        },
         { label: "SLA breaches", value: `${detail.slaBreaches}` },
         { label: "Equipment faults", value: `${detail.workOrders.length}` },
       ],
@@ -1356,7 +1587,8 @@ export class ExecutiveAssistantService {
     const sign = diff >= 0 ? `+${diff}` : `${diff}`;
     const pctSign = pctChange >= 0 ? `+${pctChange}%` : `${pctChange}%`;
 
-    const pulseDiff = curDetail.currentPulse - (priorDetail?.currentPulse || curDetail.currentPulse);
+    const pulseDiff =
+      curDetail.currentPulse - (priorDetail?.currentPulse || curDetail.currentPulse);
     const pulseSign = pulseDiff >= 0 ? `+${pulseDiff}` : `${pulseDiff}`;
 
     const answer = `Comparative performance for ${curDetail.id} (${curDetail.name}) - ${currentRange.label} vs ${priorRange.label}: Complaint volume changed by ${pctSign} (${curCount} cases vs ${priorCount} cases, delta of ${sign}). Store PulseScore changed by ${pulseSign} points (currently ${curDetail.currentPulse}/100 vs ${priorDetail?.currentPulse || curDetail.currentPulse}/100). SLA breaches changed from ${priorDetail?.slaBreaches || 0} to ${curDetail.slaBreaches}.`;
@@ -1369,12 +1601,19 @@ export class ExecutiveAssistantService {
         { label: "Current complaints", value: `${curCount}`, tone: "neutral" },
         { label: "Prior complaints", value: `${priorCount}`, tone: "neutral" },
         { label: "Volume delta", value: pctSign, tone: pctChange > 0 ? "crit" : "ok" },
-        { label: "PulseScore delta", value: `${pulseSign} pts`, tone: pulseDiff < 0 ? "crit" : "ok" },
+        {
+          label: "PulseScore delta",
+          value: `${pulseSign} pts`,
+          tone: pulseDiff < 0 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Current window", value: `${curCount} complaints (${currentRange.label})` },
         { label: "Prior window", value: `${priorCount} complaints (${priorRange.label})` },
-        { label: "SLA breaches", value: `${curDetail.slaBreaches} current vs ${priorDetail?.slaBreaches || 0} prior` },
+        {
+          label: "SLA breaches",
+          value: `${curDetail.slaBreaches} current vs ${priorDetail?.slaBreaches || 0} prior`,
+        },
       ],
       suggestedQuestions: [
         `What should I investigate first?`,
@@ -1406,15 +1645,23 @@ export class ExecutiveAssistantService {
 
     const steps: string[] = [];
     if (detail.slaBreaches > 0) {
-      steps.push(`1. **Clear Overdue Queue:** Triage the ${detail.slaBreaches} SLA-breached tickets in Operations Queue immediately`);
+      steps.push(
+        `1. **Clear Overdue Queue:** Triage the ${detail.slaBreaches} SLA-breached tickets in Operations Queue immediately`,
+      );
     }
     if (detail.workOrders.length > 0) {
-      steps.push(`2. **Service Critical Hardware:** Dispatch maintenance technician for active work order (${detail.workOrders[0].asset})`);
+      steps.push(
+        `2. **Service Critical Hardware:** Dispatch maintenance technician for active work order (${detail.workOrders[0].asset})`,
+      );
     }
     if (detail.topCategories.length > 0) {
-      steps.push(`3. **Audit Inventory Bins:** Audit fulfillment picking bins to mitigate ${CATEGORY_LABEL_MAP[detail.topCategories[0].category] || detail.topCategories[0].category}`);
+      steps.push(
+        `3. **Audit Inventory Bins:** Audit fulfillment picking bins to mitigate ${CATEGORY_LABEL_MAP[detail.topCategories[0].category] || detail.topCategories[0].category}`,
+      );
     }
-    steps.push(`4. **Balance Shift Capacity:** Reallocate floor pickers and riders (${detail.pickers} pickers, ${detail.riders} riders currently assigned)`);
+    steps.push(
+      `4. **Balance Shift Capacity:** Reallocate floor pickers and riders (${detail.pickers} pickers, ${detail.riders} riders currently assigned)`,
+    );
 
     const synthesis = `**Executive Synthesis:** Executing these sequential actions will halt score decay at \`${detail.id}\`, stabilizing PulseScore from its critical level (${detail.currentPulse}/100) and clearing the ${detail.slaBreaches} overdue SLA cases.`;
     const recommendation = `**Recommended Action:** Instruct the dark store manager at ${detail.name} to prioritize the ${detail.slaBreaches} overdue tickets and inspect the ${detail.workOrders[0]?.asset || "equipment assets"}.`;
@@ -1474,10 +1721,22 @@ export class ExecutiveAssistantService {
       answer,
       summary: `${detail.id} overview: Pulse ${detail.currentPulse}/100, ${detail.complaintsCount} complaints, ${detail.slaBreaches} SLA breaches.`,
       metrics: [
-        { label: "PulseScore", value: `${detail.currentPulse}/100`, tone: detail.currentPulse < 60 ? "crit" : detail.currentPulse < 80 ? "warn" : "ok" },
+        {
+          label: "PulseScore",
+          value: `${detail.currentPulse}/100`,
+          tone: detail.currentPulse < 60 ? "crit" : detail.currentPulse < 80 ? "warn" : "ok",
+        },
         { label: "Complaints", value: `${detail.complaintsCount}`, tone: "neutral" },
-        { label: "SLA Breaches", value: `${detail.slaBreaches}`, tone: detail.slaBreaches > 0 ? "crit" : "ok" },
-        { label: "Pickers / Riders", value: `${detail.pickers} / ${detail.riders}`, tone: "neutral" },
+        {
+          label: "SLA Breaches",
+          value: `${detail.slaBreaches}`,
+          tone: detail.slaBreaches > 0 ? "crit" : "ok",
+        },
+        {
+          label: "Pickers / Riders",
+          value: `${detail.pickers} / ${detail.riders}`,
+          tone: "neutral",
+        },
       ],
       evidence: [
         { label: "Store", value: `${detail.id} - ${detail.name}` },
@@ -1593,8 +1852,16 @@ export class ExecutiveAssistantService {
       metrics: [
         { label: `${c1.city} complaints`, value: `${c1.complaintsCount}`, tone: "neutral" },
         { label: `${c2.city} complaints`, value: `${c2.complaintsCount}`, tone: "neutral" },
-        { label: `${c1.city} Pulse`, value: `${c1.avgPulse}/100`, tone: c1.avgPulse < 70 ? "warn" : "ok" },
-        { label: `${c2.city} Pulse`, value: `${c2.avgPulse}/100`, tone: c2.avgPulse < 70 ? "warn" : "ok" },
+        {
+          label: `${c1.city} Pulse`,
+          value: `${c1.avgPulse}/100`,
+          tone: c1.avgPulse < 70 ? "warn" : "ok",
+        },
+        {
+          label: `${c2.city} Pulse`,
+          value: `${c2.avgPulse}/100`,
+          tone: c2.avgPulse < 70 ? "warn" : "ok",
+        },
       ],
       evidence: [
         { label: `${c1.city} stores`, value: `${c1.storeCount}` },
@@ -1624,7 +1891,10 @@ export class ExecutiveAssistantService {
     const sla = await this.tools.getSLAAnalytics(parsed.timeRange, parsed.parameters);
 
     const cityText = sla.byCity.length
-      ? sla.byCity.slice(0, 3).map((c) => `**${c.city}** (${c.breaches} breaches)`).join(", ")
+      ? sla.byCity
+          .slice(0, 3)
+          .map((c) => `**${c.city}** (${c.breaches} breaches)`)
+          .join(", ")
       : "No city-level clusters.";
 
     const synthesis = `**Executive Synthesis:** Support queues are operating at a **${sla.breachRate}% SLA breach rate** against the 95% target, driven by ${sla.p1Breaches} critical P1 tickets overdue for resolution.`;
@@ -1638,9 +1908,21 @@ export class ExecutiveAssistantService {
       summary: `SLA status: ${sla.breached} breached cases (${sla.breachRate}% breach rate), ${sla.atRisk} at-risk cases.`,
       metrics: [
         { label: "Active support queue", value: `${sla.activeTotal}`, tone: "neutral" },
-        { label: "SLA breached cases", value: `${sla.breached}`, tone: sla.breached > 0 ? "crit" : "ok" },
-        { label: "SLA breach rate", value: `${sla.breachRate}%`, tone: sla.breachRate > 20 ? "crit" : "ok" },
-        { label: "P1 critical breaches", value: `${sla.p1Breaches}`, tone: sla.p1Breaches > 0 ? "crit" : "ok" },
+        {
+          label: "SLA breached cases",
+          value: `${sla.breached}`,
+          tone: sla.breached > 0 ? "crit" : "ok",
+        },
+        {
+          label: "SLA breach rate",
+          value: `${sla.breachRate}%`,
+          tone: sla.breachRate > 20 ? "crit" : "ok",
+        },
+        {
+          label: "P1 critical breaches",
+          value: `${sla.p1Breaches}`,
+          tone: sla.p1Breaches > 0 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Active queue", value: `${sla.activeTotal}` },
@@ -1685,7 +1967,11 @@ export class ExecutiveAssistantService {
         { label: "Total issues processed", value: `${auto.totalComplaints}`, tone: "neutral" },
         { label: "Auto-resolved cases", value: `${auto.autoResolvedCount}`, tone: "ok" },
         { label: "Manual support queue", value: `${auto.manualQueueCount}`, tone: "warn" },
-        { label: "Auto-resolution rate", value: `${auto.autoResolutionRate}%`, tone: auto.autoResolutionRate > 30 ? "ok" : "warn" },
+        {
+          label: "Auto-resolution rate",
+          value: `${auto.autoResolutionRate}%`,
+          tone: auto.autoResolutionRate > 30 ? "ok" : "warn",
+        },
       ],
       evidence: [
         { label: "Time period", value: parsed.timeRange.label },
@@ -1730,7 +2016,11 @@ export class ExecutiveAssistantService {
       answer,
       summary: `Fraud review: ${risk.pendingCount} pending cases across ${risk.affectedStores.length} stores.`,
       metrics: [
-        { label: "Pending risk reviews", value: `${risk.pendingCount}`, tone: risk.pendingCount > 0 ? "warn" : "ok" },
+        {
+          label: "Pending risk reviews",
+          value: `${risk.pendingCount}`,
+          tone: risk.pendingCount > 0 ? "warn" : "ok",
+        },
         { label: "Affected stores", value: `${risk.affectedStores.length}`, tone: "neutral" },
       ],
       evidence: [
@@ -1763,7 +2053,10 @@ export class ExecutiveAssistantService {
     const critAlerts = anomalies.filter((a) => a.type === "critical_alert");
     const pulseDrops = anomalies.filter((a) => a.type === "pulse_drop");
 
-    const descList = anomalies.slice(0, 4).map((a) => `• **${a.title}:** ${a.description}`).join("\n");
+    const descList = anomalies
+      .slice(0, 4)
+      .map((a) => `• **${a.title}:** ${a.description}`)
+      .join("\n");
 
     const synthesis = `**Executive Synthesis:** Active equipment breakdowns create localized operational choke-points, directly causing temperature-sensitive order spoilage and delivery cancellations.`;
     const recommendation = `**Recommended Action:** Expedite emergency vendor work orders for offline refrigeration units to restore cold-chain compliance.`;
@@ -1775,8 +2068,16 @@ export class ExecutiveAssistantService {
       answer,
       summary: `${critAlerts.length} critical alerts, ${pulseDrops.length} stores with severe PulseScore drops.`,
       metrics: [
-        { label: "Active critical alerts", value: `${critAlerts.length}`, tone: critAlerts.length > 0 ? "crit" : "ok" },
-        { label: "Critical health stores", value: `${pulseDrops.length}`, tone: pulseDrops.length > 0 ? "crit" : "ok" },
+        {
+          label: "Active critical alerts",
+          value: `${critAlerts.length}`,
+          tone: critAlerts.length > 0 ? "crit" : "ok",
+        },
+        {
+          label: "Critical health stores",
+          value: `${pulseDrops.length}`,
+          tone: pulseDrops.length > 0 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Critical alerts", value: `${critAlerts.length}` },
@@ -1811,8 +2112,10 @@ export class ExecutiveAssistantService {
       priorRange,
     );
 
-    const direction = comp.difference > 0 ? "increased" : comp.difference < 0 ? "decreased" : "remained unchanged";
-    const deltaSign = comp.percentageChange >= 0 ? `+${comp.percentageChange}%` : `${comp.percentageChange}%`;
+    const direction =
+      comp.difference > 0 ? "increased" : comp.difference < 0 ? "decreased" : "remained unchanged";
+    const deltaSign =
+      comp.percentageChange >= 0 ? `+${comp.percentageChange}%` : `${comp.percentageChange}%`;
 
     const answer = `Period comparison (${comp.currentPeriodLabel} vs ${comp.previousPeriodLabel}): ${comp.metric} ${direction} by ${Math.abs(comp.percentageChange)}% (${comp.currentValue} vs ${comp.previousValue}, difference of ${comp.difference >= 0 ? `+${comp.difference}` : comp.difference}).`;
 
@@ -1821,9 +2124,21 @@ export class ExecutiveAssistantService {
       answer,
       summary: `${comp.metric} ${direction} by ${Math.abs(comp.percentageChange)}% (${comp.currentValue} vs ${comp.previousValue}).`,
       metrics: [
-        { label: `Current (${comp.currentPeriodLabel})`, value: `${comp.currentValue}`, tone: "neutral" },
-        { label: `Prior (${comp.previousPeriodLabel})`, value: `${comp.previousValue}`, tone: "neutral" },
-        { label: "Percentage change", value: deltaSign, tone: comp.percentageChange > 0 ? "crit" : "ok" },
+        {
+          label: `Current (${comp.currentPeriodLabel})`,
+          value: `${comp.currentValue}`,
+          tone: "neutral",
+        },
+        {
+          label: `Prior (${comp.previousPeriodLabel})`,
+          value: `${comp.previousValue}`,
+          tone: "neutral",
+        },
+        {
+          label: "Percentage change",
+          value: deltaSign,
+          tone: comp.percentageChange > 0 ? "crit" : "ok",
+        },
       ],
       evidence: [
         { label: "Metric", value: comp.metric },
@@ -1886,18 +2201,85 @@ export class ExecutiveAssistantService {
   /**
    * 17. Help Response
    */
+  /**
+   * Conversational Intent Handlers
+   */
+  private getGreetingResponse(): AssistantResponse {
+    const greetings = [
+      "Hello! What would you like to check across the network today?",
+      "Hey there! What can I help you investigate?",
+      "Good day. Ready to dive into store operations and network health.",
+    ];
+    return {
+      intent: "GREETING",
+      answer: greetings[Math.floor(Math.random() * greetings.length)],
+      summary: "Greeting",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [],
+    };
+  }
+
+  private getHowAreYouResponse(): AssistantResponse {
+    return {
+      intent: "HOW_ARE_YOU",
+      answer: "I'm doing well, thank you! Ready to help you investigate network operations.",
+      summary: "Status inquiry",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [],
+    };
+  }
+
+  private getThanksResponse(): AssistantResponse {
+    return {
+      intent: "THANKS",
+      answer: "You're welcome! Let me know if you need anything else.",
+      summary: "Acknowledgment",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [],
+    };
+  }
+
+  private getAcknowledgementResponse(): AssistantResponse {
+    const responses = ["Understood.", "Got it.", "Makes sense.", "Perfect."];
+    return {
+      intent: "ACKNOWLEDGEMENT",
+      answer: responses[Math.floor(Math.random() * responses.length)],
+      summary: "Acknowledgment",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [],
+    };
+  }
+
+  private getGoodbyeResponse(): AssistantResponse {
+    return {
+      intent: "GOODBYE",
+      answer: "Goodbye! Have a great day.",
+      summary: "Farewell",
+      metrics: [],
+      evidence: [],
+      suggestedQuestions: [],
+    };
+  }
+
+  /**
+   * 17. Help Response
+   */
   private getHelpResponse(): AssistantResponse {
     return {
       intent: "HELP",
       answer:
-        "I am the DarkOps Executive Operational Copilot. I analyze live database metrics to answer operational intelligence questions across these capabilities:\n• Network health & PulseScores\n• Complaint volumes & category breakdowns\n• Problem stores & store deep-dives\n• City-level performance & comparisons\n• SLA compliance & breach tracking\n• Automation & auto-resolution rates\n• Fraud & risk reviews\n• Hardware anomalies & red alerts",
-      summary: "Executive Operational Copilot capabilities guide.",
+        "I can help you investigate network health, PulseScores, problem dark stores, SLA performance, regional trends, and automation.\n\nTry asking:\n• *What is our pulse score?*\n• *Which stores have the most complaints?*\n• *Where are SLA breaches happening?*",
+      summary: "Assistant capabilities guide.",
       metrics: [],
       evidence: [],
       suggestedQuestions: [
         "What is happening across the network?",
+        "What is our pulse score?",
         "Which stores have the most complaints?",
-        "Are complaints increasing?",
         "Where are SLA breaches happening?",
       ],
     };
@@ -1910,16 +2292,11 @@ export class ExecutiveAssistantService {
     return {
       intent: "UNSUPPORTED",
       answer:
-        "I could not match that to a specific DarkOps operational metric. As your Executive Copilot, I monitor live database telemetry and can investigate:\n• Network Pulse & Fleet Health (e.g. 'What is our pulse score?')\n• Operational Bottlenecks (e.g. 'What is going wrong?' or 'Any critical issues?')\n• Problem Stores (e.g. 'Which stores have the most complaints?')\n• SLA Performance (e.g. 'Where are SLA breaches happening?')\n• Regional Hotspots (e.g. 'Which areas need attention?')\n• Automation & Auto-Refunds (e.g. 'How effective is automation?')\n• Fraud & Risk Reviews (e.g. 'Any fraud risks?')",
-      summary: "I specialize in DarkOps operational analytics, SLA tracking, store health, and exception triage.",
+        "I'm focused on DarkOps network operations. Feel free to ask about store health, complaints, SLA breaches, or automation.",
+      summary: "Out-of-scope query.",
       metrics: [],
       evidence: [],
-      suggestedQuestions: [
-        "What is happening across the network?",
-        "What is our pulse score?",
-        "What is going wrong?",
-        "Which stores have the most complaints?",
-      ],
+      suggestedQuestions: [],
     };
   }
 
@@ -1939,15 +2316,81 @@ export class ExecutiveAssistantService {
 
   // --- Helper Methods ---
 
-  private tokenize(text: string): string[] {
-    return text
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, " ")
-      .split(/\s+/)
-      .filter((t) => t.length > 0);
+  private isGreeting(q: string): boolean {
+    const exact = [
+      "hi",
+      "hello",
+      "hey",
+      "good morning",
+      "good afternoon",
+      "good evening",
+      "hi there",
+      "hello there",
+      "hey there",
+    ];
+    return exact.includes(q);
   }
 
-  private isOutOfScope(q: string): boolean {
+  private isHowAreYou(q: string): boolean {
+    const phrases = [
+      "how are you",
+      "how is it going",
+      "how's it going",
+      "how are things",
+      "how are you doing",
+      "how do you do",
+    ];
+    return phrases.some((p) => q.includes(p));
+  }
+
+  private isThanks(q: string): boolean {
+    const phrases = [
+      "thanks",
+      "thank you",
+      "appreciate it",
+      "that's helpful",
+      "thats helpful",
+      "thank you very much",
+      "many thanks",
+    ];
+    return phrases.some((p) => q === p || q.includes(p));
+  }
+
+  private isAcknowledgement(q: string): boolean {
+    const exact = [
+      "okay",
+      "ok",
+      "got it",
+      "understood",
+      "makes sense",
+      "perfect",
+      "alright",
+      "sure",
+      "cool",
+      "noted",
+    ];
+    return exact.includes(q);
+  }
+
+  private isGoodbye(q: string): boolean {
+    const exact = ["bye", "goodbye", "see you", "talk later", "cya", "see ya", "bye bye"];
+    return exact.includes(q);
+  }
+
+  private isHelpOrCapabilities(q: string): boolean {
+    return (
+      q === "help" ||
+      q === "what can you do" ||
+      q.includes("what questions can i ask") ||
+      q.includes("what can i ask") ||
+      q.includes("what are your capabilities") ||
+      q.includes("how can you help") ||
+      q.includes("what can you help with") ||
+      q.includes("show me what i can ask")
+    );
+  }
+
+  private isExplicitOutOfScope(q: string): boolean {
     const terms = [
       "weather",
       "cricket",
@@ -1959,8 +2402,48 @@ export class ExecutiveAssistantService {
       "movie",
       "song",
       "translate",
+      "capital of",
+      "president of",
+      "stock price",
     ];
     return terms.some((t) => q.includes(t));
+  }
+
+  private stripGreetingPreamble(q: string): string {
+    const text = q.trim();
+    const preambles = [
+      /^hey\s*,\s*/i,
+      /^hi\s*,\s*/i,
+      /^hello\s*,\s*/i,
+      /^good\s+(morning|afternoon|evening)\s*,\s*/i,
+      /^hi\s+there\s*,\s*/i,
+      /^hello\s+there\s*,\s*/i,
+      /^hey\s+/i,
+      /^hi\s+/i,
+      /^hello\s+/i,
+      /^good\s+(morning|afternoon|evening)\s+/i,
+    ];
+    for (const p of preambles) {
+      if (p.test(text)) {
+        const remaining = text.replace(p, "").trim();
+        if (remaining.length >= 3) {
+          return remaining;
+        }
+      }
+    }
+    return text;
+  }
+
+  private tokenize(text: string): string[] {
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, " ")
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+  }
+
+  private isOutOfScope(q: string): boolean {
+    return this.isExplicitOutOfScope(q);
   }
 
   private extractStoreId(q: string): string | null {
@@ -1994,8 +2477,8 @@ export class ExecutiveAssistantService {
     return null;
   }
 
-  private detectCityComparison(q: string): { city1: string; city2: string } | null {
-    if (!q.includes("compare") && !q.includes("vs")) return null;
+  private detectCityComparison(q: string, context?: any): { city1: string; city2: string } | null {
+    if (!q.includes("compare") && !q.includes("vs") && !q.includes("versus")) return null;
     const citiesFound: string[] = [];
     const allCities = [
       "mumbai",
@@ -2007,14 +2490,23 @@ export class ExecutiveAssistantService {
       "chennai",
       "pune",
       "indore",
+      "jaipur",
+      "ahmedabad",
     ];
     for (const c of allCities) {
       if (q.includes(c) && !citiesFound.includes(c)) {
-        citiesFound.push(c.charAt(0).toUpperCase() + c.slice(1));
+        citiesFound.push(c === "bangalore" ? "Bengaluru" : c.charAt(0).toUpperCase() + c.slice(1));
       }
     }
     if (citiesFound.length >= 2) {
       return { city1: citiesFound[0], city2: citiesFound[1] };
+    }
+    if (citiesFound.length === 1 && context?.lastCity) {
+      const city1 = context.lastCity;
+      const city2 = citiesFound[0];
+      if (city1.toLowerCase() !== city2.toLowerCase()) {
+        return { city1, city2 };
+      }
     }
     return null;
   }
@@ -2039,10 +2531,18 @@ export class ExecutiveAssistantService {
       return { start: new Date(Date.now() - 86400000), end: new Date(), label: "last 24 hours" };
     }
     if (q.includes("last 30 days") || q.includes("30 days") || q.includes("this month")) {
-      return { start: new Date(Date.now() - 30 * 86400000), end: new Date(), label: "last 30 days" };
+      return {
+        start: new Date(Date.now() - 30 * 86400000),
+        end: new Date(),
+        label: "last 30 days",
+      };
     }
     if (q.includes("90 days") || q.includes("last quarter")) {
-      return { start: new Date(Date.now() - 90 * 86400000), end: new Date(), label: "last 90 days" };
+      return {
+        start: new Date(Date.now() - 90 * 86400000),
+        end: new Date(),
+        label: "last 90 days",
+      };
     }
     if (q.includes("this week") || q.includes("last 7 days") || q.includes("7 days")) {
       return { start: new Date(Date.now() - 7 * 86400000), end: new Date(), label: "last 7 days" };
@@ -2055,10 +2555,18 @@ export class ExecutiveAssistantService {
 
     // Inherit from dashboardContext if present
     if (dashboardContext?.timeFilter === "30d") {
-      return { start: new Date(Date.now() - 30 * 86400000), end: new Date(), label: "last 30 days" };
+      return {
+        start: new Date(Date.now() - 30 * 86400000),
+        end: new Date(),
+        label: "last 30 days",
+      };
     }
     if (dashboardContext?.timeFilter === "90d") {
-      return { start: new Date(Date.now() - 90 * 86400000), end: new Date(), label: "last 90 days" };
+      return {
+        start: new Date(Date.now() - 90 * 86400000),
+        end: new Date(),
+        label: "last 90 days",
+      };
     }
 
     // Default: last 7 days

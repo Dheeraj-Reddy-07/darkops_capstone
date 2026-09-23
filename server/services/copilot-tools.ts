@@ -144,13 +144,7 @@ export class CopilotTools {
    * 1. Overall Network KPIs
    */
   async getNetworkKPIs(timeRange: TimeRange): Promise<NetworkKPIs> {
-    const [
-      storesRes,
-      pulseRes,
-      complaintsRes,
-      fraudRes,
-      alertsRes,
-    ] = await Promise.all([
+    const [storesRes, pulseRes, complaintsRes, fraudRes, alertsRes] = await Promise.all([
       this.supabase.from("stores").select("id, name, city"),
       this.supabase
         .from("pulse_scores")
@@ -179,7 +173,7 @@ export class CopilotTools {
 
     // Map latest pulse per store
     const latestPulse = new Map<string, number>();
-    pulseRows.forEach((p) => {
+    pulseRows.forEach((p: any) => {
       if (!latestPulse.has(p.store_id)) {
         latestPulse.set(p.store_id, p.score);
       }
@@ -195,14 +189,14 @@ export class CopilotTools {
     const healthyStores = pulseScores.filter((s) => s >= 80).length;
 
     const activeStatuses = ["unassigned", "assigned", "in_progress", "escalated_l2"];
-    const activeCases = complaints.filter((c) => activeStatuses.includes(c.status)).length;
-    const slaBreached = complaints.filter((c) => c.sla_state === "breached").length;
-    const slaAtRisk = complaints.filter((c) => c.sla_state === "at_risk").length;
-    const p1Cases = complaints.filter((c) => c.priority === "P1").length;
+    const activeCases = complaints.filter((c: any) => activeStatuses.includes(c.status)).length;
+    const slaBreached = complaints.filter((c: any) => c.sla_state === "breached").length;
+    const slaAtRisk = complaints.filter((c: any) => c.sla_state === "at_risk").length;
+    const p1Cases = complaints.filter((c: any) => c.priority === "P1").length;
 
     // Top Category
     const catCount: Record<string, number> = {};
-    complaints.forEach((c) => {
+    complaints.forEach((c: any) => {
       if (c.category) catCount[c.category] = (catCount[c.category] || 0) + 1;
     });
     const topCatEntry = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0];
@@ -210,13 +204,13 @@ export class CopilotTools {
 
     // Top Problem Store
     const storeCountMap: Record<string, number> = {};
-    complaints.forEach((c) => {
+    complaints.forEach((c: any) => {
       if (c.store_id) storeCountMap[c.store_id] = (storeCountMap[c.store_id] || 0) + 1;
     });
     const topStoreEntry = Object.entries(storeCountMap).sort((a, b) => b[1] - a[1])[0];
     let topProblemStore: NetworkKPIs["topProblemStore"] = null;
     if (topStoreEntry) {
-      const storeObj = stores.find((s) => s.id === topStoreEntry[0]);
+      const storeObj = stores.find((s: any) => s.id === topStoreEntry[0]);
       topProblemStore = {
         id: topStoreEntry[0],
         name: storeObj?.name || topStoreEntry[0],
@@ -227,7 +221,7 @@ export class CopilotTools {
 
     return {
       storeCount: stores.length,
-      cityCount: new Set(stores.map((s) => s.city)).size,
+      cityCount: new Set(stores.map((s: any) => s.city)).size,
       avgPulse,
       criticalStores,
       atRiskStores,
@@ -253,7 +247,9 @@ export class CopilotTools {
   ): Promise<ComplaintAnalytics> {
     let query = this.supabase
       .from("complaints")
-      .select("id, store_id, status, priority, type, category, sla_state, refund_amount_paise, created_at")
+      .select(
+        "id, store_id, status, priority, type, category, sla_state, refund_amount_paise, created_at",
+      )
       .gte("created_at", timeRange.start.toISOString())
       .lte("created_at", timeRange.end.toISOString());
 
@@ -276,8 +272,8 @@ export class CopilotTools {
         .from("stores")
         .select("id")
         .ilike("city", `%${filters.city}%`);
-      const validStoreIds = new Set((storesInCity || []).map((s) => s.id));
-      complaints = complaints.filter((c) => validStoreIds.has(c.store_id));
+      const validStoreIds = new Set((storesInCity || []).map((s: any) => s.id));
+      complaints = complaints.filter((c: any) => validStoreIds.has(c.store_id));
     }
 
     const total = complaints.length;
@@ -289,7 +285,7 @@ export class CopilotTools {
     let breached = 0;
     let resolved = 0;
 
-    complaints.forEach((c) => {
+    complaints.forEach((c: any) => {
       if (c.category) catMap[c.category] = (catMap[c.category] || 0) + 1;
       if (c.type) typeMap[c.type] = (typeMap[c.type] || 0) + 1;
       if (c.priority) prioMap[c.priority] = (prioMap[c.priority] || 0) + 1;
@@ -342,7 +338,7 @@ export class CopilotTools {
     const { data: stores = [] } = await storeQuery;
     if (!stores || stores.length === 0) return [];
 
-    const storeIds = stores.map((s) => s.id);
+    const storeIds = stores.map((s: any) => s.id);
 
     // Pulse scores
     const { data: pulseRows = [] } = await this.supabase
@@ -352,7 +348,7 @@ export class CopilotTools {
       .order("calculated_at", { ascending: false });
 
     const latestPulse = new Map<string, number>();
-    (pulseRows || []).forEach((p) => {
+    (pulseRows || []).forEach((p: any) => {
       if (!latestPulse.has(p.store_id)) latestPulse.set(p.store_id, p.score);
     });
 
@@ -367,14 +363,14 @@ export class CopilotTools {
     const complaintCounts: Record<string, number> = {};
     const breachCounts: Record<string, number> = {};
 
-    (complaintRows || []).forEach((c) => {
+    (complaintRows || []).forEach((c: any) => {
       complaintCounts[c.store_id] = (complaintCounts[c.store_id] || 0) + 1;
       if (c.sla_state === "breached") {
         breachCounts[c.store_id] = (breachCounts[c.store_id] || 0) + 1;
       }
     });
 
-    const items: StoreRankingItem[] = stores.map((s) => ({
+    const items: StoreRankingItem[] = stores.map((s: any) => ({
       id: s.id,
       name: s.name,
       city: s.city,
@@ -439,7 +435,7 @@ export class CopilotTools {
     let activeCases = 0;
     const activeStatuses = ["unassigned", "assigned", "in_progress", "escalated_l2"];
 
-    complaints.forEach((c) => {
+    complaints.forEach((c: any) => {
       if (c.category) catCount[c.category] = (catCount[c.category] || 0) + 1;
       if (c.sla_state === "breached") slaBreaches++;
       if (activeStatuses.includes(c.status)) activeCases++;
@@ -481,7 +477,7 @@ export class CopilotTools {
         .lte("created_at", compareRange.end.toISOString());
 
       priorPeriodComplaints = priorComplaintsRes.count || priorComplaintsRes.data?.length || 0;
-      complaintsDeltaPct = this.calcPctChange(complaints.length, priorPeriodComplaints);
+      complaintsDeltaPct = this.calcPctChange(complaints.length, priorPeriodComplaints || 0);
     }
 
     return {
@@ -499,13 +495,13 @@ export class CopilotTools {
       activeCases,
       slaBreaches,
       topCategories,
-      workOrders: workOrders.map((w) => ({
+      workOrders: workOrders.map((w: any) => ({
         id: w.id,
         asset: w.asset_name,
         priority: w.priority,
         status: w.status,
       })),
-      activeAlerts: alerts.map((a) => ({
+      activeAlerts: alerts.map((a: any) => ({
         title: a.title,
         severity: a.severity,
         detail: a.detail,
@@ -538,7 +534,7 @@ export class CopilotTools {
     const pulseRows = pulseRes.data || [];
 
     const latestPulse = new Map<string, number>();
-    pulseRows.forEach((p) => {
+    pulseRows.forEach((p: any) => {
       if (!latestPulse.has(p.store_id)) latestPulse.set(p.store_id, p.score);
     });
 
@@ -552,7 +548,7 @@ export class CopilotTools {
       }
     > = {};
 
-    stores.forEach((s) => {
+    stores.forEach((s: any) => {
       if (!cityMap[s.city]) {
         cityMap[s.city] = { stores: [], complaints: 0, breaches: 0, pulseScores: [] };
       }
@@ -562,9 +558,9 @@ export class CopilotTools {
     });
 
     const storeCity = new Map<string, string>();
-    stores.forEach((s) => storeCity.set(s.id, s.city));
+    stores.forEach((s: any) => storeCity.set(s.id, s.city));
 
-    complaints.forEach((c) => {
+    complaints.forEach((c: any) => {
       const city = storeCity.get(c.store_id);
       if (city && cityMap[city]) {
         cityMap[city]!.complaints++;
@@ -582,7 +578,7 @@ export class CopilotTools {
         // Find worst store in city
         let worstStore: CityAnalyticsItem["worstStore"] = null;
         let minPulse = 101;
-        data.stores.forEach((s) => {
+        data.stores.forEach((s: any) => {
           const score = latestPulse.get(s.id) ?? 70;
           if (score < minPulse) {
             minPulse = score;
@@ -613,7 +609,7 @@ export class CopilotTools {
     const storesRes = await this.supabase.from("stores").select("id, city");
     const stores = storesRes.data || [];
     const storeCityMap = new Map<string, string>();
-    stores.forEach((s) => storeCityMap.set(s.id, s.city));
+    stores.forEach((s: any) => storeCityMap.set(s.id, s.city));
 
     let query = this.supabase
       .from("complaints")
@@ -627,7 +623,7 @@ export class CopilotTools {
     const complaints = complaintsRes.data || [];
 
     const activeStatuses = ["unassigned", "assigned", "in_progress", "escalated_l2"];
-    const active = complaints.filter((c) => activeStatuses.includes(c.status));
+    const active = complaints.filter((c: any) => activeStatuses.includes(c.status));
 
     let onTrack = 0;
     let atRisk = 0;
@@ -639,7 +635,7 @@ export class CopilotTools {
 
     const cityBreaches: Record<string, number> = {};
 
-    active.forEach((c) => {
+    active.forEach((c: any) => {
       if (c.sla_state === "on_track") onTrack++;
       else if (c.sla_state === "at_risk") atRisk++;
       else if (c.sla_state === "breached") {
@@ -686,7 +682,7 @@ export class CopilotTools {
     let manualQueue = 0;
     let autoRefundPaise = 0;
 
-    complaints.forEach((c) => {
+    complaints.forEach((c: any) => {
       const isAuto =
         c.automation_result?.toLowerCase().includes("auto-approved") ||
         c.automation_result?.toLowerCase().includes("auto-resolve") ||
@@ -716,7 +712,9 @@ export class CopilotTools {
   async getRiskAnalytics(): Promise<RiskAnalytics> {
     const reviewsRes = await this.supabase
       .from("fraud_reviews")
-      .select("id, complaint_id, decision, reason, risk_confidence, complaints(store_id, stores(name, city))");
+      .select(
+        "id, complaint_id, decision, reason, risk_confidence, complaints(store_id, stores(name, city))",
+      );
     const reviews = reviewsRes.data || [];
 
     let pendingCount = 0;

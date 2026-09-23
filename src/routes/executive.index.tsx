@@ -235,9 +235,9 @@ function ExecutiveOverviewContent({
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-crit/40 bg-crit-soft/25 px-4 py-3">
         <AlertTriangle className="size-4 text-crit" />
         <p className="text-[13px] font-medium">
-          Network health declining - backlog up {EXEC_KPIS.openComplaintsDelta}%,{" "}
-          {NETWORK.criticalStores} stores need intervention, {EXEC_KPIS.slaBreached} SLA breaches
-          today.
+          Network status - {NETWORK.criticalStores} stores need intervention ·{" "}
+          {EXEC_KPIS.slaBreached} open SLA breaches · backlog {EXEC_KPIS.openComplaintsDelta}% vs
+          prior 30d.
         </p>
       </div>
 
@@ -318,52 +318,48 @@ function ExecutiveOverviewContent({
         />
       </div>
 
-      <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_500px]">
-        <Panel>
-          <PanelHeader
-            title="Complaint volume vs resolved - 30 days"
-            subtitle="Intake is outpacing resolution since 21 Aug; backlog is accumulating."
-          />
-          <div className="p-4">
-            <ResponsiveContainer width="100%" height={286}>
-              <AreaChart data={VOLUME_SERIES} margin={{ left: -18, right: 8, top: 6 }}>
-                <defs>
-                  <linearGradient id="raised" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="day" interval={4} {...axis} />
-                <YAxis {...axis} width={52} />
-                <RTooltip
-                  contentStyle={tooltipStyle}
-                  itemStyle={{ color: "var(--popover-foreground)" }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={9} />
-                <Area
-                  type="monotone"
-                  dataKey="raised"
-                  name="Complaints raised"
-                  stroke="var(--chart-1)"
-                  fill="url(#raised)"
-                  strokeWidth={2}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="resolved"
-                  name="Complaints resolved"
-                  stroke="var(--chart-2)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Panel>
-
-        <ExecutiveAssistant dashboardContext={{ timeFilter }} />
-      </div>
+      <Panel className="mt-3">
+        <PanelHeader
+          title="Complaint volume vs resolved - 30 days"
+          subtitle="Daily complaints raised vs resolved across the network."
+        />
+        <div className="p-4">
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={VOLUME_SERIES} margin={{ left: -18, right: 8, top: 6 }}>
+              <defs>
+                <linearGradient id="raised" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="day" interval={4} {...axis} />
+              <YAxis {...axis} width={52} />
+              <RTooltip
+                contentStyle={tooltipStyle}
+                itemStyle={{ color: "var(--popover-foreground)" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={9} />
+              <Area
+                type="monotone"
+                dataKey="raised"
+                name="Complaints raised"
+                stroke="var(--chart-1)"
+                fill="url(#raised)"
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="resolved"
+                name="Complaints resolved"
+                stroke="var(--chart-2)"
+                strokeWidth={2}
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </Panel>
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_400px]">
         <Panel>
@@ -451,6 +447,8 @@ function ExecutiveOverviewContent({
           <StoreHeatmap />
         </div>
       </Panel>
+
+      <ExecutiveAssistant dashboardContext={{ timeFilter }} />
     </>
   );
 }

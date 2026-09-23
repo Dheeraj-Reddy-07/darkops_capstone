@@ -1,26 +1,17 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import {
-  CheckCircle2,
-  Circle,
-  Package,
-  MapPin,
-  Truck,
-  Clock,
-  ArrowLeft,
-  AlertCircle,
-} from "lucide-react";
-import { Panel, PanelHeader, StatusBadge } from "@/components/ops/primitives";
+import { ArrowLeft, AlertCircle, Clock, MapPin, Truck, CheckCircle2, XCircle } from "lucide-react";
+import { Panel, PanelHeader } from "@/components/ops/primitives";
 import { useCustomerOrderById } from "@/hooks/useCustomer";
-import { inr, cn } from "@/lib/utils";
+import { inr } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/customer/orders_/$id")({
   head: () => ({
     meta: [
-      { title: "Order details - DarkOps Care" },
+      { title: "Order Details - DarkOps Care" },
       {
         name: "description",
-        content: "View detailed order information, items, and delivery status.",
+        content: "View complaint-grounding order context and item details.",
       },
     ],
   }),
@@ -34,7 +25,7 @@ function OrderDetail() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="text-sm text-muted-foreground">Loading order details...</div>
+        <div className="text-sm text-muted-foreground">Loading order context...</div>
       </div>
     );
   }
@@ -44,55 +35,20 @@ function OrderDetail() {
       <div className="mx-auto w-full max-w-2xl">
         <Panel className="p-8 text-center">
           <AlertCircle className="mx-auto size-8 text-crit" />
-          <h1 className="mt-3 text-lg font-semibold">Order not found</h1>
+          <h1 className="mt-3 text-lg font-semibold text-foreground">Order Not Found</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This order may not exist or you don't have permission to view it.
+            This order could not be found or is not associated with your account.
           </p>
           <Button asChild size="sm" className="mt-4">
-            <Link to="/customer">Back to home</Link>
+            <Link to="/customer/orders">Back to Recent Orders</Link>
           </Button>
         </Panel>
       </div>
     );
   }
 
-  const getTrackingSteps = () => {
-    const steps = [
-      { label: "Order placed", done: true, time: order.placedAt, icon: Package },
-      {
-        label: "Packing",
-        done:
-          order.status === "Packing" ||
-          order.status === "Out for delivery" ||
-          order.status === "Delivered",
-        time:
-          order.status === "Packing"
-            ? "In progress"
-            : order.status === "Delivered" || order.status === "Out for delivery"
-              ? "Completed"
-              : "Pending",
-        icon: Package,
-      },
-      {
-        label: "Out for delivery",
-        done: order.status === "Out for delivery" || order.status === "Delivered",
-        time:
-          order.status === "Out for delivery"
-            ? "In progress"
-            : order.status === "Delivered"
-              ? "Completed"
-              : "Pending",
-        icon: Truck,
-      },
-      {
-        label: "Delivered",
-        done: order.status === "Delivered",
-        time: order.status === "Delivered" ? "Completed" : "Pending",
-        icon: CheckCircle2,
-      },
-    ];
-    return steps;
-  };
+  const isDelivered =
+    order.status === "Delivered" || order.status === "delivered" || !!order.deliveredAt;
 
   return (
     <div className="w-full space-y-4">
@@ -101,138 +57,112 @@ function OrderDetail() {
         <Button asChild variant="ghost" size="sm">
           <Link to="/customer/orders">
             <ArrowLeft className="mr-2 size-4" />
-            Back to orders
+            Back to Orders
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-lg font-semibold tracking-tight">Order details</h1>
-          <p className="text-xs text-muted-foreground">{order.id}</p>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Order Context</h1>
+          <p className="text-xs text-muted-foreground">Order #{order.id}</p>
         </div>
+        <Button asChild size="sm">
+          <Link to="/report-issue" search={{ order: order.id }}>
+            <AlertCircle className="mr-1.5 size-4 text-warn" />
+            Report an Issue
+          </Link>
+        </Button>
       </div>
 
-      {/* Order Summary */}
+      {/* Complaint-Grounding Order Summary */}
       <Panel>
         <PanelHeader
-          title="Order summary"
+          title="Order Summary"
           subtitle={`${order.storeName} · ${order.items} items · ${inr(order.total)}`}
-          right={<StatusBadge status={order.status} />}
+          right={
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2 text-xs font-semibold">
+              {isDelivered ? (
+                <>
+                  <CheckCircle2 className="size-3.5 text-ok" />
+                  <span className="text-ok">Delivered</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="size-3.5 text-warn" />
+                  <span className="text-warn">Not delivered</span>
+                </>
+              )}
+            </div>
+          }
         />
-        <div className="grid gap-4 p-4 sm:grid-cols-2">
-          <div className="flex items-start gap-3">
-            <Clock className="size-4 shrink-0 text-muted-foreground" />
+        <div className="grid gap-4 p-4 sm:grid-cols-2 text-xs">
+          <div className="flex items-start gap-2.5">
+            <Clock className="size-4 shrink-0 text-muted-foreground mt-0.5" />
             <div>
-              <p className="text-[13px]">Placed on</p>
-              <p className="num text-xs text-muted-foreground">{order.placedAt}</p>
+              <p className="font-semibold text-foreground">Order Date</p>
+              <p className="text-muted-foreground">{order.placedAt}</p>
             </div>
           </div>
-          {order.eta && (
-            <div className="flex items-start gap-3">
-              <Clock className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-[13px]">Estimated delivery</p>
-                <p className="num text-xs text-muted-foreground">{order.eta}</p>
-              </div>
+
+          <div className="flex items-start gap-2.5">
+            <MapPin className="size-4 shrink-0 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="font-semibold text-foreground">Fulfillment Dark Store</p>
+              <p className="text-muted-foreground">Dark Store: {order.storeName}</p>
             </div>
-          )}
-          {order.deliveredAt && (
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="size-4 shrink-0 text-ok" />
-              <div>
-                <p className="text-[13px]">Delivered on</p>
-                <p className="num text-xs text-muted-foreground">{order.deliveredAt}</p>
-              </div>
-            </div>
-          )}
-          {order.storeCity && (
-            <div className="flex items-start gap-3">
-              <MapPin className="size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-[13px]">Store location</p>
-                <p className="num text-xs text-muted-foreground">{order.storeCity}</p>
-              </div>
-            </div>
-          )}
+          </div>
+
           {order.deliveryPartner && (
-            <div className="flex items-start gap-3">
-              <Truck className="size-4 shrink-0 text-muted-foreground" />
+            <div className="flex items-start gap-2.5 sm:col-span-2">
+              <Truck className="size-4 shrink-0 text-muted-foreground mt-0.5" />
               <div>
-                <p className="text-[13px]">Delivery partner</p>
-                <p className="num text-xs text-muted-foreground">{order.deliveryPartner}</p>
+                <p className="font-semibold text-foreground">Assigned Delivery Partner</p>
+                <p className="text-muted-foreground">
+                  Delivered by {order.deliveryPartner} (Static Reference)
+                </p>
               </div>
             </div>
           )}
         </div>
       </Panel>
 
-      {/* Order Items */}
+      {/* Order Line Items */}
       <Panel>
-        <PanelHeader title="Order items" subtitle={`${order.orderItems.length} items`} />
+        <PanelHeader title="Purchased Items" subtitle={`${order.orderItems.length} line items`} />
         <ul className="divide-y divide-border/60">
           {order.orderItems.map((item, index) => (
-            <li key={index} className="flex items-center justify-between px-4 py-3">
+            <li key={index} className="flex items-center justify-between px-4 py-3 text-xs">
               <div>
-                <p className="text-[13px]">{item.name}</p>
-                <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                <p className="font-semibold text-foreground">{item.name}</p>
+                <p className="text-muted-foreground">Quantity: {item.quantity}</p>
               </div>
-              <span className="num text-[13px]">{inr(item.unitPrice * item.quantity)}</span>
+              <span className="font-mono text-xs font-semibold text-foreground">
+                {inr(item.unitPrice * item.quantity)}
+              </span>
             </li>
           ))}
         </ul>
-        <div className="border-t border-border/70 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Total</p>
-            <p className="num text-lg font-semibold">{inr(order.total)}</p>
+        <div className="border-t border-border/70 px-4 py-3 bg-surface-2/20">
+          <div className="flex items-center justify-between text-sm font-semibold text-foreground">
+            <span>Total Order Amount</span>
+            <span className="font-mono text-base">{inr(order.total)}</span>
           </div>
         </div>
       </Panel>
 
-      {/* Delivery Timeline */}
+      {/* Issue Action Card */}
       <Panel>
-        <PanelHeader title="Delivery timeline" subtitle="Track your order progress" />
-        <ol className="p-4">
-          {getTrackingSteps().map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <li key={step.label} className="flex gap-3 pb-4 last:pb-0">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded-full",
-                      step.done ? "bg-ok/10" : "bg-surface-2",
-                    )}
-                  >
-                    <Icon
-                      className={cn("size-4", step.done ? "text-ok" : "text-muted-foreground")}
-                    />
-                  </div>
-                  {i < 3 && (
-                    <span
-                      className={cn("mt-2 w-px flex-1", step.done ? "bg-ok/50" : "bg-border")}
-                    />
-                  )}
-                </div>
-                <div className="-mt-1">
-                  <p className={cn("text-[13px]", !step.done && "text-muted-foreground")}>
-                    {step.label}
-                  </p>
-                  <p className="num text-xs text-muted-foreground">{step.time}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </Panel>
-
-      {/* Report Issue — shown for any order status */}
-      <Panel>
-        <div className="p-4">
-          <p className="text-sm font-medium">Have an issue with this order?</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Report missing, wrong, or damaged items and we'll help you resolve it.
-          </p>
-          <Button asChild size="sm" className="mt-3">
-            <Link to="/customer/support" state={{ orderId: order.id } as any}>
-              Report an issue
+        <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold text-foreground">
+              Need to report a problem with this order?
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Report missing items, damaged products, or delivery delays for quick investigation.
+            </p>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            <Link to="/report-issue" search={{ order: order.id }}>
+              <AlertCircle className="mr-1.5 size-3.5" />
+              Report an Issue
             </Link>
           </Button>
         </div>

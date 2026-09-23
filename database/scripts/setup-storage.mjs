@@ -1,10 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // Test upload capability with service role
 const testContent = new TextEncoder().encode("test");
@@ -26,4 +23,4 @@ const { data: signedUrl, error: sue } = await supabase.storage
   .createSignedUploadUrl("test-user/test-complaint/test.jpg");
 console.log("signed upload URL:", signedUrl?.signedUrl ? "generated OK" : "failed", sue?.message);
 
-console.log("Setup complete — storage bucket is ready for signed upload URLs");
+console.log("Setup complete - storage bucket is ready for signed upload URLs");

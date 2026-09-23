@@ -5,7 +5,7 @@ import { Panel, PanelHeader, Chip } from "@/components/ops/primitives";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api";
-import { format } from "date-fns";
+import { formatShortDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/security/events")({
   head: () => ({
@@ -212,8 +212,8 @@ function SecurityEventRow({ event }: { event: any }) {
           )}
         </div>
       </div>
-      <div className="ml-3 text-xs text-muted-foreground">
-        {format(new Date(event.created_at), "dd MMM, HH:mm")}
+      <div className="num ml-3 text-xs text-muted-foreground">
+        {formatShortDateTime(event.occurred_at)}
       </div>
     </div>
   );

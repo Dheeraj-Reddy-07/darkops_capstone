@@ -31,22 +31,29 @@ function ComplaintHistory() {
       return c.status === statusFilter;
     }) || [];
 
+  const allCount = complaints?.length || 0;
+  const activeCount =
+    complaints?.filter((c: any) => c.status !== "resolved" && c.status !== "closed").length || 0;
+  const resolvedCount =
+    complaints?.filter((c: any) => c.status === "resolved" || c.status === "closed").length || 0;
+
   const getCustomerFriendlyStatus = (complaint: any) => {
     if (complaint.customerStatusLabel) return complaint.customerStatusLabel;
-    const rawStatus = (complaint.status || "").toLowerCase();
+    const rawStatus = (complaint.status || "").toLowerCase().replace(/_/g, " ");
     const statusMap: Record<string, string> = {
       received: "Complaint received",
       unassigned: "Complaint received",
       agent_queue: "Under review",
       assigned: "Under review",
       in_progress: "Being resolved",
+      refund_in_progress: "Refund in progress",
       auto_resolved: "Resolved automatically",
       resolved: "Resolved",
       closed: "Resolved",
       sla_expired: "Support available",
       awaiting_customer: "Waiting for response",
     };
-    return statusMap[rawStatus] || "Under review";
+    return statusMap[rawStatus] || rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
   };
 
   if (isLoading) {
@@ -87,7 +94,7 @@ function ComplaintHistory() {
         <div className="flex-1">
           <h1 className="text-lg font-semibold tracking-tight">My Issues</h1>
           <p className="text-xs text-muted-foreground">
-            {complaints?.length || 0} total reported issue{complaints?.length !== 1 ? "s" : ""}
+            {allCount} total reported issue{allCount !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
@@ -101,9 +108,9 @@ function ComplaintHistory() {
           </div>
           <div className="flex flex-wrap gap-2">
             {[
-              { value: "all", label: "All" },
-              { value: "open", label: "Active" },
-              { value: "resolved", label: "Resolved" },
+              { value: "all", label: `All (${allCount})` },
+              { value: "open", label: `Active (${activeCount})` },
+              { value: "resolved", label: `Resolved (${resolvedCount})` },
             ].map((filter) => (
               <button
                 key={filter.value}
@@ -140,7 +147,7 @@ function ComplaintHistory() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                       <p className="num text-[13px]">{complaint.complaintRef}</p>
+                        <p className="num text-[13px]">{complaint.complaintRef}</p>
                         <StatusBadge status={getCustomerFriendlyStatus(complaint)} />
                       </div>
                       <p className="text-sm font-medium">{complaint.summary}</p>

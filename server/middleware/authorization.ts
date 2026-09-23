@@ -74,9 +74,7 @@ export const requireCustomerAccess = (customerIdParam: string = "customerId") =>
 
       // Internal roles can access customer data
       if (
-        ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "CUSTOMER_SUPPORT"].includes(
-          auth.user.role,
-        )
+        ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "CUSTOMER_SUPPORT"].includes(auth.user.role)
       ) {
         return next();
       }
@@ -135,12 +133,7 @@ export const requireFraudAccess = () => {
       }
 
       // Only these roles can access fraud data
-      const allowedRoles = [
-        "PLATFORM_ADMIN",
-        "EXECUTIVE",
-        "OPERATIONS",
-        "CUSTOMER_SUPPORT",
-      ];
+      const allowedRoles = ["PLATFORM_ADMIN", "EXECUTIVE", "OPERATIONS", "CUSTOMER_SUPPORT"];
 
       if (!allowedRoles.includes(auth.user.role)) {
         throw new HTTPError(403, "FORBIDDEN", "You do not have permission to access fraud data");

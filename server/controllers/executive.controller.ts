@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { createSupabaseServiceRoleClient } from "../lib/supabase";
 import { DeterministicInsightsProvider } from "../services/insights.service";
 import { ExecutiveAssistantService } from "../services/executive-assistant.service";
+import { thinkingDelay } from "../lib/thinking-delay";
 
 let metricsCache: { data: any; expiresAt: number } | null = null;
 
@@ -12,7 +13,9 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
 
   // Return cached metrics if fresh (< 15 seconds)
   if (metricsCache && Date.now() < metricsCache.expiresAt) {
-    console.log(`[GET_METRICS_CACHE_HIT] RequestID: ${requestId}, serving cached in ${Date.now() - reqStart}ms`);
+    console.log(
+      `[GET_METRICS_CACHE_HIT] RequestID: ${requestId}, serving cached in ${Date.now() - reqStart}ms`,
+    );
     return res.status(200).json(metricsCache.data);
   }
 
@@ -20,39 +23,32 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
     const supabase = createSupabaseServiceRoleClient();
 
     // 5 clean, non-blocking queries in parallel
-    const [
-      storesResult,
-      complaintsResult,
-      pulseResult,
-      fraudResult,
-      alertsResult,
-    ] = await Promise.all([
-      // 1. Stores with their snapshots
-      supabase
-        .from("stores")
-        .select("id, name, city, store_metrics_snapshots(sla_pct, refund_rate_pct)"),
-      // 2. All complaints (small table, ~92 rows) with all fields needed
-      supabase
-        .from("complaints")
-        .select("id, store_id, status, priority, sla_state, created_at"),
-      // 3. Latest pulse scores
-      supabase
-        .from("pulse_scores")
-        .select("store_id, score, calculated_at")
-        .order("calculated_at", { ascending: false })
-        .limit(600),
-      // 4. Pending fraud reviews count
-      supabase
-        .from("fraud_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("decision", "pending_review"),
-      // 5. Active critical alerts
-      supabase
-        .from("alerts")
-        .select("*")
-        .eq("severity", "crit")
-        .is("is_resolved", false),
-    ]);
+    const [storesResult, complaintsResult, pulseResult, fraudResult, alertsResult] =
+      await Promise.all([
+        // 1. Stores with their snapshots
+        supabase
+          .from("stores")
+          .select("id, name, city, store_metrics_snapshots(sla_pct, refund_rate_pct)"),
+        // 2. Complaints (network-wide) with fields needed for the dashboard.
+        supabase
+          .from("complaints")
+          .select("id, store_id, status, priority, sla_state, created_at, resolved_at")
+          .order("created_at", { ascending: false })
+          .limit(5000),
+        // 3. Latest pulse scores
+        supabase
+          .from("pulse_scores")
+          .select("store_id, score, calculated_at")
+          .order("calculated_at", { ascending: false })
+          .limit(10000),
+        // 4. Pending fraud reviews count
+        supabase
+          .from("fraud_reviews")
+          .select("id", { count: "exact", head: true })
+          .eq("decision", "pending_review"),
+        // 5. Active critical alerts
+        supabase.from("alerts").select("*").eq("severity", "crit").is("is_resolved", false),
+      ]);
 
     console.log(`[GET_METRICS_QUERIES_DONE] Queries finished in ${Date.now() - reqStart}ms`);
 
@@ -62,16 +58,19 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
 
     // Map latest pulse score per store
     const latestPulseMap = new Map<string, { score: number; calculated_at: string }>();
-    pulseScores.forEach((p) => {
+    pulseScores.forEach((p: any) => {
       const existing = latestPulseMap.get(p.store_id);
-      if (!existing || new Date(p.calculated_at).getTime() > new Date(existing.calculated_at).getTime()) {
+      if (
+        !existing ||
+        new Date(p.calculated_at).getTime() > new Date(existing.calculated_at).getTime()
+      ) {
         latestPulseMap.set(p.store_id, p);
       }
     });
 
     // Store city lookup
     const storeCityMap = new Map<string, string>();
-    stores.forEach((s) => storeCityMap.set(s.id, s.city));
+    stores.forEach((s: any) => storeCityMap.set(s.id, s.city));
 
     // Pulse aggregations
     const pulseValues = Array.from(latestPulseMap.values());
@@ -87,17 +86,24 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
 
     // Complaints aggregations
     const activeStatuses = ["unassigned", "assigned", "in_progress", "escalated_l2"];
-    const activeCases = complaints.filter((c) => activeStatuses.includes(c.status)).length;
-    const slaAtRisk = complaints.filter((c) => c.sla_state === "at_risk").length;
-    const slaBreached = complaints.filter((c) => c.sla_state === "breached").length;
-    const p1Cases = complaints.filter((c) => c.priority === "P1").length;
-    const resolvedToday = complaints.filter((c) => c.status === "resolved").length;
+    const activeCases = complaints.filter((c: any) => activeStatuses.includes(c.status)).length;
+    const slaAtRisk = complaints.filter((c: any) => c.sla_state === "at_risk").length;
+    const slaBreached = complaints.filter((c: any) => c.sla_state === "breached").length;
+    const p1Cases = complaints.filter((c: any) => c.priority === "P1").length;
+    // Genuinely "resolved today" — resolutions in the last 24h (not all-time).
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const resolvedToday = complaints.filter(
+      (c: any) =>
+        (c.status === "resolved" || c.status === "closed") &&
+        c.resolved_at &&
+        new Date(c.resolved_at).getTime() >= oneDayAgo,
+    ).length;
 
     // City stats
     const cityStatsMap: Record<string, number> = {};
     complaints
-      .filter((c) => activeStatuses.includes(c.status))
-      .forEach((c) => {
+      .filter((c: any) => activeStatuses.includes(c.status))
+      .forEach((c: any) => {
         const city = storeCityMap.get(c.store_id) || "Unknown";
         cityStatsMap[city] = (cityStatsMap[city] || 0) + 1;
       });
@@ -110,8 +116,8 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const volumeByDay: Record<string, number> = {};
     complaints
-      .filter((c) => new Date(c.created_at) >= thirtyDaysAgo)
-      .forEach((c) => {
+      .filter((c: any) => new Date(c.created_at) >= thirtyDaysAgo)
+      .forEach((c: any) => {
         const day = new Date(c.created_at).toISOString().split("T")[0];
         volumeByDay[day] = (volumeByDay[day] || 0) + 1;
       });
@@ -138,7 +144,7 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
 
     const resultData = {
       store_count: stores.length,
-      city_count: new Set(stores.map((s) => s.city)).size,
+      city_count: new Set(stores.map((s: any) => s.city)).size,
       critical_stores: criticalStores,
       at_risk_stores: atRiskStores,
       avg_pulse: avgPulse,
@@ -166,7 +172,6 @@ export const getMetrics = async (req: Request, res: Response, next: NextFunction
     console.error(`[GET_METRICS_ERROR] in ${Date.now() - reqStart}ms:`, error);
     next(error);
   }
-
 };
 
 export const getInsights = async (req: Request, res: Response, next: NextFunction) => {
@@ -191,6 +196,7 @@ export const chatInsights = async (req: Request, res: Response, next: NextFuncti
       });
       return;
     }
+    await thinkingDelay();
     const provider = new DeterministicInsightsProvider();
     const answer = await provider.chat(question.trim());
     res.status(200).json({ answer });
@@ -202,7 +208,7 @@ export const chatInsights = async (req: Request, res: Response, next: NextFuncti
 export const assistantQuery = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { question, context, dashboardContext } = req.body;
-    
+
     if (!question || typeof question !== "string" || question.trim().length === 0) {
       res.status(400).json({
         error: {
@@ -213,9 +219,10 @@ export const assistantQuery = async (req: Request, res: Response, next: NextFunc
       return;
     }
 
+    await thinkingDelay();
     const assistant = new ExecutiveAssistantService();
     const response = await assistant.query(question.trim(), context, dashboardContext);
-    
+
     res.status(200).json(response);
   } catch (error) {
     next(error);

@@ -27,7 +27,7 @@ export const Route = createFileRoute("/fraud/$id")({
       { property: "og:title", content: `Risk review ${params.id} - DarkOps` },
       {
         property: "og:description",
-        content: "Explainable risk scoring with analyst decision controls.",
+        content: "Risk factors, evidence and support review decision controls.",
       },
     ],
   }),
@@ -58,7 +58,7 @@ function FraudDetail() {
       <Breadcrumbs
         items={[
           { label: "Fraud & risk", to: "/fraud" },
-          { label: "AI review queue", to: "/fraud" },
+          { label: "Risk review queue", to: "/fraud" },
           { label: record.id },
         ]}
       />
@@ -88,11 +88,11 @@ function FraudDetail() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
-          label="Risk confidence"
+          label="Risk score"
           value={record.confidence}
           unit="%"
           tone={record.confidence >= 85 ? "crit" : "warn"}
-          footnote="model score on this claim"
+          footnote="heuristic risk score"
         />
         <KpiCard
           label="Refund requested"
@@ -227,26 +227,42 @@ function FraudDetail() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-[308px]">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      decide.mutate({ id: record.id, decision: "Approved", note });
-                      toast.success(`Refund approved for ${record.id}`);
-                    }}
+                    onSelect={() =>
+                      decide.mutate(
+                        { id: record.id, decision: "Approved", note },
+                        {
+                          onSuccess: () => toast.success(`Refund approved for ${record.id}`),
+                          onError: (e: any) => toast.error(e?.message || "Decision failed"),
+                        },
+                      )
+                    }
                   >
                     Approve refund
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      decide.mutate({ id: record.id, decision: "Denied", note });
-                      toast.error(`Refund denied for ${record.id}`);
-                    }}
+                    onSelect={() =>
+                      decide.mutate(
+                        { id: record.id, decision: "Denied", note },
+                        {
+                          onSuccess: () => toast.error(`Refund denied for ${record.id}`),
+                          onError: (e: any) => toast.error(e?.message || "Decision failed"),
+                        },
+                      )
+                    }
                   >
                     Deny refund
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      decide.mutate({ id: record.id, decision: "Escalated", note });
-                      toast.warning(`Case ${record.id} escalated to management`);
-                    }}
+                    onSelect={() =>
+                      decide.mutate(
+                        { id: record.id, decision: "Escalated", note },
+                        {
+                          onSuccess: () =>
+                            toast.warning(`Case ${record.id} escalated to management`),
+                          onError: (e: any) => toast.error(e?.message || "Decision failed"),
+                        },
+                      )
+                    }
                   >
                     Escalate to management
                   </DropdownMenuItem>
@@ -265,12 +281,6 @@ function FraudDetail() {
             <Field
               label="Upheld claims"
               value={<span className="num text-crit">{record.upheldClaims}</span>}
-            />
-            <Field
-              label="Lifetime refund value"
-              value={
-                <span className="num">{inr(record.refundAmount * (1 + record.priorClaims))}</span>
-              }
             />
             <Field
               label="Account standing"

@@ -41,12 +41,20 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { fetchApi } from "@/lib/api";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { initialIdentity, fetchCurrentUser, isSupportLead } from "@/lib/current-user";
+import {
+  formatCategory,
+  formatStatus,
+  formatQueue,
+  formatResolution,
+  formatPriority,
+} from "@/lib/formatters";
+import { toast } from "sonner";
 
 // ─── Route Definition ────────────────────────────────────────────────────────
 
 const searchSchema = z.object({
-  tab: z.enum(["mine", "team", "unassigned", "resolved"]).optional().default("mine"),
+  tab: z.enum(["mine", "team", "unassigned", "resolved"]).optional(),
   status: z.string().optional().default("all"),
   priority: z.string().optional().default("all"),
   queue: z.string().optional().default("all"),
@@ -58,7 +66,7 @@ export const Route = createFileRoute("/support/")({
   validateSearch: (search) => searchSchema.parse(search),
   head: () => ({
     meta: [
-      { title: "Support Workspace — DarkOps" },
+      { title: "Support Workspace - DarkOps" },
       {
         name: "description",
         content: "Resolve assigned cases, manage SLA risk, and keep customer issues moving.",
@@ -133,36 +141,34 @@ function SlaCell({ deadline }: { deadline: string | null }) {
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
+// ─── Status badge ─────────────────────────────────────────────────────────────
+
 function StatusChip({ status }: { status: string }) {
-  const s = status.toLowerCase();
+  const s = status ? status.toLowerCase() : "";
   const tone =
     s === "resolved" || s === "closed"
       ? "ok"
-      : s === "escalated"
+      : s === "escalated" || s === "escalated_l2"
         ? "crit"
         : s === "in_progress"
           ? "info"
           : s === "awaiting_customer"
             ? "warn"
             : "neutral";
-  const label =
-    s === "in_progress"
-      ? "In Progress"
-      : s === "awaiting_customer"
-        ? "Awaiting"
-        : s.charAt(0).toUpperCase() + s.slice(1);
-  return <Chip tone={tone}>{label}</Chip>;
+  return <Chip tone={tone}>{formatStatus(status)}</Chip>;
 }
 
 // ─── Assignment label ─────────────────────────────────────────────────────────
 
 function AssigneeLabel({ profile, currentUserId }: { profile: any; currentUserId: string }) {
-  if (!profile) return <span className="text-xs text-muted-foreground">Unassigned</span>;
+  if (!profile || !profile.full_name) {
+    return <span className="text-xs text-muted-foreground font-mono">Unassigned</span>;
+  }
   const isMe = profile.id === currentUserId;
   return (
     <span
       className={cn(
-        "text-xs flex items-center gap-1",
+        "text-xs flex items-center gap-1.5",
         isMe ? "text-primary font-medium" : "text-muted-foreground",
       )}
     >
@@ -179,33 +185,49 @@ function SupportWorkspace() {
   const search = useSearch({ from: "/support/" });
   const queryClient = useQueryClient();
 
-  const { tab, status, priority, queue, q } = search;
-
-  // Current agent identity
+  // Current agent identity — resolves the ACTUAL signed-in user (mock session or
+  // real Supabase profile); never falls back to the Lead.
   const { data: me } = useQuery({
     queryKey: ["current-user"],
-    queryFn: async () => {
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      return profile as any;
-    },
+    queryFn: fetchCurrentUser,
+    initialData: initialIdentity,
     staleTime: 60000,
   });
+
+  const isSupportStaff =
+    me?.role === "CUSTOMER_SUPPORT" ||
+    me?.role === "PLATFORM_ADMIN" ||
+    me?.role === "OPERATIONS" ||
+    me?.role === "EXECUTIVE";
+
+  const isLead = isSupportLead(me);
+
+  // Persisted support workspace preferences
+  const supportPrefs = (me?.preferences as any) || {};
+  const supportAutoRefresh = supportPrefs.supportAutoRefresh !== false; // default on
+  const prefQueue = supportPrefs.supportDefaultQueue as "mine" | "team" | "unassigned" | undefined;
+
+  // Default landing tab: explicit URL tab → saved preference → role default
+  const tab = search.tab || prefQueue || (isLead ? "team" : "mine");
+  const { status, priority, queue, q } = search;
+  const ticketRefetch = supportAutoRefresh ? 60000 : (false as const);
 
   // Personal KPI stats
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["my-support-stats"],
     queryFn: () => fetchApi("/support/me/stats"),
+    enabled: !!isSupportStaff,
     refetchInterval: 60000,
   });
+
+  // Team Workload breakdown (Support Lead view)
+  const workloadQuery = useQuery({
+    queryKey: ["team-workload"],
+    queryFn: () => fetchApi("/support/team/workload"),
+    enabled: isLead && !!isSupportStaff,
+    refetchInterval: 60000,
+  });
+  const workloadList: any[] = workloadQuery.data?.data || [];
 
   // Tab data queries
   const myTicketsQuery = useQuery({
@@ -218,7 +240,8 @@ function SupportWorkspace() {
       if (q) params.set("q", q);
       return fetchApi(`/support/me/tickets?${params}`);
     },
-    enabled: tab === "mine",
+    enabled: tab === "mine" && !!isSupportStaff,
+    refetchInterval: ticketRefetch,
   });
 
   const teamTicketsQuery = useQuery({
@@ -231,19 +254,22 @@ function SupportWorkspace() {
       if (q) params.set("q", q);
       return fetchApi(`/support/team/tickets?${params}`);
     },
-    enabled: tab === "team",
+    enabled: tab === "team" && !!isSupportStaff,
+    refetchInterval: ticketRefetch,
   });
 
   const unassignedQuery = useQuery({
     queryKey: ["unassigned-tickets"],
     queryFn: () => fetchApi("/support/unassigned/tickets"),
-    enabled: tab === "unassigned",
+    enabled: tab === "unassigned" && !!isSupportStaff,
+    refetchInterval: ticketRefetch,
   });
 
   const resolvedQuery = useQuery({
     queryKey: ["my-resolved-tickets"],
     queryFn: () => fetchApi("/support/me/resolved"),
-    enabled: tab === "resolved",
+    enabled: tab === "resolved" && !!isSupportStaff,
+    refetchInterval: ticketRefetch,
   });
 
   // Determine active data
@@ -276,6 +302,7 @@ function SupportWorkspace() {
         to: "/support",
         search: (prev: any) => ({ ...prev, ...updates }),
         replace: true,
+        resetScroll: false,
       });
     },
     [navigate],
@@ -284,17 +311,40 @@ function SupportWorkspace() {
   const agentFirstName = me?.full_name?.split(" ")[0] || "Agent";
 
   // KPI counts from stats (all real, from database)
-  const myOpen = stats?.my_open ?? (statsLoading ? "—" : 0);
-  const urgent = stats?.urgent ?? (statsLoading ? "—" : 0);
-  const atRisk = stats?.sla_at_risk ?? (statsLoading ? "—" : 0);
-  const overdue = stats?.overdue ?? (statsLoading ? "—" : 0);
+  const myOpen = stats?.my_open ?? (statsLoading ? "-" : 0);
+  const urgent = stats?.urgent ?? (statsLoading ? "-" : 0);
+  const atRisk = stats?.sla_at_risk ?? (statsLoading ? "-" : 0);
+  const overdue = stats?.overdue ?? (statsLoading ? "-" : 0);
 
   const TABS = [
+    ...(isLead ? [{ key: "team", label: "Team Queue (Lead)" }] : []),
     { key: "mine", label: "My Tickets" },
-    { key: "team", label: "Team Queue" },
-    { key: "unassigned", label: "Unassigned" },
-    { key: "resolved", label: "Resolved" },
+    ...(!isLead ? [{ key: "team", label: "Team Queue" }] : []),
+    { key: "unassigned", label: "Unassigned Pool" },
+    { key: "resolved", label: "Resolved History" },
   ] as const;
+
+  // Access Restricted View for non-support accounts
+  if (me && !isSupportStaff) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Support Workspace"
+          subtitle="Resolve assigned cases, manage SLA risk, and keep customer issues moving."
+        />
+        <Panel className="p-8 max-w-2xl mx-auto text-center">
+          <AlertTriangle className="size-12 text-warn mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-foreground">Support Workspace Access Restricted</h2>
+          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+            You are currently signed in as{" "}
+            <strong className="text-foreground">{me.full_name || me.email}</strong> ({me.role}). The
+            internal Support Console is restricted to Support Leads and Agents. Please sign in with
+            a support account to access this workspace.
+          </p>
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -306,24 +356,38 @@ function SupportWorkspace() {
 
       {/* Agent identity bar */}
       {me && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
-            {me.full_name
-              ?.split(" ")
-              .map((n: string) => n[0])
-              .join("")
-              .toUpperCase()
-              .slice(0, 2)}
-          </span>
-          <span>
-            Welcome back, <span className="font-medium text-foreground">{agentFirstName}</span>.
-            {typeof myOpen === "number" && myOpen > 0 && (
-              <span className="ml-1">
-                <span className="num text-foreground">{myOpen}</span> ticket
-                {myOpen !== 1 ? "s" : ""} assigned to you.
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="flex size-6 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
+              {me.full_name
+                ?.split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2)}
+            </span>
+            <span>
+              Welcome back,{" "}
+              <span className="font-medium text-foreground">
+                {isLead
+                  ? `Support Lead (${me.full_name || me.email})`
+                  : me.full_name || agentFirstName}
               </span>
-            )}
-          </span>
+              .
+              {typeof myOpen === "number" && myOpen > 0 && (
+                <span className="ml-1">
+                  <span className="num text-foreground">{myOpen}</span> ticket
+                  {myOpen !== 1 ? "s" : ""} assigned to you.
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-mono">
+              Role: {isLead ? "SUPPORT_LEAD" : "SUPPORT_AGENT"}
+            </span>
+          </div>
         </div>
       )}
 
@@ -336,9 +400,10 @@ function SupportWorkspace() {
         >
           <KpiCard
             label="My Open"
+            loading={statsLoading}
             value={myOpen}
             footnote="active tickets assigned to you"
-            tone={typeof myOpen === "number" && myOpen > 0 ? "neutral" : "neutral"}
+            tone="neutral"
           />
         </button>
         <button
@@ -348,8 +413,9 @@ function SupportWorkspace() {
         >
           <KpiCard
             label="Urgent"
+            loading={statsLoading}
             value={urgent}
-            footnote="P1 priority — act immediately"
+            footnote="P1 priority - act immediately"
             tone="crit"
             alert={typeof urgent === "number" && urgent > 0}
           />
@@ -361,6 +427,7 @@ function SupportWorkspace() {
         >
           <KpiCard
             label="SLA at Risk"
+            loading={statsLoading}
             value={atRisk}
             footnote="approaching SLA deadline"
             tone={typeof atRisk === "number" && atRisk > 0 ? "warn" : "neutral"}
@@ -374,6 +441,7 @@ function SupportWorkspace() {
         >
           <KpiCard
             label="Overdue"
+            loading={statsLoading}
             value={overdue}
             footnote="SLA already breached"
             tone="crit"
@@ -381,6 +449,91 @@ function SupportWorkspace() {
           />
         </button>
       </div>
+
+      {/* Support Lead Workload Overview - List View */}
+      {isLead && workloadList.length > 0 && (
+        <Panel className="mb-6">
+          <PanelHeader
+            title="Team Workload & Queue Allocation"
+            subtitle="Live distribution of active tickets, priority issues, and SLA breaches across all agents."
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-surface-2/50">
+                  <th className="px-4 py-2.5 text-left text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Agent
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Role
+                  </th>
+                  <th className="px-4 py-2.5 text-center text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Open
+                  </th>
+                  <th className="px-4 py-2.5 text-center text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Urgent P1
+                  </th>
+                  <th className="px-4 py-2.5 text-center text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Breached
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                    Email
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {workloadList.map((agent: any) => (
+                  <tr key={agent.agent_id} className="hover:bg-surface-2/40 transition-colors">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+                          {(agent.full_name || agent.email || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-medium text-foreground">
+                          {agent.full_name || agent.email}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Chip tone={agent.role === "SUPPORT_LEAD" ? "info" : "neutral"} size="sm">
+                        {agent.role === "SUPPORT_LEAD" ? "Lead" : "Agent"}
+                      </Chip>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className="num font-bold text-foreground">
+                        {agent.open_tickets_count}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span
+                        className={cn(
+                          "num font-bold",
+                          agent.urgent_count > 0 ? "text-crit" : "text-muted-foreground",
+                        )}
+                      >
+                        {agent.urgent_count > 0 ? agent.urgent_count : "-"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span
+                        className={cn(
+                          "num font-bold",
+                          agent.breached_count > 0 ? "text-warn" : "text-muted-foreground",
+                        )}
+                      >
+                        {agent.breached_count > 0 ? agent.breached_count : "-"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs text-muted-foreground font-mono">{agent.email}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
 
       {/* Main Panel */}
       <Panel>
@@ -540,10 +693,14 @@ function SupportWorkspace() {
           onRetry={() => activeQuery.refetch()}
           tab={tab}
           currentUserId={me?.id}
+          isLead={isLead}
           navigate={navigate}
+          workloadList={workloadList}
           onClaimSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+            queryClient.invalidateQueries({ queryKey: ["team-tickets"] });
             queryClient.invalidateQueries({ queryKey: ["unassigned-tickets"] });
+            queryClient.invalidateQueries({ queryKey: ["team-workload"] });
             queryClient.invalidateQueries({ queryKey: ["my-support-stats"] });
           }}
         />
@@ -564,7 +721,9 @@ function TicketTable({
   onRetry,
   tab,
   currentUserId,
+  isLead,
   navigate,
+  workloadList,
   onClaimSuccess,
 }: {
   tickets: any[];
@@ -573,10 +732,14 @@ function TicketTable({
   onRetry: () => void;
   tab: string;
   currentUserId: string | undefined;
+  isLead: boolean;
   navigate: any;
+  workloadList: any[];
   onClaimSuccess: () => void;
 }) {
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const handleClaim = async (ticketId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -586,11 +749,36 @@ function TicketTable({
         method: "PATCH",
         body: JSON.stringify({ assign_to_self: true }),
       });
+      toast.success("Ticket claimed");
       onClaimSuccess();
     } catch (err: any) {
-      console.error("Claim failed:", err.message);
+      toast.error(`Claim failed: ${err.message}`);
     } finally {
       setClaimingId(null);
+    }
+  };
+
+  const handleReassign = async (
+    ticketId: string,
+    newAgentId: string,
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    e.stopPropagation();
+    setReassigningId(ticketId);
+    try {
+      await fetchApi(`/support/tickets/${ticketId}/assign`, {
+        method: "PATCH",
+        body: JSON.stringify({ assigned_to: newAgentId || null }),
+      });
+      toast.success("Ticket reassigned successfully");
+      queryClient.invalidateQueries({ queryKey: ["team-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["team-workload"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-tickets"] });
+    } catch (err: any) {
+      toast.error(`Reassignment failed: ${err.message}`);
+    } finally {
+      setReassigningId(null);
     }
   };
 
@@ -620,7 +808,7 @@ function TicketTable({
         }
         hint={
           tab === "mine"
-            ? "Your queue is clear — great work."
+            ? "Your queue is clear - great work."
             : tab === "unassigned"
               ? "All tickets have been claimed."
               : "Try adjusting your filters."
@@ -680,21 +868,39 @@ function TicketTable({
               </Td>
               {tab !== "mine" && (
                 <Td>
-                  <AssigneeLabel
-                    profile={ticket.assigned_to_profile}
-                    currentUserId={currentUserId || ""}
-                  />
+                  {isLead ? (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <select
+                        value={ticket.assigned_to || ""}
+                        disabled={reassigningId === ticket.id}
+                        onChange={(e) => handleReassign(ticket.id, e.target.value, e)}
+                        className="rounded border border-border bg-surface-2 px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+                      >
+                        <option value="">- Unassigned -</option>
+                        {workloadList.map((agent: any) => (
+                          <option key={agent.agent_id} value={agent.agent_id}>
+                            {agent.full_name} {agent.role === "SUPPORT_LEAD" ? "(Lead)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <AssigneeLabel
+                      profile={ticket.assigned_to_profile}
+                      currentUserId={currentUserId || ""}
+                    />
+                  )}
                 </Td>
               )}
               <Td>
-                <Chip>{ticket.queue}</Chip>
+                <Chip>{formatQueue(ticket.queue)}</Chip>
               </Td>
               <Td>
                 <PriorityBadge priority={ticket.priority as any} />
               </Td>
               <Td>
                 {isResolved ? (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-muted-foreground">-</span>
                 ) : (
                   <SlaCell deadline={ticket.sla_deadline} />
                 )}
@@ -782,7 +988,7 @@ function FailedAutomationPanel({ navigate }: { navigate: any }) {
     <>
       <Panel className="mt-6">
         <PanelHeader
-          title="Automation Failures — Intake Queue"
+          title="Automation Failures - Intake Queue"
           subtitle={`${rows.length} complaint${rows.length !== 1 ? "s" : ""} that couldn't be auto-processed. Review and create a ticket or resolve manually.`}
         />
         <TableShell>
@@ -874,7 +1080,11 @@ function getRuleExplanation(failureStep: string, failureReason: string): string 
     if (reasonLower.includes("prior claim") || reasonLower.includes("history")) {
       return "Auto-approval Rule Failed: Customer has exceeded the prior claims threshold (≤2 claims in 90 days). This flag indicates potential abuse risk requiring manual review.";
     }
-    if (reasonLower.includes("amount") || reasonLower.includes("threshold") || reasonLower.includes("rs")) {
+    if (
+      reasonLower.includes("amount") ||
+      reasonLower.includes("threshold") ||
+      reasonLower.includes("rs")
+    ) {
       return "Auto-approval Rule Failed: Order amount exceeds the auto-approve threshold (≤Rs 500). Higher value refunds require manual approval for fraud prevention.";
     }
     if (reasonLower.includes("confidence") || reasonLower.includes("nlp")) {
@@ -884,7 +1094,11 @@ function getRuleExplanation(failureStep: string, failureReason: string): string 
   }
 
   if (stepLower.includes("reorder")) {
-    if (reasonLower.includes("expired") || reasonLower.includes("window") || reasonLower.includes("old")) {
+    if (
+      reasonLower.includes("expired") ||
+      reasonLower.includes("window") ||
+      reasonLower.includes("old")
+    ) {
       return "Auto-approval Rule Failed: Reorder time window has expired (≤24 hours from order placement). Reorders outside this window require manual investigation.";
     }
     if (reasonLower.includes("prior claim") || reasonLower.includes("customer")) {
@@ -909,7 +1123,7 @@ function getRuleExplanation(failureStep: string, failureReason: string): string 
     return "Operational Rule: This complaint type requires human investigation (e.g., late delivery, wrong items, quality issues). Automation cannot resolve operational disputes.";
   }
 
-  return `Manual review required. Failure in ${failureStep || 'unknown'} step: ${failureReason || 'no specific reason provided'}`;
+  return `Manual review required. Failure in ${failureStep || "unknown"} step: ${failureReason || "no specific reason provided"}`;
 }
 
 // ─── Review Automation Dialog ──────────────────────────────────────────────────
@@ -979,7 +1193,7 @@ function ReviewAutomationDialog({
             <DialogHeader>
               <DialogTitle>Review Automation Failure</DialogTitle>
               <DialogDescription>
-                {item.complaints?.complaint_ref} —{" "}
+                {item.complaints?.complaint_ref} -{" "}
                 {item.complaints?.summary || "No summary available"}
               </DialogDescription>
             </DialogHeader>
@@ -987,9 +1201,7 @@ function ReviewAutomationDialog({
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-xs text-muted-foreground font-medium mb-1">
-                    Failure Step
-                  </div>
+                  <div className="text-xs text-muted-foreground font-medium mb-1">Failure Step</div>
                   <div className="text-sm font-medium">{item.failure_step}</div>
                 </div>
                 <div>

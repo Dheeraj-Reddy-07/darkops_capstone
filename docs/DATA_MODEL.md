@@ -1,4 +1,4 @@
-# DarkOps — Data Model
+# DarkOps - Data Model
 
 Derived from the existing mock data structures and product workflows observed in the Lovable prototype.
 
@@ -199,7 +199,7 @@ CREATE TYPE order_status AS ENUM (
 
 #### `complaints`
 
-The unified case record — one complaint per customer issue.
+The unified case record - one complaint per customer issue.
 
 ```sql
 CREATE TABLE complaints (
@@ -416,7 +416,7 @@ CREATE TABLE audit_logs (
 | Child Table              | Parent                    | FK                    | Notes                          |
 | ------------------------ | ------------------------- | --------------------- | ------------------------------ |
 | profiles                 | auth.users                | id                    | 1:1                            |
-| stores                   | —                         | —                     | Root entity                    |
+| stores                   | -                         | -                     | Root entity                    |
 | pulse_scores             | stores                    | store_id              | Many per store (history)       |
 | store_metrics_snapshots  | stores                    | store_id              | Hourly snapshots               |
 | customers                | profiles                  | profile_id            | Optional (ops agents see all)  |

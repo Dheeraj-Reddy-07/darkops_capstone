@@ -1,4 +1,4 @@
-# DarkOps — Product Specification
+# DarkOps - Product Specification
 
 **Final Implementation Contract**
 
@@ -158,26 +158,26 @@ This document defines the complete DarkOps product specification, serving as the
 
 | Permission                   | ADMIN | EXEC | OPS_MGR | OPS_AGENT | FRAUD    | STORE_MGR | CUSTOMER |
 | ---------------------------- | ----- | ---- | ------- | --------- | -------- | --------- | -------- |
-| `executive.read`             | ✓     | ✓    | —       | —         | —        | —         | —        |
-| `cases.read.all`             | ✓     | ✓    | ✓       | —         | —        | —         | —        |
-| `cases.read.assigned`        | ✓     | —    | ✓       | ✓         | —        | —         | —        |
-| `cases.assign`               | ✓     | —    | ✓       | —         | —        | —         | —        |
-| `cases.escalate`             | ✓     | —    | ✓       | ✓(own)    | —        | —         | —        |
-| `cases.resolve`              | ✓     | —    | ✓       | ✓(own)    | —        | —         | —        |
-| `cases.comment`              | ✓     | —    | ✓       | ✓(own)    | ✓(fraud) | —         | —        |
-| `stores.read.all`            | ✓     | ✓    | ✓       | —         | —        | —         | —        |
-| `stores.read.own`            | ✓     | —    | —       | —         | —        | ✓         | —        |
-| `fraud.read`                 | ✓     | ✓    | ✓       | —         | ✓        | —         | —        |
-| `fraud.decide`               | ✓     | —    | —       | —         | ✓        | —         | —        |
-| `customers.read.own`         | ✓     | —    | —       | —         | —        | —         | ✓        |
-| `customers.create_complaint` | ✓     | —    | —       | —         | —        | —         | ✓        |
-| `orders.read.all`            | ✓     | ✓    | ✓       | ✓         | ✓        | —         | —        |
-| `orders.read.own`            | ✓     | —    | —       | —         | —        | —         | ✓        |
-| `work_orders.read.all`       | ✓     | ✓    | ✓       | —         | —        | —         | —        |
-| `work_orders.read.own`       | ✓     | —    | —       | —         | —        | ✓         | —        |
-| `work_orders.manage`         | ✓     | —    | ✓       | —         | —        | ✓         | —        |
-| `audit.read`                 | ✓     | —    | —       | —         | —        | —         | —        |
-| `admin.users`                | ✓     | —    | —       | —         | —        | —         | —        |
+| `executive.read`             | ✓     | ✓    | -       | -         | -        | -         | -        |
+| `cases.read.all`             | ✓     | ✓    | ✓       | -         | -        | -         | -        |
+| `cases.read.assigned`        | ✓     | -    | ✓       | ✓         | -        | -         | -        |
+| `cases.assign`               | ✓     | -    | ✓       | -         | -        | -         | -        |
+| `cases.escalate`             | ✓     | -    | ✓       | ✓(own)    | -        | -         | -        |
+| `cases.resolve`              | ✓     | -    | ✓       | ✓(own)    | -        | -         | -        |
+| `cases.comment`              | ✓     | -    | ✓       | ✓(own)    | ✓(fraud) | -         | -        |
+| `stores.read.all`            | ✓     | ✓    | ✓       | -         | -        | -         | -        |
+| `stores.read.own`            | ✓     | -    | -       | -         | -        | ✓         | -        |
+| `fraud.read`                 | ✓     | ✓    | ✓       | -         | ✓        | -         | -        |
+| `fraud.decide`               | ✓     | -    | -       | -         | ✓        | -         | -        |
+| `customers.read.own`         | ✓     | -    | -       | -         | -        | -         | ✓        |
+| `customers.create_complaint` | ✓     | -    | -       | -         | -        | -         | ✓        |
+| `orders.read.all`            | ✓     | ✓    | ✓       | ✓         | ✓        | -         | -        |
+| `orders.read.own`            | ✓     | -    | -       | -         | -        | -         | ✓        |
+| `work_orders.read.all`       | ✓     | ✓    | ✓       | -         | -        | -         | -        |
+| `work_orders.read.own`       | ✓     | -    | -       | -         | -        | ✓         | -        |
+| `work_orders.manage`         | ✓     | -    | ✓       | -         | -        | ✓         | -        |
+| `audit.read`                 | ✓     | -    | -       | -         | -        | -         | -        |
+| `admin.users`                | ✓     | -    | -       | -         | -        | -         | -        |
 
 ---
 

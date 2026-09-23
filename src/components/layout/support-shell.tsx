@@ -3,9 +3,11 @@ import { Link, useRouterState, useRouter } from "@tanstack/react-router";
 import { LogOut, Settings, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { initialIdentity, fetchCurrentUser, isSupportLead } from "@/lib/current-user";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,11 +17,35 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const NAV = [{ label: "Dashboard", to: "/support" }];
-
 export function SupportShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
+
+  const { data: me } = useQuery({
+    queryKey: ["current-user"],
+    queryFn: fetchCurrentUser,
+    initialData: initialIdentity,
+    staleTime: 60000,
+  });
+
+  const isLead = isSupportLead(me);
+
+  const NAV = [
+    {
+      label: "Dashboard",
+      to: "/support",
+      match: (p: string) => !p.startsWith("/support/performance"),
+    },
+    ...(isLead
+      ? [
+          {
+            label: "Team Performance",
+            to: "/support/performance",
+            match: (p: string) => p.startsWith("/support/performance"),
+          },
+        ]
+      : []),
+  ];
 
   const handleLogout = async () => {
     const supabase = createSupabaseBrowserClient();
@@ -50,7 +76,7 @@ export function SupportShell({ children }: { children: ReactNode }) {
                 to={n.to}
                 className={cn(
                   "rounded-sm px-3 py-1.5 text-[13px] transition-colors",
-                  pathname.startsWith(n.to)
+                  n.match(pathname)
                     ? "bg-surface-3 font-medium text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
@@ -60,6 +86,7 @@ export function SupportShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -69,9 +96,9 @@ export function SupportShell({ children }: { children: ReactNode }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="flex flex-col">
-                  <span className="text-[13px]">Support Agent</span>
+                  <span className="text-[13px]">{me?.full_name || "Support Agent"}</span>
                   <span className="text-xs font-normal text-muted-foreground">
-                    Customer Support
+                    {isLead ? "Support Lead" : "Customer Support"}
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

@@ -71,6 +71,10 @@ export const ROLE_PERMISSIONS: Record<AppRole, AppPermission[]> = {
     "customers.read.own",
     "notifications.read",
     "attachments.read",
+    // Fraud review is a support capability (matches server RBAC); enables the
+    // "Open risk review" links from case/ticket detail to reach /fraud/:id.
+    "fraud.read",
+    "fraud.decide",
   ],
   STORE_MANAGER: [
     "stores.read.own",
@@ -103,6 +107,7 @@ export const ROUTE_PERMISSIONS: Record<string, AppPermission[]> = {
   "/admin/": ["admin.users"],
   "/customer": ["customers.read.own"],
   "/customer/": ["customers.read.own"],
+  "/report-issue": ["customers.read.own"],
 };
 
 export function hasPermission(role: AppRole, permission: AppPermission): boolean {
@@ -133,10 +138,7 @@ export function canAccessRoute(role: AppRole, path: string): boolean {
 
   // Check route groups (e.g., /admin/users matches /admin/)
   const rootMatch = Object.keys(ROUTE_PERMISSIONS).find(
-    (prefix) =>
-      !prefix.endsWith("/") &&
-      prefix !== path &&
-      path.startsWith(prefix + "/"),
+    (prefix) => !prefix.endsWith("/") && prefix !== path && path.startsWith(prefix + "/"),
   );
   if (rootMatch) {
     return (ROUTE_PERMISSIONS[rootMatch] ?? []).some((perm) => hasPermission(role, perm));
@@ -144,4 +146,3 @@ export function canAccessRoute(role: AppRole, path: string): boolean {
 
   return true; // No specific permissions required for this path
 }
-

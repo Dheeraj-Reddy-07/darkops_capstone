@@ -4,7 +4,7 @@ import { getPublicOverview } from "../controllers/public.controller";
 const router = Router();
 
 /**
- * Public routes — no authentication required.
+ * Public routes - no authentication required.
  * Returns only safe, aggregate network statistics for the landing page.
  */
 

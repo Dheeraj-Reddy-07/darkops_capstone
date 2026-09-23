@@ -13,6 +13,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["server/**/*", "src/types/**/*", "database/seed.ts"],
+  "include": ["server/**/*", "src/lib/mock/**/*", "src/types/**/*", "database/seed.ts"],
   "exclude": ["**/*.test.ts"]
 }

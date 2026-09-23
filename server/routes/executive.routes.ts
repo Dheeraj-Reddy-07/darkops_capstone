@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { getMetrics, getInsights, chatInsights, assistantQuery } from "../controllers/executive.controller";
+import {
+  getMetrics,
+  getInsights,
+  chatInsights,
+  assistantQuery,
+} from "../controllers/executive.controller";
 import { requireAuth, requirePermission } from "../middleware/auth";
 import { rateLimit } from "../middleware/rateLimit";
 

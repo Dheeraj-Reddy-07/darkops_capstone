@@ -185,11 +185,7 @@ export const intakeComplaint = async (req: Request, res: Response, next: NextFun
     });
 
     if (insertErr) {
-      throw new HTTPError(
-        500,
-        "INSERT_FAILED",
-        `Failed to create complaint: ${insertErr.message}`,
-      );
+      throw new HTTPError(500, "INSERT_FAILED", `Failed to create complaint: ${insertErr.message}`);
     }
 
     // 7. Insert initial status history

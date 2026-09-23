@@ -30,12 +30,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useState, useRef } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { initialIdentity, fetchCurrentUser, isSupportLead } from "@/lib/current-user";
 import { toast } from "sonner";
+import {
+  formatCategory,
+  formatStatus,
+  formatQueue,
+  formatResolution,
+  formatPriority,
+} from "@/lib/formatters";
 
 export const Route = createFileRoute("/support/tickets/$id")({
   head: ({ params }) => ({
-    meta: [{ title: `Ticket ${params.id} — DarkOps Support` }],
+    meta: [{ title: `Ticket ${params.id} - DarkOps Support` }],
   }),
   component: TicketDetail,
 });
@@ -105,7 +112,7 @@ function SlaBanner({ deadline }: { deadline: string | null }) {
       )}
     >
       <AlertTriangle className="size-4 flex-shrink-0" />
-      SLA {state === "breached" ? "Breached" : "At Risk"} — {label}
+      SLA {state === "breached" ? "Breached" : "At Risk"} - {label}
     </div>
   );
 }
@@ -251,24 +258,24 @@ function TicketDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Current agent identity
+  // Current agent identity — actual signed-in user (mock session or real profile).
   const { data: me } = useQuery({
     queryKey: ["current-user"],
+    queryFn: fetchCurrentUser,
+    initialData: initialIdentity,
     staleTime: 60000,
-    queryFn: async () => {
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      return profile as any;
-    },
   });
+  const isLead = isSupportLead(me);
+
+  // Real support roster (Lead only) — used to populate the reassign dropdown with
+  // genuine agent profile ids instead of hardcoded mock ids.
+  const { data: workload } = useQuery({
+    queryKey: ["team-workload"],
+    queryFn: () => fetchApi("/support/team/workload"),
+    enabled: isLead,
+    staleTime: 60000,
+  });
+  const roster: any[] = workload?.data || [];
 
   // Ticket data
   const {
@@ -308,13 +315,15 @@ function TicketDetail() {
   };
 
   const assignMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (targetId?: string | null) =>
       fetchApi(`/support/tickets/${id}/assign`, {
         method: "PATCH",
-        body: JSON.stringify({ assign_to_self: true }),
+        body: JSON.stringify(
+          targetId !== undefined ? { assigned_to: targetId } : { assign_to_self: true },
+        ),
       }),
     onSuccess: () => {
-      toast.success("Ticket assigned to you");
+      toast.success("Assignment updated");
       invalidateAll();
     },
     onError: (err: any) => toast.error(`Failed to assign: ${err.message}`),
@@ -334,11 +343,16 @@ function TicketDetail() {
     onError: (err: any) => toast.error(`Failed: ${err.message}`),
   });
 
+  const [resolutionDecision, setResolutionDecision] = useState<string>("REFUND");
+
   const resolveMutation = useMutation({
     mutationFn: () =>
       fetchApi(`/support/tickets/${id}/resolve`, {
         method: "POST",
-        body: JSON.stringify({ resolution_note: resolutionNote }),
+        body: JSON.stringify({
+          resolution_note: resolutionNote,
+          resolution_decision: resolutionDecision,
+        }),
       }),
     onSuccess: () => {
       toast.success("Ticket resolved successfully");
@@ -423,20 +437,20 @@ function TicketDetail() {
       const { signed_url } = await fetchApi(
         `/support/tickets/${id}/attachments/${attachmentId}/download`,
       );
-      
+
       // Fetch the file as a blob to ensure it downloads instead of opening
       const response = await fetch(signed_url);
       if (!response.ok) throw new Error("Failed to fetch file");
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      
+
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      
+
       // Clean up
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
@@ -544,10 +558,48 @@ function TicketDetail() {
                     "No description available."}
                 </p>
               </div>
-              {ticket.complaints?.category && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border/60 pt-3">
                 <div>
                   <div className="label-caps mb-1">Category</div>
-                  <Chip>{ticket.complaints.category}</Chip>
+                  <Chip>{formatCategory(ticket.complaints?.category)}</Chip>
+                </div>
+                <div>
+                  <div className="label-caps mb-1">Customer Requested</div>
+                  <Chip tone="info">
+                    {formatResolution(ticket.complaints?.requested_resolution || "SUPPORT_REVIEW")}
+                  </Chip>
+                </div>
+                <div>
+                  <div className="label-caps mb-1">DarkOps Decision</div>
+                  <Chip tone={ticket.complaints?.resolution_decision ? "ok" : "warn"}>
+                    {formatResolution(
+                      ticket.complaints?.resolution_decision || "PENDING_AGENT_REVIEW",
+                    )}
+                  </Chip>
+                </div>
+              </div>
+              {ticket.complaints?.resolution_decision_reason && (
+                <div className="rounded-sm bg-surface-2 p-3 text-xs">
+                  <span className="font-semibold text-foreground">Decision Reason: </span>
+                  <span className="text-muted-foreground">
+                    {ticket.complaints.resolution_decision_reason}
+                  </span>
+                </div>
+              )}
+              {ticket.complaints?.execution_handoffs && (
+                <div className="rounded-sm bg-primary/5 border border-primary/20 p-3 text-xs flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-primary">Execution Handoff: </span>
+                    <span className="text-muted-foreground">
+                      {ticket.complaints.execution_handoffs.resolution_type}
+                    </span>
+                    <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+                      Ref:{" "}
+                      {ticket.complaints.execution_handoffs.downstream_reference ||
+                        ticket.complaints.execution_handoffs.idempotency_key}
+                    </span>
+                  </div>
+                  <Chip tone="ok">{ticket.complaints.execution_handoffs.status}</Chip>
                 </div>
               )}
             </div>
@@ -801,7 +853,29 @@ function TicketDetail() {
                   <div className="text-sm text-muted-foreground">Unassigned</div>
                 )}
               </div>
-              {!isResolved && !isAssignedToMe && (
+
+              {isLead && !isResolved && (
+                <div className="space-y-1.5 pt-2 border-t border-border/60">
+                  <div className="label-caps text-xs text-muted-foreground">
+                    Reassign Agent (Lead)
+                  </div>
+                  <select
+                    value={ticket.assigned_to || ""}
+                    disabled={assignMutation.isPending}
+                    onChange={(e) => assignMutation.mutate(e.target.value || null)}
+                    className="w-full rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium"
+                  >
+                    <option value="">Unassigned</option>
+                    {roster.map((agent: any) => (
+                      <option key={agent.agent_id} value={agent.agent_id}>
+                        {agent.full_name} {agent.role === "SUPPORT_LEAD" ? "(Lead)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {!isResolved && !isAssignedToMe && !isLead && (
                 <button
                   onClick={() => assignMutation.mutate()}
                   disabled={assignMutation.isPending}
@@ -867,16 +941,40 @@ function TicketDetail() {
                     className="w-full flex items-center gap-2 rounded-md border border-ok/40 bg-ok/10 px-3 py-2 text-xs font-medium text-ok hover:bg-ok/20 transition-colors"
                   >
                     <CheckCircle2 className="size-3" />
-                    Resolve ticket
+                    Make Resolution Decision
                   </button>
                 ) : (
-                  <div className="space-y-2 rounded-md border border-ok/30 bg-ok/5 p-3">
-                    <div className="label-caps text-ok">Resolution Note</div>
+                  <div className="space-y-3 rounded-md border border-ok/30 bg-ok/5 p-3">
+                    <div className="label-caps text-ok">Resolution Decision</div>
+                    <div className="grid grid-cols-2 gap-1.5 text-xs">
+                      {[
+                        { key: "REFUND", label: "Approve Refund" },
+                        { key: "REPLACEMENT", label: "Approve Replacement" },
+                        { key: "SUPPORT_REVIEW", label: "Support Review" },
+                        { key: "NO_ACTION", label: "No Action / Reject" },
+                      ].map((opt) => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setResolutionDecision(opt.key)}
+                          className={cn(
+                            "rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition-colors",
+                            resolutionDecision === opt.key
+                              ? "border-ok bg-ok/20 text-ok"
+                              : "border-border bg-surface-2 text-muted-foreground hover:bg-surface-3",
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="label-caps text-ok mt-2">Resolution Note</div>
                     <textarea
                       value={resolutionNote}
                       onChange={(e) => setResolutionNote(e.target.value)}
-                      placeholder="Describe how this was resolved…"
-                      rows={4}
+                      placeholder="Describe the justification for this resolution decision…"
+                      rows={3}
                       className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ok/30 resize-none"
                     />
                     <div className="flex gap-2">
@@ -886,7 +984,7 @@ function TicketDetail() {
                         className="flex items-center gap-1.5 rounded-md bg-ok px-3 py-1.5 text-xs font-medium text-ok-soft hover:bg-ok/90 disabled:opacity-50 transition-colors"
                       >
                         {resolveMutation.isPending && <Loader2 className="size-3 animate-spin" />}
-                        Confirm resolve
+                        Confirm Decision
                       </button>
                       <button
                         onClick={() => {
@@ -941,7 +1039,7 @@ function TicketDetail() {
             <PanelHeader title="Details" />
             <div className="p-4 space-y-3">
               {[
-                { label: "Queue", value: <Chip>{ticket.queue}</Chip> },
+                { label: "Queue", value: <Chip>{formatQueue(ticket.queue)}</Chip> },
                 { label: "Created", value: formatTs(ticket.created_at) },
                 { label: "Last updated", value: formatTs(ticket.updated_at) },
                 ticket.sla_deadline && !isResolved
@@ -985,7 +1083,7 @@ function TicketDetail() {
 // ─── StatusChip (local copy) ──────────────────────────────────────────────────
 
 function StatusChip({ status }: { status: string }) {
-  const s = status.toLowerCase();
+  const s = (status || "").toLowerCase();
   const tone =
     s === "resolved" || s === "closed"
       ? "ok"
@@ -996,19 +1094,5 @@ function StatusChip({ status }: { status: string }) {
           : s === "awaiting_customer"
             ? "warn"
             : "neutral";
-  const label =
-    s === "in_progress"
-      ? "In Progress"
-      : s === "awaiting_customer"
-        ? "Awaiting"
-        : s === "resolved"
-          ? "Resolved"
-          : s === "closed"
-            ? "Closed"
-            : s === "open"
-              ? "Open"
-              : s === "escalated"
-                ? "Escalated"
-                : s.charAt(0).toUpperCase() + s.slice(1);
-  return <Chip tone={tone}>{label}</Chip>;
+  return <Chip tone={tone}>{formatStatus(status)}</Chip>;
 }

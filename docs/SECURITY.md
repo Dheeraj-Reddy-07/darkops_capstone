@@ -1,11 +1,11 @@
-# DarkOps — Security Architecture
+# DarkOps - Security Architecture
 
 ## 1. Authentication
 
 ### Supabase Auth
 
 - **Mechanism**: Email + Password (for internal ops users) and Magic Link (for customers)
-- **Session storage**: httpOnly cookies via `@supabase/ssr` server-side helpers — never localStorage
+- **Session storage**: httpOnly cookies via `@supabase/ssr` server-side helpers - never localStorage
 - **JWT**: Signed by Supabase, validated server-side on every API route call
 - **Session refresh**: Handled by Supabase SSR middleware, transparent to the user
 
@@ -17,11 +17,11 @@
    - Client-side code
    - Git history
 2. The service role key is used **ONLY** in TanStack Start server functions / Nitro API routes
-3. The anon key (`VITE_SUPABASE_ANON_KEY`) is safe for the browser — it is subject to RLS
+3. The anon key (`VITE_SUPABASE_ANON_KEY`) is safe for the browser - it is subject to RLS
 
 ---
 
-## 2. Authorization — RBAC
+## 2. Authorization - RBAC
 
 ### Role Definitions
 
@@ -39,27 +39,27 @@
 
 | Action                      | ADMIN | EXEC       | OPS_MGR | OPS_AGENT | FRAUD          | STORE_MGR | CUSTOMER |
 | --------------------------- | ----- | ---------- | ------- | --------- | -------------- | --------- | -------- |
-| `executive:read`            | ✓     | ✓          | —       | —         | —              | —         | —        |
-| `cases:read:all`            | ✓     | ✓(summary) | ✓       | —         | —              | —         | —        |
-| `cases:read:assigned`       | ✓     | —          | ✓       | ✓         | —              | —         | —        |
-| `cases:assign`              | ✓     | —          | ✓       | —         | —              | —         | —        |
-| `cases:escalate`            | ✓     | —          | ✓       | ✓(own)    | —              | —         | —        |
-| `cases:resolve`             | ✓     | —          | ✓       | ✓(own)    | —              | —         | —        |
-| `cases:comment`             | ✓     | —          | ✓       | ✓(own)    | ✓(fraud cases) | —         | —        |
-| `stores:read:all`           | ✓     | ✓          | ✓       | —         | —              | —         | —        |
-| `stores:read:own`           | ✓     | —          | —       | —         | —              | ✓         | —        |
-| `fraud:read`                | ✓     | ✓(summary) | —       | —         | ✓              | —         | —        |
-| `fraud:decide`              | ✓     | —          | —       | —         | ✓              | —         | —        |
-| `customer:read:own`         | ✓     | —          | —       | —         | —              | —         | ✓        |
-| `customer:complaint:create` | ✓     | —          | —       | —         | —              | —         | ✓        |
-| `audit:read`                | ✓     | —          | —       | —         | —              | —         | —        |
-| `admin:users`               | ✓     | —          | —       | —         | —              | —         | —        |
+| `executive:read`            | ✓     | ✓          | -       | -         | -              | -         | -        |
+| `cases:read:all`            | ✓     | ✓(summary) | ✓       | -         | -              | -         | -        |
+| `cases:read:assigned`       | ✓     | -          | ✓       | ✓         | -              | -         | -        |
+| `cases:assign`              | ✓     | -          | ✓       | -         | -              | -         | -        |
+| `cases:escalate`            | ✓     | -          | ✓       | ✓(own)    | -              | -         | -        |
+| `cases:resolve`             | ✓     | -          | ✓       | ✓(own)    | -              | -         | -        |
+| `cases:comment`             | ✓     | -          | ✓       | ✓(own)    | ✓(fraud cases) | -         | -        |
+| `stores:read:all`           | ✓     | ✓          | ✓       | -         | -              | -         | -        |
+| `stores:read:own`           | ✓     | -          | -       | -         | -              | ✓         | -        |
+| `fraud:read`                | ✓     | ✓(summary) | -       | -         | ✓              | -         | -        |
+| `fraud:decide`              | ✓     | -          | -       | -         | ✓              | -         | -        |
+| `customer:read:own`         | ✓     | -          | -       | -         | -              | -         | ✓        |
+| `customer:complaint:create` | ✓     | -          | -       | -         | -              | -         | ✓        |
+| `audit:read`                | ✓     | -          | -       | -         | -              | -         | -        |
+| `admin:users`               | ✓     | -          | -       | -         | -              | -         | -        |
 
 ### Authorization Implementation
 
 - Roles are stored in `profiles.role` (server-trusted)
 - Every API route reads the authenticated user's role from the server-side Supabase session
-- Frontend **never** sends its own role in requests — the role is derived server-side
+- Frontend **never** sends its own role in requests - the role is derived server-side
 - A frontend hiding a button is UX, not security
 
 ---
@@ -170,7 +170,7 @@ CREATE POLICY "notifications_own" ON notifications
 | Mass assignment                         | Explicit allow-list of mutable fields per endpoint         |
 | Unauthorized state transitions          | Server-side state machine for complaint/fraud workflows    |
 | Replay attacks                          | Supabase JWT expiry + refresh                              |
-| XSS token theft                         | httpOnly cookies — JS cannot read the token                |
+| XSS token theft                         | httpOnly cookies - JS cannot read the token                |
 | CSRF                                    | Supabase SameSite=Lax + state validation                   |
 | Brute force                             | Supabase rate limiting on auth endpoints                   |
 
@@ -181,7 +181,7 @@ CREATE POLICY "notifications_own" ON notifications
 | Secret                      | Location                            | Access                          |
 | --------------------------- | ----------------------------------- | ------------------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server environment variable (Nitro) | Server functions only           |
-| `VITE_SUPABASE_ANON_KEY`    | Vite public env                     | Browser (safe — subject to RLS) |
+| `VITE_SUPABASE_ANON_KEY`    | Vite public env                     | Browser (safe - subject to RLS) |
 | `VITE_SUPABASE_URL`         | Vite public env                     | Browser                         |
 | `OPENAI_API_KEY`            | Server environment variable         | Server functions only           |
 

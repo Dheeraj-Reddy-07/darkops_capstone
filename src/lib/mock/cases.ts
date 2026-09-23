@@ -153,63 +153,107 @@ const STATUSES: CaseStatus[] = [
 ];
 
 function build(): CaseRecord[] {
-  const rand = rngFor("case-queue-v1");
-  const pool: DarkStore[] = [...STORES].sort((a, b) => a.pulse - b.pulse).slice(0, 60);
+  const rand = rngFor("case-queue-v2");
+  const pool: DarkStore[] = [...STORES].sort((a, b) => a.pulse - b.pulse);
 
-  return Array.from({ length: 64 }, (_, i) => {
-    const store = pool[Math.floor(rand() * pool.length)]!;
-    const c = COMPLAINTS[i % COMPLAINTS.length]!;
-    const priority = pick(rand, PRIORITIES);
-    const status = i % 9 === 3 ? "Escalated - L2" : pick(rand, STATUSES);
-    const agentId = status === "Unassigned" ? null : pick(rand, AGENTS).id;
-    const ageMins = intBetween(rand, 12, 380);
-    const sla: SlaState = ageMins > 240 ? "breached" : ageMins > 150 ? "at-risk" : "on-track";
-    const orderValue = intBetween(rand, 180, 4200);
-    const type: RouteKind =
-      c.category === "Payment issue" || c.category === "Missing item"
-        ? "Refund"
-        : c.category === "Wrong item"
-          ? "Reorder"
-          : "Operational investigation";
+  const cases: CaseRecord[] = [];
+  let caseCounter = 4100;
+  let complaintCounter = 482000;
 
-    return {
-      id: `CS-${4100 + i}`,
-      complaintId: `CMP-${482000 + i * 137}`,
-      summary: c.summary,
-      detail: c.detail,
-      storeId: store.id,
-      storeName: store.name,
-      city: store.city,
-      priority,
-      agentId,
-      status,
-      sla,
-      slaDueIST: istClock(ageMins - 240),
-      ageMins,
-      customerName: pick(rand, CUSTOMERS),
-      customerId: `CU-${intBetween(rand, 100000, 999999)}`,
-      orderId: `ORD-${intBetween(rand, 700000, 999999)}`,
-      orderValue,
-      refundAmount: Math.round(orderValue * (0.3 + rand() * 0.7)),
-      partner: pick(rand, PARTNERS),
-      partnerId: `RD-${intBetween(rand, 1000, 9999)}`,
-      type,
-      category: c.category,
-      urgency: priority === "P1" ? "Critical" : priority === "P2" ? "High" : "Standard",
-      sentiment: rand() > 0.62 ? "Frustrated" : rand() > 0.3 ? "Neutral" : "Angry",
-      qcScore: Math.round(72 + rand() * 26),
-      classifierConfidence: Math.round(78 + rand() * 20),
-      resolution:
-        status === "Resolved"
-          ? "Refund settled to source"
-          : type === "Refund"
-            ? "Refund pending risk review"
-            : type === "Reorder"
-              ? "Replacement dispatch pending"
-              : "Field investigation open",
-      resolvedNote: null,
-    } satisfies CaseRecord;
-  });
+  // Generate ~240 complaints across 30 days
+  for (let dayOffset = 29; dayOffset >= 0; dayOffset--) {
+    const dailyVolume = Math.floor(5 + rand() * 10);
+
+    for (let i = 0; i < dailyVolume; i++) {
+      const store = pool[Math.floor(rand() * pool.length)]!;
+      const c = COMPLAINTS[(caseCounter + i) % COMPLAINTS.length]!;
+      const priority = pick(rand, PRIORITIES);
+
+      const minsInDay = Math.floor(rand() * 1400);
+      const ageMins = dayOffset * 1440 + minsInDay;
+
+      let status: CaseStatus;
+      if (dayOffset > 2) {
+        status = rand() > 0.12 ? "Resolved" : rand() > 0.5 ? "Escalated - L2" : "Awaiting customer";
+      } else {
+        status =
+          i % 5 === 0
+            ? "Unassigned"
+            : i % 5 === 1
+              ? "Assigned"
+              : i % 5 === 2
+                ? "In progress"
+                : i % 5 === 3
+                  ? "Awaiting customer"
+                  : "Resolved";
+      }
+
+      const agentId = status === "Unassigned" ? null : pick(rand, AGENTS).id;
+
+      let slaTarget = 120;
+      if (priority === "P1") slaTarget = 15;
+      else if (priority === "P2") slaTarget = 30;
+
+      let sla: SlaState = "on-track";
+      if (status !== "Resolved") {
+        if (ageMins > slaTarget) sla = "breached";
+        else if (ageMins > slaTarget * 0.75) sla = "at-risk";
+      } else {
+        sla = rand() > 0.85 ? "breached" : "on-track";
+      }
+
+      const orderValue = intBetween(rand, 220, 3800);
+      const type: RouteKind =
+        c.category === "Payment issue" || c.category === "Missing item"
+          ? "Refund"
+          : c.category === "Wrong item"
+            ? "Reorder"
+            : "Operational investigation";
+
+      cases.push({
+        id: `CS-${caseCounter++}`,
+        complaintId: `CMP-${(complaintCounter += 137)}`,
+        summary: c.summary,
+        detail: c.detail,
+        storeId: store.id,
+        storeName: store.name,
+        city: store.city,
+        priority,
+        agentId,
+        status,
+        sla,
+        slaDueIST: istClock(ageMins - slaTarget),
+        ageMins,
+        customerName: pick(rand, CUSTOMERS),
+        customerId: `CU-${intBetween(rand, 100000, 999999)}`,
+        orderId: `ORD-${intBetween(rand, 700000, 999999)}`,
+        orderValue,
+        refundAmount: Math.round(orderValue * (0.3 + rand() * 0.7)),
+        partner: pick(rand, PARTNERS),
+        partnerId: `RD-${intBetween(rand, 1000, 9999)}`,
+        type,
+        category: c.category,
+        urgency: priority === "P1" ? "Critical" : priority === "P2" ? "High" : "Standard",
+        sentiment: rand() > 0.62 ? "Frustrated" : rand() > 0.3 ? "Neutral" : "Angry",
+        qcScore: Math.round(72 + rand() * 26),
+        classifierConfidence: Math.round(78 + rand() * 20),
+        resolution:
+          status === "Resolved"
+            ? "Refund settled to source"
+            : type === "Refund"
+              ? "Refund pending risk review"
+              : type === "Reorder"
+                ? "Replacement dispatch pending"
+                : "Field investigation open",
+        resolvedNote:
+          status === "Resolved"
+            ? "Issue investigated and resolved per operational guidelines."
+            : null,
+      });
+    }
+  }
+
+  return cases;
 }
 
 export const CASES: CaseRecord[] = build();
@@ -224,13 +268,16 @@ export function agentById(id: string | null) {
 }
 
 export const QUEUE_KPIS = {
-  pending: 1342,
-  escalated: 186,
-  slaBreaches: 74,
+  pending: CASES.filter((c) => c.status !== "Resolved").length,
+  escalated: CASES.filter((c) => c.status === "Escalated - L2").length,
+  slaBreaches: CASES.filter((c) => c.sla === "breached").length,
   agentsAvailable: 138,
   agentsOnShift: 500,
-  awaitingAssignment: 212,
-  oldestWaitingMins: 47,
+  awaitingAssignment: CASES.filter((c) => c.status === "Unassigned").length,
+  oldestWaitingMins: Math.max(
+    ...CASES.filter((c) => c.status === "Unassigned").map((c) => c.ageMins),
+    47,
+  ),
 };
 
 export const PRIORITY_MIX = [

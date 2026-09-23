@@ -154,7 +154,7 @@ export class DeterministicInsightsProvider {
       topCategories,
     } = ctx;
 
-    // Deterministic engine — keyword-matched answers grounded on real DB metrics
+    // Deterministic engine - keyword-matched answers grounded on real DB metrics
     return this.deterministicAnswer(question, {
       avgPulse,
       criticalStores,

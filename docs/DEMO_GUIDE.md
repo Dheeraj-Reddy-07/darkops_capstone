@@ -1,4 +1,4 @@
-# DarkOps — Demo Guide
+# DarkOps - Demo Guide
 
 ## Deloitte Capstone 2026
 
@@ -16,14 +16,14 @@ This guide covers how to start, access, and demonstrate the DarkOps Operational 
 
 ## Starting the Application
 
-### Terminal 1 — Frontend (Vite)
+### Terminal 1 - Frontend (Vite)
 
 ```bash
 npm run dev:client
 # Vite starts on http://localhost:5173
 ```
 
-### Terminal 2 — Backend (Express)
+### Terminal 2 - Backend (Express)
 
 ```bash
 npm run dev:server

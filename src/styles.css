@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * DarkOps design system — dual-theme semantic token architecture.
+ * DarkOps design system - dual-theme semantic token architecture.
  *
  * DARK (default): Charcoal surfaces, subtle borders, restrained blue accent.
  * LIGHT (LightOps): Off-white backgrounds, clean surfaces, enterprise-grade calm.
@@ -79,7 +79,7 @@
 }
 
 /* ===================================================================
-   DARK THEME (Default — DarkOps identity)
+   DARK THEME (Default - DarkOps identity)
    Charcoal, restrained blue accent, depth via surface hierarchy.
 =================================================================== */
 :root {
@@ -128,7 +128,7 @@
   --info-soft: oklch(0.32 0.06 250);
   --neutral-chip: oklch(0.3 0.007 265);
 
-  /* Chart palette — readable on dark */
+  /* Chart palette - readable on dark */
   --chart-1: oklch(0.66 0.15 250);
   --chart-2: oklch(0.74 0.16 155);
   --chart-3: oklch(0.8 0.14 82);
@@ -147,7 +147,7 @@
 }
 
 /* ===================================================================
-   LIGHT THEME (LightOps — enterprise-grade, calm, premium)
+   LIGHT THEME (LightOps - enterprise-grade, calm, premium)
    Off-white page, white card surfaces, deep gray text, subtle borders.
    Blue accent remains consistent with DarkOps brand identity.
 =================================================================== */
@@ -184,7 +184,7 @@
   --input: oklch(0.91 0.004 265);
   --ring: oklch(0.52 0.16 254);
 
-  /* Semantic status colors — slightly deeper for better text contrast on light */
+  /* Semantic status colors - slightly deeper for better text contrast on light */
   --ok: oklch(0.56 0.15 155);
   --ok-soft: oklch(0.93 0.06 155);
   --warn: oklch(0.6 0.14 75);
@@ -195,7 +195,7 @@
   --info-soft: oklch(0.93 0.06 250);
   --neutral-chip: oklch(0.88 0.004 265);
 
-  /* Chart palette — slightly deeper to pop on white/light surfaces */
+  /* Chart palette - slightly deeper to pop on white/light surfaces */
   --chart-1: oklch(0.52 0.16 254);
   --chart-2: oklch(0.56 0.15 155);
   --chart-3: oklch(0.6 0.14 75);
@@ -234,7 +234,7 @@
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
     -webkit-font-smoothing: antialiased;
     font-size: 14px;
-    /* Smooth theme transitions — only colors, no layout shifts */
+    /* Smooth theme transitions - only colors, no layout shifts */
     transition:
       background-color 150ms ease,
       color 100ms ease;
@@ -281,3 +281,29 @@
     background-color: var(--surface-2);
   }
 }
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

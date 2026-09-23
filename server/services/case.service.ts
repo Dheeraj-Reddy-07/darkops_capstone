@@ -76,6 +76,22 @@ export async function resolveCase(
 ) {
   const adminClient = createSupabaseServiceRoleClient();
 
+  const { data: complaint, error: fetchErr } = await adminClient
+    .from("complaints")
+    .select("status, settlement_status")
+    .eq("id", caseId)
+    .single();
+
+  if (fetchErr || !complaint) throw new HTTPError(404, "NOT_FOUND", "Case not found");
+
+  if (complaint.settlement_status === "pending") {
+    throw new HTTPError(
+      400,
+      "SETTLEMENT_PENDING",
+      "Cannot mark complaint as resolved while refund settlement is pending",
+    );
+  }
+
   const { error: updateErr } = await adminClient
     .from("complaints")
     .update({

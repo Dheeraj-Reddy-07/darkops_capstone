@@ -263,48 +263,68 @@ function build(): DarkStore[] {
       }
       usedIds.add(id);
 
-      const breakdown: PulseBreakdown =
-        override?.breakdown ??
-        (() => {
-          const severity = rand();
-          const scale = severity > 0.86 ? 2.4 : severity > 0.6 ? 1.5 : 0.75;
-          return {
-            equipment: 0, // Will be calculated from metrics
-            sla: 0, // Will be calculated from metrics
-            refunds: 0, // Will be calculated from metrics
-            delivery: 0, // Will be calculated from metrics
-            picker: 0, // Will be calculated from metrics
-            inventory: 0, // Will be calculated from metrics
-          };
-        })();
+      // Determine realistic store health tier distribution:
+      // ~70% healthy (80-98), ~20% at-risk (60-79), ~10% critical (35-58)
+      const roll = rand();
+      const isCriticalOverride = override && override.sla < 70;
+      const tier = isCriticalOverride
+        ? "critical"
+        : roll > 0.3
+          ? "healthy"
+          : roll > 0.1
+            ? "at-risk"
+            : "critical";
 
-      // Generate realistic metrics first
-      const severity = rand();
-      const scale = severity > 0.86 ? 2.4 : severity > 0.6 ? 1.5 : 0.75;
-      // Allow zero values for healthy stores, realistic ranges for others
-      const equipmentFailures14d = Math.round(intBetween(rand, 0, 12) * scale);
-      const slaPct =
-        override?.sla ?? round(Math.max(70, 98 - intBetween(rand, 0, 30) - rand() * 4), 1);
-      const refundRatePct =
-        override?.refundRate ?? round(2 + intBetween(rand, 0, 8) * scale + rand() * 0.8, 1);
-      const deliveryDelays = Math.round(intBetween(rand, 0, 50) * scale);
-      const pickerDelayMins = round(1.5 + intBetween(rand, 0, 5) * scale, 1);
-      const inventoryIssues = Math.round(intBetween(rand, 0, 18) * scale);
-      const avgResolutionMins = Math.round(30 + intBetween(rand, 10, 120) * scale);
-      const openIssues = Math.round(intBetween(rand, 0, 18) * scale);
+      let equipmentFailures14d: number;
+      let slaPct: number;
+      let refundRatePct: number;
+      let deliveryDelays: number;
+      let pickerDelayMins: number;
+      let inventoryIssues: number;
+      let avgResolutionMins: number;
+      let openIssues: number;
 
-      // Calculate pulse from metrics using the same formula as seed.ts
-      const equipmentPts = Math.min(30, equipmentFailures14d * 3);
-      const slaPts = Math.max(0, (95 - slaPct) * 0.5);
-      const refundsPts = Math.max(0, (refundRatePct - 2) * 1);
-      const deliveryPts = Math.min(20, deliveryDelays * 0.5);
-      const pickerPts = Math.max(0, (pickerDelayMins - 2.5) * 2);
-      const inventoryPts = Math.min(15, inventoryIssues * 1);
+      if (tier === "healthy") {
+        equipmentFailures14d = Math.floor(rand() * 2);
+        slaPct = override?.sla ?? round(93 + rand() * 5.5, 1);
+        refundRatePct = override?.refundRate ?? round(1.2 + rand() * 2.3, 1);
+        deliveryDelays = Math.floor(rand() * 6);
+        pickerDelayMins = round(1.0 + rand() * 1.2, 1);
+        inventoryIssues = Math.floor(rand() * 4);
+        avgResolutionMins = Math.round(20 + rand() * 25);
+        openIssues = Math.floor(rand() * 3);
+      } else if (tier === "at-risk") {
+        equipmentFailures14d = Math.floor(2 + rand() * 3);
+        slaPct = override?.sla ?? round(82 + rand() * 9, 1);
+        refundRatePct = override?.refundRate ?? round(4.0 + rand() * 2.2, 1);
+        deliveryDelays = Math.floor(6 + rand() * 10);
+        pickerDelayMins = round(2.5 + rand() * 1.2, 1);
+        inventoryIssues = Math.floor(4 + rand() * 5);
+        avgResolutionMins = Math.round(45 + rand() * 30);
+        openIssues = Math.floor(3 + rand() * 4);
+      } else {
+        // critical
+        equipmentFailures14d = Math.floor(5 + rand() * 6);
+        slaPct = override?.sla ?? round(62 + rand() * 16, 1);
+        refundRatePct = override?.refundRate ?? round(6.5 + rand() * 4.5, 1);
+        deliveryDelays = Math.floor(16 + rand() * 18);
+        pickerDelayMins = round(3.8 + rand() * 2.0, 1);
+        inventoryIssues = Math.floor(8 + rand() * 8);
+        avgResolutionMins = Math.round(75 + rand() * 45);
+        openIssues = Math.floor(7 + rand() * 9);
+      }
+
+      // Calculate PulseScore deductions accurately
+      const equipmentPts = Math.min(25, equipmentFailures14d * 2.5);
+      const slaPts = Math.max(0, (95 - slaPct) * 0.4);
+      const refundsPts = Math.max(0, (refundRatePct - 2) * 1.5);
+      const deliveryPts = Math.min(15, deliveryDelays * 0.4);
+      const pickerPts = Math.max(0, (pickerDelayMins - 2.0) * 1.5);
+      const inventoryPts = Math.min(10, inventoryIssues * 0.8);
       const totalDeduction =
         equipmentPts + slaPts + refundsPts + deliveryPts + pickerPts + inventoryPts;
-      const pulse = Math.max(0, Math.min(100, Math.round(100 - totalDeduction)));
+      const pulse = Math.max(15, Math.min(99, Math.round(100 - totalDeduction)));
 
-      // Update breakdown to match calculated points
       const calculatedBreakdown = {
         equipment: Math.round(equipmentPts),
         sla: Math.round(slaPts),
@@ -321,7 +341,7 @@ function build(): DarkStore[] {
         zone: pick(rand, ZONES),
         manager: override?.manager ?? pick(rand, MANAGERS),
         pulse,
-        prevPulse: pulse + intBetween(rand, -3, 9),
+        prevPulse: Math.min(100, Math.max(15, pulse + intBetween(rand, -3, 6))),
         sla: slaPct,
         refundRate: refundRatePct,
         avgResolutionMins,
@@ -368,20 +388,64 @@ export function storesByCity(city: string) {
 export function storeSeries(store: DarkStore) {
   const rand = rngFor(`series-${store.id}`);
   return Array.from({ length: 14 }, (_, i) => {
-    const day = 16 + i;
-    // Use actual metrics to generate realistic series data
-    const avgDailyFailures = store.equipmentFailures14d / 14;
-    const avgDailyStockouts = store.inventoryIssues / 14;
-    
-    // Add realistic daily variation - some days have 0, some have more
-    const dailyVariation = () => (rand() > 0.3) ? (0.3 + rand() * 1.4) : 0;
-    
+    const day = 1 + i;
+    const dateLabel = `${day} Sep`;
+    const failureBase = Math.max(0, store.equipmentFailures14d / 14);
+    const stockoutBase = Math.max(0, store.inventoryIssues / 14);
+    const downtimeBase = Math.max(0, store.deliveryDelays / 20);
+
+    const v1 = rand();
+    const v2 = rand();
+    const v3 = rand();
+
+    const failures = Math.max(
+      0,
+      Math.round(
+        failureBase * (0.4 + v1 * 1.6) +
+          (store.status === "critical"
+            ? i % 3 === 0
+              ? 2
+              : 1
+            : store.status === "at-risk"
+              ? i % 5 === 0
+                ? 1
+                : 0
+              : 0),
+      ),
+    );
+    const stockouts = Math.max(
+      0,
+      Math.round(
+        stockoutBase * (0.4 + v2 * 1.6) +
+          (store.status === "critical"
+            ? i % 2 === 0
+              ? 3
+              : 1
+            : store.status === "at-risk"
+              ? i % 4 === 0
+                ? 2
+                : 0
+              : i % 6 === 0
+                ? 1
+                : 0),
+      ),
+    );
+    const downtime = round(
+      Math.max(
+        0.1,
+        downtimeBase * (0.5 + v3 * 1.5) +
+          (store.status === "critical" ? 2.5 : store.status === "at-risk" ? 1.0 : 0.3),
+      ),
+      1,
+    );
+    const mismatches = Math.max(0, Math.round(stockouts * 0.4 + (v1 > 0.6 ? 1 : 0)));
+
     return {
-      day: `${day} Aug`,
-      failures: Math.max(0, Math.round(avgDailyFailures * dailyVariation())),
-      downtime: round(rand() * (avgDailyFailures > 0 ? 1 + avgDailyFailures * 0.5 : 0.5), 1),
-      stockouts: Math.max(0, Math.round(avgDailyStockouts * dailyVariation())),
-      mismatches: Math.max(0, Math.round(avgDailyStockouts * 0.4 * dailyVariation())),
+      day: dateLabel,
+      failures,
+      downtime,
+      stockouts,
+      mismatches,
     };
   });
 }

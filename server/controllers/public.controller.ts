@@ -18,7 +18,7 @@ export const getPublicOverview = async (_req: Request, res: Response, next: Next
       { data: pulseData },
       { count: pendingFraud },
     ] = await Promise.all([
-      // Active store count (is_active not filtered — column set by seed upsert)
+      // Active store count (is_active not filtered - column set by seed upsert)
       supabase.from("stores").select("*", { count: "exact", head: true }),
 
       // Open operational cases (unassigned, assigned, in_progress, escalated)
@@ -30,7 +30,7 @@ export const getPublicOverview = async (_req: Request, res: Response, next: Next
       // Pulse scores for computing network average
       supabase.from("pulse_scores").select("score"),
 
-      // Open fraud review queue — count only, no case details
+      // Open fraud review queue - count only, no case details
       supabase
         .from("fraud_reviews")
         .select("*", { count: "exact", head: true })
@@ -40,7 +40,7 @@ export const getPublicOverview = async (_req: Request, res: Response, next: Next
     // Compute network average PulseScore
     let avgPulse = 0;
     if (pulseData && pulseData.length > 0) {
-      const sum = pulseData.reduce((acc, curr) => acc + curr.score, 0);
+      const sum = pulseData.reduce((acc: any, curr: any) => acc + curr.score, 0);
       avgPulse = Math.round(sum / pulseData.length);
     }
 

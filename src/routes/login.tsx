@@ -1,30 +1,144 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  BarChart3,
+  Layers,
+  Store,
+  ShieldAlert,
+  Users,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Building2,
+  ExternalLink,
+  Zap,
+  Lock,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in - DarkOps" },
-      { name: "description", content: "Sign in to DarkOps Operational Intelligence Platform." },
+      { title: "Sign in - DarkOps Platform" },
+      {
+        name: "description",
+        content: "Sign in to DarkOps Resolution Care & Operational Command Center.",
+      },
     ],
   }),
   component: LoginPage,
 });
 
-const DEMO_ROLES = [
-  { label: "Executive", email: "exec@darkops.com", color: "text-primary" },
-  { label: "Operations", email: "manager@darkops.com", color: "text-ok" },
-  { label: "Customer Support", email: "support@darkops.com", color: "text-crit" },
-  { label: "Support Agent A", email: "agent.a@darkops.com", color: "text-crit" },
-  { label: "Support Agent B", email: "agent.b@darkops.com", color: "text-crit" },
-  { label: "Store Manager", email: "storemanager@darkops.com", color: "text-warn" },
-  { label: "Platform Admin", email: "admin@darkops.com", color: "text-muted-foreground" },
-  { label: "Customer", email: "customer@darkops.com", color: "text-info" },
-] as const;
+interface DemoRole {
+  label: string;
+  roleTitle: string;
+  email: string;
+  description: string;
+  badge: string;
+  color: string;
+  icon: any;
+}
+
+const DEMO_CATEGORIES: Record<string, { label: string; roles: DemoRole[] }> = {
+  management: {
+    label: "Management & Ops",
+    roles: [
+      {
+        label: "Executive",
+        roleTitle: "Network Executive",
+        email: "exec@darkops.com",
+        description: "Macro network metrics, PulseScore trends & city performance",
+        badge: "EXECUTIVE",
+        color: "text-primary border-primary/30 bg-primary/10",
+        icon: BarChart3,
+      },
+      {
+        label: "Operations",
+        roleTitle: "Ops Manager",
+        email: "manager@darkops.com",
+        description: "Case resolution, SLA tracking & operational queues",
+        badge: "OPERATIONS",
+        color: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10",
+        icon: Layers,
+      },
+      {
+        label: "Store Manager",
+        roleTitle: "Hub Manager (DS-1462)",
+        email: "storemanager@darkops.com",
+        description: "Single store operational health & work order execution",
+        badge: "STORE MGR",
+        color: "text-amber-500 border-amber-500/30 bg-amber-500/10",
+        icon: Store,
+      },
+      {
+        label: "Platform Admin",
+        roleTitle: "System Admin",
+        email: "admin@darkops.com",
+        description: "Full system administration & user access management",
+        badge: "ADMIN",
+        color: "text-purple-400 border-purple-400/30 bg-purple-400/10",
+        icon: Building2,
+      },
+    ],
+  },
+  support: {
+    label: "Support & Care",
+    roles: [
+      {
+        label: "Support Lead",
+        roleTitle: "Customer Support Lead",
+        email: "support@darkops.com",
+        description: "Ticket queues, agent assignments & escalation review",
+        badge: "SUPPORT LEAD",
+        color: "text-rose-500 border-rose-500/30 bg-rose-500/10",
+        icon: Users,
+      },
+      {
+        label: "Agent A (Priya)",
+        roleTitle: "Support Specialist",
+        email: "agent.a@darkops.com",
+        description: "Frontline complaint investigation & refund decisions",
+        badge: "AGENT",
+        color: "text-rose-400 border-rose-400/30 bg-rose-400/10",
+        icon: Users,
+      },
+      {
+        label: "Agent B (Rohan)",
+        roleTitle: "Support Specialist",
+        email: "agent.b@darkops.com",
+        description: "Frontline complaint investigation & customer care",
+        badge: "AGENT",
+        color: "text-rose-400 border-rose-400/30 bg-rose-400/10",
+        icon: Users,
+      },
+    ],
+  },
+  customer: {
+    label: "Customer & Handoff",
+    roles: [
+      {
+        label: "Customer Demo",
+        roleTitle: "Rajat Sharma (Customer)",
+        email: "customer@darkops.com",
+        description: "Customer complaint submission & order tracking portal",
+        badge: "CUSTOMER",
+        color: "text-sky-400 border-sky-400/30 bg-sky-400/10",
+        icon: Users,
+      },
+    ],
+  },
+};
 
 function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -35,7 +149,18 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [activeDemoCategory, setActiveDemoCategory] = useState<string>("management");
+  const [showDemoDrawer, setShowDemoDrawer] = useState(true);
+
+  // Read message or error passed via query string (e.g., from failed handoff verification)
+  const initialError =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("message") ||
+        new URLSearchParams(window.location.search).get("error") ||
+        null
+      : null;
+
+  const [error, setError] = useState<string | null>(initialError);
   const router = useRouter();
   const navigate = useNavigate();
 
@@ -68,9 +193,7 @@ function LoginPage() {
         return;
       }
 
-      // Clear React Query cache to prevent stale data from previous sessions
       queryClient.clear();
-
       await router.invalidate();
 
       const {
@@ -83,7 +206,6 @@ function LoginPage() {
         .single();
 
       const role = (profile as any)?.role as string | undefined;
-      console.log("[Login] User role:", role, "for email:", email);
 
       let redirectPath = "/executive";
       if (role === "CUSTOMER") redirectPath = "/customer";
@@ -91,12 +213,10 @@ function LoginPage() {
       else if (role === "CUSTOMER_SUPPORT") redirectPath = "/support";
       else if (role === "OPERATIONS") redirectPath = "/operations";
       else if (role === "PLATFORM_ADMIN") redirectPath = "/admin";
-      else if (role === "ADMIN")
-        redirectPath = "/admin"; // Fallback for old role name
+      else if (role === "ADMIN") redirectPath = "/admin";
       else if (role === "OPERATIONS_MANAGER" || role === "OPERATIONS_AGENT")
-        redirectPath = "/operations"; // Fallback for old role names
+        redirectPath = "/operations";
 
-      console.log("[Login] Redirecting to:", redirectPath);
       navigate({ to: redirectPath });
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -143,7 +263,6 @@ function LoginPage() {
       }
 
       if (authData.user) {
-        // Create profile entry
         const { error: profileError } = await (supabase.from("profiles") as any).insert([
           {
             id: authData.user.id,
@@ -176,87 +295,151 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Theme toggle — fixed top-right for accessibility */}
+    <div className="flex min-h-screen bg-background font-sans antialiased text-foreground">
+      {/* Theme toggle - fixed top-right */}
       <div className="fixed top-4 right-4 z-50">
         <ThemeToggle />
       </div>
-      {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:flex-col lg:w-[440px] xl:w-[520px] border-r border-border bg-surface p-12">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-[5px] bg-primary/15">
-            <span className="size-3 rounded-[3px] bg-primary" />
-          </span>
-          <span className="text-[16px] font-semibold tracking-tight">
-            Dark<span className="text-primary">Ops</span>
-          </span>
-        </div>
 
-        <div className="mt-auto">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Operational Intelligence Platform
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground leading-snug">
-            Monitor. Resolve.
-            <br />
-            Decide. At scale.
-          </h1>
-          <p className="mt-4 text-sm text-muted-foreground leading-relaxed max-w-xs">
-            Real-time visibility into dark-store health, case operations, fraud risk, and executive
-            network analytics - in one command center.
-          </p>
+      {/* Left Panel - Customer-Safe Platform Overview & Assurance */}
+      <div className="hidden lg:flex lg:flex-col lg:w-[480px] xl:w-[540px] border-r border-border bg-gradient-to-b from-surface via-background to-surface p-10 justify-between relative overflow-hidden">
+        {/* Ambient Background Accents */}
+        <div className="absolute -top-24 -left-24 size-80 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 size-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
-          <div className="mt-10 space-y-4">
-            {[
-              { metric: "14", desc: "Dark stores monitored across Bengaluru metro" },
-              { metric: "< 2s", desc: "Average PulseScore update latency" },
-              { metric: "74/100", desc: "Current network PulseScore" },
-            ].map((kpi) => (
-              <div key={kpi.metric} className="flex items-baseline gap-3">
-                <span className="num text-2xl font-semibold text-primary">{kpi.metric}</span>
-                <span className="text-xs text-muted-foreground">{kpi.desc}</span>
-              </div>
-            ))}
+        {/* Top Header & Brand */}
+        <div className="relative z-10 space-y-6">
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2.5 group">
+              <span className="flex size-8 items-center justify-center rounded-md bg-primary/15 border border-primary/30 group-hover:scale-105 transition-transform">
+                <span className="size-3.5 rounded-[3px] bg-primary" />
+              </span>
+              <span className="text-lg font-bold tracking-tight text-foreground">
+                Dark<span className="text-primary">Ops</span>
+              </span>
+            </Link>
+
+            <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-500">
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>SYSTEM STATUS · ALL OPERATIONAL</span>
+            </div>
+          </div>
+
+          <div className="pt-4 space-y-2">
+            <span className="text-[11px] font-bold tracking-widest text-primary uppercase">
+              Resolution Care & Operations Platform
+            </span>
+            <h1 className="text-3xl font-extrabold tracking-tight leading-snug text-foreground">
+              Monitor. Resolve.
+              <br />
+              <span className="text-primary">Decide. At scale.</span>
+            </h1>
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-md pt-1">
+              DarkOps powers seamless resolution care for customers and end-to-end operational coordination across the delivery network.
+            </p>
           </div>
         </div>
 
-        <div className="mt-auto pt-12 text-xs text-muted-foreground">Deloitte Capstone · 2026</div>
+        {/* Middle Platform Assurance Pillars (Customer-Safe) */}
+        <div className="relative z-10 my-6 space-y-3">
+          <div className="rounded-xl border border-border bg-surface/80 backdrop-blur p-4 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between text-xs border-b border-border/60 pb-2.5 font-semibold text-foreground">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="size-4 text-primary" />
+                <span>Service Assurance Commitments</span>
+              </span>
+              <span className="text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                24/7 Care
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 text-xs">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
+                  <Clock className="size-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">Instant Issue Triage</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Order issues are automatically routed to resolution specialists with real-time SLA tracking.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 text-xs">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
+                  <CheckCircle2 className="size-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">Fair & Transparent Resolutions</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Instant refunds, replacements, or agent reviews calculated with automated eligibility rules.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 text-xs">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                  <Lock className="size-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">Enterprise Data Privacy</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Strict role-based access control, customer data isolation, and encrypted transaction security.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="relative z-10 flex items-center justify-between text-xs text-muted-foreground border-t border-border/70 pt-4">
+          <span>Deloitte Capstone · 2026</span>
+          <span className="flex items-center gap-1 font-medium text-foreground">
+            <Lock className="size-3.5 text-primary" />
+            <span>256-bit Encrypted</span>
+          </span>
+        </div>
       </div>
 
-      {/* Right panel - login form */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
-        {/* Mobile logo */}
-        <div className="flex items-center gap-2 mb-10 lg:hidden">
-          <span className="flex size-7 items-center justify-center rounded-[5px] bg-primary/15">
+      {/* Right Panel - Sign In Form & Fenced Evaluator Demo Access */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 overflow-y-auto">
+        {/* Mobile Header */}
+        <div className="flex items-center gap-2 mb-8 lg:hidden">
+          <span className="flex size-7 items-center justify-center rounded-md bg-primary/15">
             <span className="size-3 rounded-[3px] bg-primary" />
           </span>
-          <span className="text-[16px] font-semibold tracking-tight">
+          <span className="text-base font-bold tracking-tight">
             Dark<span className="text-primary">Ops</span>
           </span>
         </div>
 
-        <div className="w-full max-w-sm">
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-foreground">
-              {isLogin ? "Sign in" : "Create account"}
+        <div className="w-full max-w-md space-y-6">
+          {/* Form Header */}
+          <div className="text-center sm:text-left space-y-1">
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
+              {isLogin ? "Sign in to DarkOps" : "Create an Account"}
             </h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {isLogin
-                ? "Enter your credentials to access the platform."
-                : "Enter your details to create your account."}
+                ? "Enter your account credentials to access your portal."
+                : "Register a new customer account to access DarkOps Care."}
             </p>
           </div>
 
           {error && (
-            <div className="mb-5 rounded-sm border border-crit/40 bg-crit/10 px-4 py-3 text-sm text-crit">
-              {error}
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3.5 py-2.5 text-xs font-medium text-rose-500 flex items-start gap-2">
+              <ShieldAlert className="size-4 shrink-0 mt-0.5" />
+              <p>{error}</p>
             </div>
           )}
 
-          <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
+          {/* Login / Register Form */}
+          <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-3.5">
             {!isLogin && (
-              <div className="space-y-1.5">
-                <label htmlFor="fullName" className="text-xs font-medium text-foreground">
+              <div className="space-y-1">
+                <label htmlFor="fullName" className="text-xs font-semibold text-foreground">
                   Full name
                 </label>
                 <input
@@ -269,15 +452,15 @@ function LoginPage() {
                     setFullName(e.target.value);
                     setError(null);
                   }}
-                  placeholder="John Doe"
-                  className="h-9 w-full rounded-sm border border-border bg-surface px-3 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
+                  placeholder="Rajat Sharma"
+                  className="h-9 w-full rounded-md border border-border bg-surface px-3 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
                   disabled={loading}
                 />
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="text-xs font-medium text-foreground">
+            <div className="space-y-1">
+              <label htmlFor="email" className="text-xs font-semibold text-foreground">
                 Email address
               </label>
               <input
@@ -291,13 +474,13 @@ function LoginPage() {
                   setError(null);
                 }}
                 placeholder="you@darkops.com"
-                className="h-9 w-full rounded-sm border border-border bg-surface px-3 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
+                className="h-9 w-full rounded-md border border-border bg-surface px-3 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
                 disabled={loading}
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="text-xs font-medium text-foreground">
+            <div className="space-y-1">
+              <label htmlFor="password" className="text-xs font-semibold text-foreground">
                 Password
               </label>
               <div className="relative">
@@ -312,7 +495,7 @@ function LoginPage() {
                     setError(null);
                   }}
                   placeholder="••••••••"
-                  className="h-9 w-full rounded-sm border border-border bg-surface px-3 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
+                  className="h-9 w-full rounded-md border border-border bg-surface px-3 pr-10 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
                   disabled={loading}
                 />
                 <button
@@ -328,8 +511,8 @@ function LoginPage() {
             </div>
 
             {!isLogin && (
-              <div className="space-y-1.5">
-                <label htmlFor="confirmPassword" className="text-xs font-medium text-foreground">
+              <div className="space-y-1">
+                <label htmlFor="confirmPassword" className="text-xs font-semibold text-foreground">
                   Confirm password
                 </label>
                 <div className="relative">
@@ -344,7 +527,7 @@ function LoginPage() {
                       setError(null);
                     }}
                     placeholder="••••••••"
-                    className="h-9 w-full rounded-sm border border-border bg-surface px-3 pr-10 text-[13px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
+                    className="h-9 w-full rounded-md border border-border bg-surface px-3 pr-10 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
                     disabled={loading}
                   />
                   <button
@@ -369,7 +552,7 @@ function LoginPage() {
               disabled={
                 loading || !email || !password || (!isLogin && (!fullName || !confirmPassword))
               }
-              className="flex h-9 w-full items-center justify-center gap-2 rounded-sm bg-primary text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
             >
               {loading ? (
                 <>
@@ -384,47 +567,147 @@ function LoginPage() {
             </button>
           </form>
 
-          {/* Toggle between login and register */}
-          <div className="mt-4 text-center">
+          {/* Toggle Login/Register */}
+          <div className="text-center">
             <button
               type="button"
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError(null);
               }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
             >
               {isLogin ? "Don't have an account? Create one" : "Already have an account? Sign in"}
             </button>
           </div>
 
-          {/* Demo access */}
-          <div className="mt-8 rounded-sm border border-border bg-surface">
-            <div className="border-b border-border px-4 py-2.5">
-              <p className="text-xs font-medium text-foreground">Demo access</p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Click a role to populate credentials · password is{" "}
-                <code className="num font-medium text-foreground">password123</code>
-              </p>
-            </div>
-            <div className="divide-y divide-border">
-              {DEMO_ROLES.map((role) => (
-                <button
-                  key={role.email}
-                  type="button"
-                  onClick={() => fillDemo(role.email)}
-                  className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-surface-2 transition-colors text-left"
-                >
-                  <span className={`text-[13px] font-medium ${role.color}`}>{role.label}</span>
-                  <span className="num text-[11px] text-muted-foreground">{role.email}</span>
-                </button>
-              ))}
-            </div>
+          {/* Fenced Capstone Evaluator Access Drawer */}
+          <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
+            <button
+              type="button"
+              onClick={() => setShowDemoDrawer(!showDemoDrawer)}
+              className="w-full border-b border-border bg-surface-2/50 px-4 py-3 flex items-center justify-between hover:bg-surface-2 transition-colors text-left"
+            >
+              <div>
+                <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-amber-500" />
+                  <span>Capstone Evaluator Quick-Access</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Pre-seeded demo credentials for testing platform RBAC roles
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded hidden sm:inline">
+                  password123
+                </span>
+                {showDemoDrawer ? (
+                  <ChevronUp className="size-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                )}
+              </div>
+            </button>
+
+            {showDemoDrawer && (
+              <div className="space-y-0">
+                {/* Category Tabs Header */}
+                <div className="flex border-b border-border bg-surface-3/30 p-1 gap-1 text-xs font-semibold">
+                  {Object.entries(DEMO_CATEGORIES).map(([catKey, cat]) => (
+                    <button
+                      key={catKey}
+                      type="button"
+                      onClick={() => setActiveDemoCategory(catKey)}
+                      className={cn(
+                        "flex-1 py-1.5 px-2 rounded-md text-[11px] transition-all text-center",
+                        activeDemoCategory === catKey
+                          ? "bg-background text-foreground shadow-xs font-bold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+                      )}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Role Buttons for Active Category */}
+                <div className="p-2 space-y-1.5">
+                  {DEMO_CATEGORIES[activeDemoCategory]?.roles.map((role) => {
+                    const IconComponent = role.icon;
+                    const isSelected = email === role.email;
+                    return (
+                      <button
+                        key={role.email}
+                        type="button"
+                        onClick={() => fillDemo(role.email)}
+                        className={cn(
+                          "w-full flex items-start gap-3 p-2.5 rounded-lg border text-left transition-all",
+                          isSelected
+                            ? "border-primary bg-primary/5 shadow-xs"
+                            : "border-border/60 bg-background hover:bg-surface-2/80 hover:border-border",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-xs mt-0.5",
+                            role.color,
+                          )}
+                        >
+                          <IconComponent className="size-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-foreground">{role.label}</span>
+                            <span className={cn("text-[9px] font-bold px-1.5 py-0.2 rounded border", role.color)}>
+                              {role.badge}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground truncate">{role.email}</p>
+                          <p className="text-[10px] text-muted-foreground/80 mt-0.5 line-clamp-1">
+                            {role.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Special Upstream Handoff Action Card */}
+                {activeDemoCategory === "customer" && (
+                  <div className="p-2 pt-0 border-t border-border/60 bg-purple-500/5">
+                    <div className="p-3 rounded-lg border border-purple-500/30 bg-purple-500/10 space-y-2 mt-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-purple-400">
+                        <span className="flex items-center gap-1.5">
+                          <Zap className="size-4 text-amber-400" />
+                          10MinMart Q-Commerce Handoff
+                        </span>
+                        <span className="text-[10px] bg-purple-500/20 px-2 py-0.5 rounded border border-purple-400/30">
+                          HMAC Signed
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Test production upstream customer entry. Issues a signed token from 10MinMart grocery app and logs in automatically.
+                      </p>
+                      <Button
+                        asChild
+                        size="sm"
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold h-8"
+                      >
+                        <Link to="/simulated-upstream/order-confirmation">
+                          <span>Launch 10MinMart Upstream Demo</span>
+                          <ExternalLink className="ml-1.5 size-3.5" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <p className="mt-6 text-center text-[11px] text-muted-foreground">
-            <Link to="/" className="hover:text-foreground transition-colors">
-              ← Back to overview
+          <p className="text-center text-xs text-muted-foreground pt-1">
+            <Link to="/" className="hover:text-foreground transition-colors font-medium">
+              ← Back to Platform Overview
             </Link>
           </p>
         </div>

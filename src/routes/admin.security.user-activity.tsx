@@ -5,7 +5,7 @@ import { Panel, PanelHeader, Chip } from "@/components/ops/primitives";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "@/lib/api";
-import { format } from "date-fns";
+import { formatShortDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/security/user-activity")({
   head: () => ({
@@ -170,7 +170,7 @@ function UserSummaryCard({ user }: { user: any }) {
         </div>
       </div>
       <div className="mt-2 text-xs text-muted-foreground">
-        Last active: {format(new Date(user.last_activity), "dd MMM, HH:mm")}
+        Last active: {formatShortDateTime(user.last_activity)}
       </div>
     </div>
   );
@@ -206,8 +206,8 @@ function ActivityRow({ activity }: { activity: any }) {
           <span>{activity.actor_id?.slice(0, 8)}...</span>
         </div>
       </div>
-      <div className="ml-3 text-xs text-muted-foreground">
-        {format(new Date(activity.created_at), "dd MMM, HH:mm")}
+      <div className="num ml-3 text-xs text-muted-foreground">
+        {formatShortDateTime(activity.occurred_at)}
       </div>
     </div>
   );

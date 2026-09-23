@@ -32,31 +32,10 @@ export const Route = createFileRoute("/")({
     ],
   }),
   component: LandingPage,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any);
 
 /* ─────────────────────────────── Data ─────────────────────────────── */
 
-interface PublicOverview {
-  store_count: number;
-  active_cases: number;
-  avg_pulse: number;
-  pending_fraud: number;
-}
-
-function usePublicOverview() {
-  return useQuery<PublicOverview>({
-    queryKey: ["public-overview"],
-    queryFn: async () => {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-      const res = await fetch(`${apiBase}/api/v1/public/overview`);
-      if (!res.ok) throw new Error("Overview unavailable");
-      return res.json();
-    },
-    retry: 2,
-    staleTime: 60_000,
-  });
-}
 /* ─────────────────────────── Module definitions ───────────────────── */
 
 const MODULES = [
@@ -96,7 +75,7 @@ const MODULES = [
     label: "Fraud",
     tagline: "Risk review, suspicious activity, decisions, and fraud exposure.",
     detail:
-      "AI-assisted fraud review queue with full claim context, confidence scores, and analyst decisioning. Closed audit trail for every decision.",
+      "Rules-based fraud review queue with full claim context, risk indicators, and support decisioning. Closed audit trail for every decision.",
     accent: "var(--crit)",
     accentBg: "var(--crit)",
   },
@@ -498,10 +477,7 @@ function LandingPage() {
       <footer className="lp-footer" role="contentinfo">
         <div className="lp-container lp-footer-inner">
           <span className="lp-footer-copy">DarkOps · Deloitte Capstone 2026</span>
-          <span className="lp-footer-status">
-            <span className="lp-status-dot" aria-hidden="true" />
-            All systems operational
-          </span>
+          <span className="lp-footer-status">Resolution Care &amp; Operations Platform</span>
         </div>
       </footer>
     </div>
