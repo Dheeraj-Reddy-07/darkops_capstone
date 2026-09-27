@@ -191,15 +191,21 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         let profile: any = null;
         try {
           const admin = createSupabaseServiceRoleClient();
-          const { data: realProfile } = await admin
+          const { data: realProfile, error: profileErr } = await admin
             .from("profiles")
             .select("*")
             .eq("email", email)
             .maybeSingle();
+            
+          if (profileErr) {
+            console.error("[AUTH] Failed to fetch real profile for", email, profileErr);
+          }
+            
           if (realProfile && realProfile.id) {
             profile = { ...realProfile, id: realProfile.id, email: realProfile.email || email };
           }
-        } catch {
+        } catch (e) {
+          console.error("[AUTH] Exception fetching real profile for", email, e);
           /* fall back to synthetic mock profile below */
         }
 

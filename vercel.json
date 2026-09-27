@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/:match*", "destination": "https://darkops-capstone.onrender.com/api/:match*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

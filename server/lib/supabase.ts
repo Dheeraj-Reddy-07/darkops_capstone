@@ -1,4 +1,5 @@
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { Request, Response } from "express";
 
 export function createSupabaseServerClient(req: Request, res: Response) {
@@ -2173,12 +2174,10 @@ export function createSupabaseServiceRoleClient() {
     return createMockServiceRoleClient();
   }
 
-  return createServerClient(supabaseUrl, supabaseServiceKey, {
-    cookies: {
-      getAll() {
-        return [];
-      },
-      setAll() {},
-    },
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
   });
 }
