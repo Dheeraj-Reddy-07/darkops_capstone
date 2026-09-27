@@ -281,7 +281,7 @@ async function seed() {
   if (customerErr) console.error("Customers upsert error:", customerErr);
 
   // 6. Orders
-  const FIXED_SEED_EPOCH = new Date("2026-09-10T12:00:00.000Z").getTime();
+  const FIXED_SEED_EPOCH = Date.now();
   const orderRows: any[] = [];
   for (const c of CASES) {
     orderRows.push({
