@@ -4,7 +4,7 @@ import { HTTPError } from "../middleware/errors";
 
 export const getNotifications = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServerClient(req, res);
+    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
 
     const { data, error } = await supabase
@@ -24,7 +24,7 @@ export const getNotifications = async (req: Request, res: Response, next: NextFu
 export const markNotificationRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const supabase = createSupabaseServerClient(req, res);
+    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
 
     const { error } = await supabase
@@ -43,7 +43,7 @@ export const markNotificationRead = async (req: Request, res: Response, next: Ne
 
 export const markAllNotificationsRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServerClient(req, res);
+    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
 
     const { error } = await supabase
@@ -63,7 +63,7 @@ export const markAllNotificationsRead = async (req: Request, res: Response, next
 
 export const getUnreadCount = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServerClient(req, res);
+    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
 
     const { count, error } = await supabase
