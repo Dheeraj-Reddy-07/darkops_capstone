@@ -162,6 +162,31 @@ function resolveServerMockProfile(tokenOrEmail: string) {
 }
 
 /**
+ * Decode a JWT payload without verifying the signature.
+ * Used in fallback/demo mode to extract the email from a real Supabase JWT
+ * when the backend has no Supabase credentials to validate it properly.
+ */
+function decodeJwtEmail(token: string): string | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    // base64url → base64 → JSON
+    const pad = (s: string) => s + "=".repeat((4 - (s.length % 4)) % 4);
+    const json = Buffer.from(pad(parts[1]), "base64").toString("utf8");
+    const payload = JSON.parse(json);
+    // Supabase puts the email in payload.email or payload.user_metadata.email
+    return (
+      payload?.email ||
+      payload?.user_metadata?.email ||
+      payload?.app_metadata?.email ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Enhanced authentication middleware with better error handling and logging
  */
 export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -240,7 +265,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     const isFallbackEnv = !supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("placeholder");
 
-    // Only fallback if there's no auth header, otherwise we must try to validate the token
+    // Fallback env with NO auth header → use a sensible default mock identity.
     if (isFallbackEnv && !authHeader) {
       const isCustomerRoute =
         req.originalUrl.includes("/customers") || req.originalUrl.includes("/report-issue");
@@ -255,6 +280,55 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         user: defaultProfile,
         permissions: getPermissionsForRole(defaultProfile.role as AppRole),
       };
+      return next();
+    }
+
+    // Fallback env WITH a Bearer token that is NOT already a mock-token.
+    // This happens when the frontend has real Supabase credentials and sends a
+    // real JWT, but the backend has no Supabase key to validate it. Decode the
+    // JWT payload (no signature check needed for capstone demo) to extract the
+    // email and resolve the mock profile for that user.
+    if (isFallbackEnv && authHeader && authHeader.startsWith("Bearer ")) {
+      const rawToken = authHeader.split(" ")[1];
+      const emailFromJwt = decodeJwtEmail(rawToken);
+      const profileEmail = emailFromJwt || "exec@darkops.com";
+      const cacheKey = `jwt-fallback-${profileEmail}`;
+
+      const cached = tokenAuthCache.get(cacheKey);
+      if (cached && Date.now() < cached.expiresAt) {
+        req.auth = {
+          user: cached.user,
+          permissions: getPermissionsForRole(cached.profile.role as AppRole),
+        };
+        return next();
+      }
+
+      // Try to get the real DB profile by email first (best-effort)
+      let fallbackProfile: any = null;
+      try {
+        const admin = createSupabaseServiceRoleClient();
+        const { data: realProfile } = await admin
+          .from("profiles")
+          .select("*")
+          .eq("email", profileEmail)
+          .maybeSingle();
+        if (realProfile?.id) fallbackProfile = realProfile;
+      } catch { /* best-effort */ }
+
+      if (!fallbackProfile) {
+        fallbackProfile = resolveServerMockProfile(profileEmail);
+      }
+
+      const role = fallbackProfile.role as AppRole;
+      req.auth = { user: fallbackProfile, permissions: getPermissionsForRole(role) };
+      tokenAuthCache.set(cacheKey, {
+        user: fallbackProfile,
+        profile: fallbackProfile,
+        expiresAt: Date.now() + 30000,
+      });
+      console.log(
+        `[AUTH_JWT_FALLBACK] Email: ${profileEmail}, Role: ${role}, ProfileID: ${fallbackProfile.id}`,
+      );
       return next();
     }
 
