@@ -15,7 +15,8 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
 import { queryClient } from "@/lib/queryClient";
 import { normalizeRole, getLandingRoute } from "@/lib/auth-utils";
-import { NotificationBell } from "@/components/layout/notification-bell";
+
+import { useNotifications, useUnreadCount, useMarkAsRead } from "@/hooks/useNotifications";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
@@ -93,6 +94,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     hub_city: "",
   });
 
+  // Fetch notifications
+  const { data: notifications } = useNotifications();
+  const { data: unreadCount } = useUnreadCount();
+  const { mutate: markAsRead } = useMarkAsRead();
 
   const normalizedRole = normalizeRole(userProfile?.role);
   const userRole = normalizedRole || userProfile?.role;
@@ -207,7 +212,76 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
 
-            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="relative flex size-8 items-center justify-center rounded-sm border border-border bg-surface text-muted-foreground hover:text-foreground"
+                  aria-label="Notifications"
+                >
+                  <Bell className="size-4" />
+                  {unreadCount && unreadCount > 0 ? (
+                    <span className="num absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  ) : null}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel className="label-caps">Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {notifications && notifications.length > 0 ? (
+                  <div className="flex flex-col max-h-96 overflow-y-auto">
+                    {notifications.slice(0, 10).map((notification: any) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                        onSelect={() => {
+                          if (!notification.is_read) {
+                            markAsRead(notification.id);
+                          }
+                          if (notification.link_type === "complaint") {
+                            navigate({ to: "/cases/$id", params: { id: notification.link_ref } });
+                          } else if (notification.link_type === "support_ticket") {
+                            navigate({
+                              to: "/support/tickets/$id",
+                              params: { id: notification.link_ref },
+                            });
+                          } else if (notification.link_type === "store") {
+                            navigate({
+                              to: "/dark-stores/$id",
+                              params: { id: notification.link_ref },
+                            });
+                          } else if (notification.link_type === "fraud") {
+                            navigate({ to: "/fraud/$id", params: { id: notification.link_ref } });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <span
+                            className={cn(
+                              "size-2 rounded-full shrink-0",
+                              !notification.is_read ? "bg-primary" : "bg-transparent",
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              "text-xs truncate",
+                              !notification.is_read ? "font-medium" : "text-muted-foreground",
+                            )}
+                          >
+                            {notification.title}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-[13px] text-muted-foreground">
+                    No new notifications
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

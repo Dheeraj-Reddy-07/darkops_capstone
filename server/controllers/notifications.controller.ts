@@ -1,26 +1,21 @@
 import { Request, Response, NextFunction } from "express";
-import { createSupabaseServiceRoleClient } from "../lib/supabase";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "../lib/supabase";
 import { HTTPError } from "../middleware/errors";
 
 export const getNotifications = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const adminClient = createSupabaseServiceRoleClient();
+    const supabase = createSupabaseServerClient(req, res);
     const auth = (req as any).auth;
 
-    if (!auth?.user?.id) {
-      return res.status(200).json({ data: [] });
-    }
-
-    const { data, error } = await adminClient
+    const { data, error } = await supabase
       .from("notifications")
       .select("*")
       .eq("recipient_id", auth.user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .order("created_at", { ascending: false });
 
     if (error) throw new HTTPError(500, "DATABASE_ERROR", `Database error: ${error.message}`);
 
-    res.status(200).json({ data: data || [] });
+    res.status(200).json({ data });
   } catch (error) {
     next(error);
   }
@@ -29,14 +24,10 @@ export const getNotifications = async (req: Request, res: Response, next: NextFu
 export const markNotificationRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const adminClient = createSupabaseServiceRoleClient();
+    const supabase = createSupabaseServerClient(req, res);
     const auth = (req as any).auth;
 
-    if (!auth?.user?.id) {
-      throw new HTTPError(401, "UNAUTHORIZED", "User context missing");
-    }
-
-    const { error } = await adminClient
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("id", id)
@@ -52,18 +43,14 @@ export const markNotificationRead = async (req: Request, res: Response, next: Ne
 
 export const markAllNotificationsRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const adminClient = createSupabaseServiceRoleClient();
+    const supabase = createSupabaseServerClient(req, res);
     const auth = (req as any).auth;
 
-    if (!auth?.user?.id) {
-      throw new HTTPError(401, "UNAUTHORIZED", "User context missing");
-    }
-
-    const { error } = await adminClient
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("recipient_id", auth.user.id)
-      .eq("is_read", false);
+      .is("is_read", false);
 
     if (error)
       throw new HTTPError(500, "UPDATE_FAILED", "Failed to mark all notifications as read");
@@ -76,68 +63,18 @@ export const markAllNotificationsRead = async (req: Request, res: Response, next
 
 export const getUnreadCount = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const adminClient = createSupabaseServiceRoleClient();
+    const supabase = createSupabaseServerClient(req, res);
     const auth = (req as any).auth;
 
-    if (!auth?.user?.id) {
-      return res.status(200).json({ count: 0 });
-    }
-
-    const { count, error } = await adminClient
+    const { count, error } = await supabase
       .from("notifications")
       .select("*", { count: "exact", head: true })
       .eq("recipient_id", auth.user.id)
-      .eq("is_read", false);
+      .is("is_read", false);
 
     if (error) throw new HTTPError(500, "DATABASE_ERROR", `Database error: ${error.message}`);
 
     res.status(200).json({ count: count || 0 });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const deleteNotification = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { id } = req.params;
-    const adminClient = createSupabaseServiceRoleClient();
-    const auth = (req as any).auth;
-
-    if (!auth?.user?.id) {
-      throw new HTTPError(401, "UNAUTHORIZED", "User context missing");
-    }
-
-    const { error } = await adminClient
-      .from("notifications")
-      .delete()
-      .eq("id", id)
-      .eq("recipient_id", auth.user.id);
-
-    if (error) throw new HTTPError(500, "DELETE_FAILED", `Failed to delete notification: ${error.message}`);
-
-    res.status(200).json({ success: true, message: "Notification deleted" });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const clearAllNotifications = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const adminClient = createSupabaseServiceRoleClient();
-    const auth = (req as any).auth;
-
-    if (!auth?.user?.id) {
-      throw new HTTPError(401, "UNAUTHORIZED", "User context missing");
-    }
-
-    const { error } = await adminClient
-      .from("notifications")
-      .delete()
-      .eq("recipient_id", auth.user.id);
-
-    if (error) throw new HTTPError(500, "DELETE_FAILED", `Failed to clear notifications: ${error.message}`);
-
-    res.status(200).json({ success: true, message: "All notifications cleared" });
   } catch (error) {
     next(error);
   }
