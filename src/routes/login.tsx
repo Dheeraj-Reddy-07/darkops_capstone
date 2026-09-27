@@ -209,7 +209,7 @@ function LoginPage() {
 
       let redirectPath = "/executive";
       if (role === "CUSTOMER") redirectPath = "/customer";
-      else if (role === "STORE_MANAGER") redirectPath = "/dark-stores";
+      else if (role === "STORE_MANAGER") redirectPath = `/dark-stores/${(profile as any)?.store_id || 'DS-1462'}`;
       else if (role === "CUSTOMER_SUPPORT") redirectPath = "/support";
       else if (role === "OPERATIONS") redirectPath = "/operations";
       else if (role === "PLATFORM_ADMIN") redirectPath = "/admin";

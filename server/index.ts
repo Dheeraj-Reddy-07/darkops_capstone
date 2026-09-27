@@ -47,7 +47,7 @@ const allowedOrigins = (
   .filter(Boolean);
 
 // Always allow the production Netlify frontend
-const PRODUCTION_ORIGINS = ["https://darkops.netlify.app"];
+const PRODUCTION_ORIGINS = ["https://darkops.netlify.app", "https://darkops-capstone.vercel.app"];
 PRODUCTION_ORIGINS.forEach((o) => {
   if (!allowedOrigins.includes(o)) allowedOrigins.push(o);
 });

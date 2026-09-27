@@ -240,7 +240,8 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     const isFallbackEnv = !supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("placeholder");
 
-    if (isFallbackEnv) {
+    // Only fallback if there's no auth header, otherwise we must try to validate the token
+    if (isFallbackEnv && !authHeader) {
       const isCustomerRoute =
         req.originalUrl.includes("/customers") || req.originalUrl.includes("/report-issue");
       const isSupportRoute = req.originalUrl.includes("/support");

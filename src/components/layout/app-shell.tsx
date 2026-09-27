@@ -101,10 +101,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const normalizedRole = normalizeRole(userProfile?.role);
   const userRole = normalizedRole || userProfile?.role;
-  const navItems = userRole ? NAV_BY_ROLE[userRole] || [] : isLoading ? [] : [];
+  let navItems = userRole ? NAV_BY_ROLE[userRole] || [] : isLoading ? [] : [];
 
   // Use canonical landing route from auth-utils
-  const defaultPath = getLandingRoute(userRole) || "/executive";
+  let defaultPath = getLandingRoute(userRole) || "/executive";
+
+  if (userRole === "STORE_MANAGER") {
+    const storePath = `/dark-stores/${userProfile?.store_id || 'DS-1462'}`;
+    defaultPath = storePath;
+    navItems = navItems.map((item) =>
+      item.to === "/dark-stores" ? { ...item, to: storePath } : item
+    );
+  }
 
   // Workspace label shown in the navbar (role-contextual)
   const workspaceLabel =
