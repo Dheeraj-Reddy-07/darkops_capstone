@@ -1,11 +1,23 @@
 import { Request, Response, NextFunction } from "express";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "../lib/supabase";
+import { createSupabaseServiceRoleClient } from "../lib/supabase";
 import { HTTPError } from "../middleware/errors";
+
+/** Returns true only for valid RFC-4122 UUIDs that Postgres will accept. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(id: string | undefined | null): boolean {
+  return !!id && UUID_RE.test(id);
+}
 
 export const getNotifications = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
+    // Mock/fallback user IDs (e.g. "usr-exec-001") are not valid UUIDs and
+    // will cause a Postgres error. Return empty data safely instead.
+    if (!isValidUUID(auth?.user?.id)) {
+      return res.status(200).json({ data: [] });
+    }
+
+    const supabase = createSupabaseServiceRoleClient();
 
     const { data, error } = await supabase
       .from("notifications")
@@ -24,8 +36,12 @@ export const getNotifications = async (req: Request, res: Response, next: NextFu
 export const markNotificationRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
+    if (!isValidUUID(auth?.user?.id)) {
+      return res.status(200).json({ success: true });
+    }
+
+    const supabase = createSupabaseServiceRoleClient();
 
     const { error } = await supabase
       .from("notifications")
@@ -43,8 +59,12 @@ export const markNotificationRead = async (req: Request, res: Response, next: Ne
 
 export const markAllNotificationsRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
+    if (!isValidUUID(auth?.user?.id)) {
+      return res.status(200).json({ success: true });
+    }
+
+    const supabase = createSupabaseServiceRoleClient();
 
     const { error } = await supabase
       .from("notifications")
@@ -63,8 +83,12 @@ export const markAllNotificationsRead = async (req: Request, res: Response, next
 
 export const getUnreadCount = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const supabase = createSupabaseServiceRoleClient();
     const auth = (req as any).auth;
+    if (!isValidUUID(auth?.user?.id)) {
+      return res.status(200).json({ count: 0 });
+    }
+
+    const supabase = createSupabaseServiceRoleClient();
 
     const { count, error } = await supabase
       .from("notifications")

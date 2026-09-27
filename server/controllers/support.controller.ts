@@ -5,6 +5,12 @@ import { HTTPError } from "../middleware/errors";
 import { createExecutionHandoff, dispatchHandoff } from "../services/handoff.service";
 import { autoAssignSupportAgent } from "../services/automation.service";
 
+/** Returns true only for valid RFC-4122 UUIDs that Postgres will accept. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(id: string | undefined | null): boolean {
+  return !!id && UUID_RE.test(id);
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Compute SLA state from deadline timestamp */
@@ -62,12 +68,14 @@ export const getMyStats = async (req: Request, res: Response, next: NextFunction
   try {
     const auth = (req as any).auth;
     requireSupportRole(auth);
-    // Use the service-role client with in-code scoping (requireSupportRole +
-    // per-user assigned_to filters). Support sessions use mock tokens, which the
-    // RLS client cannot validate as JWTs; this matches the pattern used across
-    // the rest of the controllers and works for both mock and real sessions.
     const supabase = createSupabaseServiceRoleClient();
     const agentId = auth.user.id;
+
+    // Non-UUID IDs (e.g. mock fallback "usr-supp-001") will cause a Postgres
+    // "invalid input syntax for type uuid" error. Return safe zero-stats instead.
+    if (!isValidUUID(agentId)) {
+      return res.json({ my_open: 0, urgent: 0, sla_at_risk: 0, overdue: 0 });
+    }
 
     const { data: tickets, error } = await supabase
       .from("support_tickets")
@@ -109,12 +117,13 @@ export const getMyTickets = async (req: Request, res: Response, next: NextFuncti
   try {
     const auth = (req as any).auth;
     requireSupportRole(auth);
-    // Use the service-role client with in-code scoping (requireSupportRole +
-    // per-user assigned_to filters). Support sessions use mock tokens, which the
-    // RLS client cannot validate as JWTs; this matches the pattern used across
-    // the rest of the controllers and works for both mock and real sessions.
     const supabase = createSupabaseServiceRoleClient();
     const { status, priority, queue, q } = req.query;
+
+    // Non-UUID IDs cause Postgres errors on UUID columns. Return empty list safely.
+    if (!isValidUUID(auth.user.id)) {
+      return res.json({ data: [] });
+    }
 
     let query = supabase
       .from("support_tickets")
@@ -129,11 +138,8 @@ export const getMyTickets = async (req: Request, res: Response, next: NextFuncti
       .order("created_at", { ascending: false });
 
     if (status && status !== "all") {
-      // Honor an explicit status filter (e.g. viewing resolved from this tab)
       query = query.eq("status", String(status));
     } else {
-      // Default "My Tickets" view is the active queue only.
-      // Resolved/closed tickets belong in the "Resolved History" tab.
       query = query.neq("status", "resolved").neq("status", "closed");
     }
     if (priority && priority !== "all") query = query.eq("priority", String(priority));
@@ -279,11 +285,12 @@ export const getMyResolvedTickets = async (req: Request, res: Response, next: Ne
   try {
     const auth = (req as any).auth;
     requireSupportRole(auth);
-    // Use the service-role client with in-code scoping (requireSupportRole +
-    // per-user assigned_to filters). Support sessions use mock tokens, which the
-    // RLS client cannot validate as JWTs; this matches the pattern used across
-    // the rest of the controllers and works for both mock and real sessions.
     const supabase = createSupabaseServiceRoleClient();
+
+    // Non-UUID IDs cause Postgres errors on UUID columns. Return empty list safely.
+    if (!isValidUUID(auth.user.id)) {
+      return res.json({ data: [] });
+    }
 
     const { data, error } = await supabase
       .from("support_tickets")
