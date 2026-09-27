@@ -434,7 +434,8 @@ export async function autoAssignSupportAgent(_queue?: string): Promise<string | 
           .from("support_tickets")
           .select("*", { count: "exact", head: true })
           .eq("assigned_to", agent.id)
-          .not("status", "in", ["resolved", "closed"]);
+          .neq("status", "resolved")
+          .neq("status", "closed");
 
         return {
           agentId: agent.id,
