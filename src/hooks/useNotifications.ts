@@ -61,3 +61,31 @@ export function useMarkAllAsRead() {
     },
   });
 }
+
+export function useDeleteNotification() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await fetchApi(`/notifications/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+  });
+}
+
+export function useClearAllNotifications() {
+  return useMutation({
+    mutationFn: async () => {
+      return await fetchApi("/notifications/clear-all", {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
+    },
+  });
+}
