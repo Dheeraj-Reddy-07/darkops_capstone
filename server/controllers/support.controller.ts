@@ -73,7 +73,7 @@ export const getMyStats = async (req: Request, res: Response, next: NextFunction
       .from("support_tickets")
       .select("id, status, priority, sla_deadline")
       .eq("assigned_to", agentId)
-      .not("status", "in", '("resolved","closed")');
+      .not("status", "in", ["resolved", "closed"]);
 
     if (error) throw new HTTPError(500, "DATABASE_ERROR", error.message);
 
@@ -133,7 +133,7 @@ export const getMyTickets = async (req: Request, res: Response, next: NextFuncti
     } else {
       // Default "My Tickets" view is the active queue only.
       // Resolved/closed tickets belong in the "Resolved History" tab.
-      query = query.not("status", "in", '("resolved","closed")');
+      query = query.not("status", "in", ["resolved", "closed"]);
     }
     if (priority && priority !== "all") query = query.eq("priority", String(priority));
     if (queue && queue !== "all") query = query.eq("queue", String(queue));
