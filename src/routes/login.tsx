@@ -171,12 +171,74 @@ function LoginPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+
+      // The known demo emails that may not exist as real Supabase Auth accounts.
+      // When a real Supabase project is configured but these demo accounts haven't
+      // been created there, signInWithPassword will fail. We fall back to a mock
+      // session so the backend mock-token path handles auth correctly.
+      const DEMO_EMAILS = new Set([
+        "admin@darkops.com",
+        "exec@darkops.com",
+        "manager@darkops.com",
+        "support@darkops.com",
+        "agent.a@darkops.com",
+        "agent.b@darkops.com",
+        "storemanager@darkops.com",
+        "customer@darkops.com",
+        "normal@darkops.com",
+        "suspicious@darkops.com",
+        "sla@darkops.com",
+        "fraud@darkops.com",
+        "operations@darkops.com",
+      ]);
+
+      const trimmedEmail = email.trim().toLowerCase();
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
         password,
       });
 
       if (authError) {
+        // If this is a known demo account and the password matches the demo password,
+        // fall back to a mock session so the backend's mock-token path handles auth.
+        if (DEMO_EMAILS.has(trimmedEmail) && password === "password123") {
+          const { getMockProfile } = await import("@/lib/supabase/client");
+          const profile = getMockProfile(trimmedEmail);
+          const mockSession = {
+            access_token: `mock-token-${trimmedEmail}`,
+            token_type: "bearer",
+            expires_in: 3600,
+            refresh_token: `mock-refresh-${trimmedEmail}`,
+            user: {
+              id: profile.id,
+              aud: "authenticated",
+              role: "authenticated",
+              email: profile.email,
+              user_metadata: { full_name: profile.full_name },
+              created_at: new Date().toISOString(),
+            },
+          };
+          try {
+            localStorage.setItem("darkops_mock_session", JSON.stringify(mockSession));
+          } catch {
+            /* ignore storage errors */
+          }
+
+          queryClient.clear();
+          await router.invalidate();
+
+          let redirectPath = "/executive";
+          if (profile.role === "CUSTOMER") redirectPath = "/customer";
+          else if (profile.role === "STORE_MANAGER") redirectPath = `/dark-stores/${(profile as any).store_id || "DS-1462"}`;
+          else if (profile.role === "CUSTOMER_SUPPORT") redirectPath = "/support";
+          else if (profile.role === "OPERATIONS") redirectPath = "/operations";
+          else if (profile.role === "PLATFORM_ADMIN") redirectPath = "/admin";
+
+          navigate({ to: redirectPath });
+          return;
+        }
+
+        // Real auth error for a non-demo account
         if (authError.message.toLowerCase().includes("invalid")) {
           setError(
             "The email or password you entered is incorrect. Check your credentials and try again.",
@@ -191,6 +253,13 @@ function LoginPage() {
         }
         setLoading(false);
         return;
+      }
+
+      // Real Supabase login succeeded — clear any stale mock session
+      try {
+        localStorage.removeItem("darkops_mock_session");
+      } catch {
+        /* ignore */
       }
 
       queryClient.clear();
@@ -223,6 +292,7 @@ function LoginPage() {
       setLoading(false);
     }
   };
+
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
